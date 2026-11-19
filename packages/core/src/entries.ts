@@ -41,9 +41,29 @@ export type Entry = {
   ms: number;
 };
 
+const scenariosByWorkCache = new WeakMap<Project['scenarios'], { count: number; map: Map<string, Scenario[]> }>();
+
+function scenariosIndex(scenarios: Project['scenarios']): Map<string, Scenario[]> {
+  const keys = Object.keys(scenarios);
+  const cached = scenariosByWorkCache.get(scenarios);
+  if (cached && cached.count === keys.length) return cached.map;
+  const map = new Map<string, Scenario[]>();
+  for (const k of keys) {
+    const s = scenarios[k]!;
+    let list = map.get(s.workId);
+    if (!list) {
+      list = [];
+      map.set(s.workId, list);
+    }
+    list.push(s);
+  }
+  scenariosByWorkCache.set(scenarios, { count: keys.length, map });
+  return map;
+}
+
 /** 某个方案的场景，按声明顺序。 */
 export const scenariosOf = (project: Pick<Project, 'scenarios'>, workId: string | null | undefined): Scenario[] =>
-  workId ? Object.values(project.scenarios).filter((s) => s.workId === workId) : [];
+  workId ? (scenariosIndex(project.scenarios).get(workId) ?? []).slice() : [];
 
 /**
  * 连续播放的顺序（D92 U2 / R9；看板、发布站、嵌入与录制 --chain 共用）：按声明顺序取不接力的场景（根），每个根之后
@@ -76,6 +96,14 @@ export function rolesOf(project: Pick<Project, 'works' | 'features'>, workId: st
 /** 切片键只在此处由已知 workId 的长度计算；不拆 ID 推断归属。 */
 export const sliceKey = (scenario: Pick<Scenario, 'id' | 'workId'>): string => scenario.id.slice(scenario.workId.length + 1);
 
+type CachedEntry = {
+  pick: string | null | undefined;
+  workId: string | null;
+  scenarioCount: number;
+  entry: Entry | null;
+};
+const entryCache = new WeakMap<Project, Map<string, CachedEntry>>();
+
 /** 一个首页条目的投影。 */
 export function entryOf(project: Project, id: string | null | undefined): Entry | null {
   if (!id) return null;
@@ -83,10 +111,20 @@ export function entryOf(project: Project, id: string | null | undefined): Entry 
   const w = project.works[id];
   if (!f && (!w || w.featureId)) return null;
   const workId = f ? (f.pick && project.works[f.pick] ? f.pick : f.workIds.find(id => project.works[id])) ?? null : id;
+  const workScenarios = workId ? (scenariosIndex(project.scenarios).get(workId) ?? []) : [];
+  let byId = entryCache.get(project);
+  if (!byId) {
+    byId = new Map();
+    entryCache.set(project, byId);
+  }
+  const hit = byId.get(id);
+  if (hit && hit.pick === f?.pick && hit.workId === workId && hit.scenarioCount === workScenarios.length) {
+    return hit.entry;
+  }
   const active = workId ? project.works[workId] : undefined;
   const sequence = playSequence(project, workId);
   const inSequence = new Set(sequence.map((s) => s.id));
-  const ordered = [...sequence, ...scenariosOf(project, workId).filter((s) => !inSequence.has(s.id))];
+  const ordered = [...sequence, ...workScenarios.filter((s) => !inSequence.has(s.id))];
   const slices = ordered.map((s): EntrySlice => ({
     id: s.id,
     key: sliceKey(s),
@@ -97,7 +135,7 @@ export function entryOf(project: Project, id: string | null | undefined): Entry 
     inSequence: inSequence.has(s.id),
   }));
   const roles = (f ? f.roles : rolesOf(project, workId)).map((r) => r.name.trim()).filter(Boolean);
-  return {
+  const entry: Entry = {
     id,
     featureId: f?.id ?? null,
     sequencing: active?.sequencing ?? 'independent',
@@ -110,9 +148,28 @@ export function entryOf(project: Project, id: string | null | undefined): Entry 
     slices,
     ms: slices.reduce((sum, s) => sum + (s.inSequence ? s.ms : 0), 0),
   };
+  byId.set(id, { pick: f?.pick, workId, scenarioCount: workScenarios.length, entry });
+  return entry;
 }
+
+const entriesListCache = new WeakMap<Project, { count: number; items: Entry[] }>();
 
 /** 项目里的全部作品，按演示顺序（entryIds）。首页的卡片、看板顶栏的下拉、outline 都从这里取。 */
 export function entriesOf(project: Project): Entry[] {
-  return project.entryIds.map(id => entryOf(project, id)!).filter(Boolean);
+  const cached = entriesListCache.get(project);
+  if (cached && cached.count === project.entryIds.length) {
+    let valid = true;
+    for (let i = 0; i < project.entryIds.length; i++) {
+      const id = project.entryIds[i]!;
+      const cur = entryOf(project, id);
+      if (cur !== cached.items[i]) {
+        valid = false;
+        break;
+      }
+    }
+    if (valid) return cached.items;
+  }
+  const items = project.entryIds.map(id => entryOf(project, id)!).filter(Boolean);
+  entriesListCache.set(project, { count: project.entryIds.length, items });
+  return items;
 }

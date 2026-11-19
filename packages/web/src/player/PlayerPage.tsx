@@ -195,7 +195,7 @@ function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; widt
         {...tip}
         style={cur ? { width } : undefined}
         className={cn(
-          'j-timeline-chip jb-focus relative flex h-[30px] items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[9px] font-jb-mono text-[11px] font-bold transition-[background-color,color,box-shadow,transform] duration-150 active:scale-[0.97]',
+          'j-timeline-chip jb-focus relative flex h-[30px] items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[9px] font-jb-mono text-[11px] font-bold transition-[background-color,color,transform] duration-100 active:scale-[0.97]',
           cur
             ? 'justify-start bg-[color-mix(in_srgb,var(--jb-accent)_30%,var(--jb-bg-surface))] px-2 text-jb-fg shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--jb-accent-press)_32%,transparent),0_1px_3px_rgba(24,22,18,0.06)] hover:bg-[color-mix(in_srgb,var(--jb-accent)_42%,var(--jb-bg-surface))] hover:text-jb-fg'
             : 'min-w-[32px] justify-center px-1.5',

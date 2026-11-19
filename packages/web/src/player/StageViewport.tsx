@@ -17,7 +17,7 @@ import { CAMERA_EASE, CAMERA_MS } from '../runtime/pace';
 import { ThemeContext, type StageTheme, type StrokeMode } from '../renderer/rough';
 import { fillStage, fitStage, videoStage } from './fit';
 import { Ban, CircleArrowRight, CircleCheck, CircleDashed, CircleX, Info, X } from 'lucide-react';
-import { Button, IconButton } from '@tokenroll/juice/primitives';
+import { JBtn, JIconBtn } from '@/lib/juice';
 import { cn } from '@/lib/utils';
 import { noticeView, type NoticeView } from './states';
 
@@ -112,12 +112,12 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
             {view.text}
           </span>
           {view.back ? (
-            <Button variant="primary" size="xs" className="shrink-0" onClick={onBack ?? onDismiss} data-testid="notice-back">
-              {i18n.player.backToDemo}</Button>
+            <JBtn variant="primary" size="xs" className="shrink-0" onClick={onBack ?? onDismiss} data-testid="notice-back">
+              {i18n.player.backToDemo}</JBtn>
           ) : null}
-          <IconButton variant="ghost" size="xs" label={i18n.player.dismissNotice} onClick={onDismiss}>
+          <JIconBtn variant="ghost" size="xs" label={i18n.player.dismissNotice} onClick={onDismiss}>
             <X className="size-3.5" />
-          </IconButton>
+          </JIconBtn>
         </div>
       ) : null}
       <div className="absolute inset-0 flex items-center justify-center" inert={curtainUp || undefined}>

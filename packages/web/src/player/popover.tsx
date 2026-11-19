@@ -116,6 +116,8 @@ export type PopoverProps = {
   onMouseLeave?: () => void;
 };
 
+const EMPTY_IGNORE: readonly (HTMLElement | null)[] = [];
+
 /** 同心浮层表面（直接基于 @tokenroll/juice v0.2.0 FloatingPopover）。 */
 export function Popover({
   open,
@@ -129,15 +131,18 @@ export function Popover({
   label,
   testid,
   autoFocus = false,
-  ignore = [],
+  ignore = EMPTY_IGNORE as (HTMLElement | null)[],
   onKeyDown,
   onMouseEnter,
   onMouseLeave,
 }: PopoverProps) {
+  const everOpened = useRef(false);
+  if (open) everOpened.current = true;
   const ignoreRefs = useMemo<ReadonlyArray<RefObject<HTMLElement | null>>>(
-    () => ignore.map((current) => ({ current })),
+    () => (ignore.length ? ignore.map((current) => ({ current })) : []),
     [ignore],
   );
+  if (!open && !everOpened.current) return null;
   const inDark = Boolean(anchor?.closest('.jb-dark'));
   return (
     <FloatingPopover

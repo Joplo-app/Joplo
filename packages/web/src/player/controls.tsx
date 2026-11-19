@@ -1,20 +1,20 @@
 import { useI18n } from '../i18n/context';
 /**
  * 看板控件原语（基于 @tokenroll/juice v0.2.0 primitives 构建，继承看板 Token --jb-*）：
- * - 按钮（Juice Button + 程序化触觉音效）、快捷键（Juice Kbd）、分段控件（.j-seg / .j-seg-btn）、下拉菜单（.j-menu-list / .j-menu-item + Juice Separator）、开关（Juice Switch v0.2.0）。
+ * - 按钮（Juice 触觉按钮 + 程序化触觉音效）、快捷键（Juice Kbd）、分段控件（.j-seg / .j-seg-btn）、下拉菜单（.j-menu-list / .j-menu-item + Juice Separator）、开关（Juice Switch v0.2.0）。
  * - 剥离生硬 1.5px 黑线框，统一使用同心圆角、微妙色阶对比与弹簧按压反馈。
  * - 文字一律不换行（whitespace-nowrap）；收起成图标的按钮，悬停提示里写全称和快捷键（useTip）。
  */
 import { useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Check, ChevronDown, Clapperboard, Ellipsis } from 'lucide-react';
 import {
-  Button as JuiceButton,
   Kbd as JuiceKbd,
   Separator as JuiceSeparator,
   Switch as JuiceSwitch,
   playJuiceSound,
   type JuiceSoundName,
 } from '@tokenroll/juice/primitives';
+import { JBtn } from '@/lib/juice';
 import { cn } from '@/lib/utils';
 import { Popover, useTip } from './popover';
 import type { Placement } from './popover-place';
@@ -48,7 +48,7 @@ const JUICE_VARIANT: Record<BtnVariant, 'primary' | 'secondary' | 'ghost'> = {
   ghost: 'ghost',
 };
 
-const base = 'jb-focus shrink-0 gap-1.5 whitespace-nowrap rounded-[10px] font-jb text-[13px] font-medium leading-none transition-[transform,background-color,box-shadow,color] duration-150 active:scale-[0.96] disabled:pointer-events-none';
+const base = 'jb-focus shrink-0 gap-1.5 whitespace-nowrap rounded-[10px] font-jb text-[13px] font-medium leading-none transition-[transform,background-color,color] duration-100 active:scale-[0.96] disabled:pointer-events-none';
 const VARIANT: Record<BtnVariant, { off: string; on: string }> = {
   default: {
     off: 'bg-[var(--juice-w6)] text-jb-fg hover:bg-[var(--juice-w12)] active:bg-jb-press',
@@ -98,7 +98,7 @@ type BtnProps = {
   ref?: Ref<HTMLButtonElement>;
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'title'>;
 
-/** 按钮（封装 Juice Button v0.2.0）：icon + 文字；iconOnly 时只有图标，文字作为悬停提示与无障碍标签。children 放在文字后面。 */
+/** 按钮（封装 Juice v0.2.0 触觉按钮）：icon + 文字；iconOnly 时只有图标，文字作为悬停提示与无障碍标签。children 放在文字后面。 */
 export function Btn({ icon, label, iconOnly = false, iconAfter = false, size = 32, variant = 'default', selected, title, kbd, tipPlacement, sound, className, children, ref, ...rest }: BtnProps) {
   const tipText = title ?? (iconOnly ? label : null);
   const [tip, tipNode] = useTip(tipText || kbd ? <TipText text={tipText ?? label} kbd={kbd} /> : null, { placement: tipPlacement });
@@ -106,7 +106,7 @@ export function Btn({ icon, label, iconOnly = false, iconAfter = false, size = 3
   const call = <E,>(a?: (e: E) => void, b?: (e: E) => void) => (a || b ? (e: E) => (a?.(e), b?.(e)) : undefined);
   return (
     <>
-      <JuiceButton
+      <JBtn
         ref={ref}
         variant={JUICE_VARIANT[variant]}
         size={JUICE_SIZE[size]}
@@ -128,7 +128,7 @@ export function Btn({ icon, label, iconOnly = false, iconAfter = false, size = 3
       >
         <span data-jb-label="" className={cn('min-w-0 truncate', iconOnly && 'hidden')}>{label}</span>
         {children}
-      </JuiceButton>
+      </JBtn>
       {tipNode}
     </>
   );

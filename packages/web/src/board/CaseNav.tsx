@@ -44,7 +44,7 @@ function Letter({ letter, on }: { letter: string; on: boolean }) {
   return (
     <span
       className={cn(
-        'flex size-6 shrink-0 items-center justify-center rounded-[8px] font-jb text-[13px] font-bold transition-[background-color,box-shadow,color] duration-150',
+        'flex size-6 shrink-0 items-center justify-center rounded-[8px] font-jb text-[13px] font-bold transition-[background-color,color] duration-100',
         on
           ? 'bg-jb-accent text-jb-on-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_1px_3px_rgba(180,135,0,0.22)]'
           : 'bg-[var(--juice-w6)] text-jb-muted',
@@ -154,7 +154,7 @@ function CaseRow({ project, featureId, workId, caseId, active, onCase, onWorkCas
   return (
     <li
       className={cn(
-        'flex items-center gap-1.5 rounded-[11px] pr-2 transition-[background-color,box-shadow] duration-150',
+        'flex items-center gap-1.5 rounded-[11px] pr-2 transition-colors duration-100',
         active
           ? 'bg-jb-surface shadow-[0_1px_3px_rgba(24,22,18,0.06),0_0_0_1px_var(--juice-edge)]'
           : 'hover:bg-[color-mix(in_srgb,var(--jb-fg-default)_4.5%,transparent)]',

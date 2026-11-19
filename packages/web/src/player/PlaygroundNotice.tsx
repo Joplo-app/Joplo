@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Button } from '@tokenroll/juice/primitives';
+import { JBtn } from '@/lib/juice';
 import { useI18n } from '../i18n/context';
 import type { DemoController, Snapshot } from '../runtime/demo';
 
@@ -22,9 +22,9 @@ export function PlaygroundNotice({ ctl, snap }: { ctl: DemoController; snap: Sna
   return <div className="flex flex-col gap-2 text-[12px]" data-testid="playground-notice">
     {snap.switchPrompt ? <div ref={prompt} role="dialog" aria-label={t.player.freeSwitchConfirm} className="j-floating-pop jb-pop p-3 text-[13px]" onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ctl.dismissSwitch(); } }}>
       {snap.switchPrompt.some(candidate => snap.project?.scenarios[candidate.scenarioId]?.actionEntry !== 'after') ? <p className="mb-2 text-jb-muted">{t.player.freeSwitchDescription}</p> : null}
-      <div className="flex flex-col gap-1.5">{snap.switchPrompt.map((candidate, index) => <Button key={`${candidate.scenarioId}:${candidate.position}`} variant="primary" size="sm" className="w-full justify-start text-left" onClick={() => ctl.confirmSwitch(index)}>
+      <div className="flex flex-col gap-1.5">{snap.switchPrompt.map((candidate, index) => <JBtn key={`${candidate.scenarioId}:${candidate.position}`} variant="primary" size="sm" className="w-full justify-start text-left" onClick={() => ctl.confirmSwitch(index)}>
         {t.player.freeSwitchPrompt(snap.project?.scenarios[candidate.scenarioId]?.name ?? candidate.scenarioId)} <span className="opacity-70">· {candidate.position + 1}</span>
-      </Button>)}<Button variant="ghost" size="sm" className="w-full justify-center" onClick={() => ctl.dismissSwitch()}>{t.player.freeSwitchCancel}</Button></div>
+      </JBtn>)}<JBtn variant="ghost" size="sm" className="w-full justify-center" onClick={() => ctl.dismissSwitch()}>{t.player.freeSwitchCancel}</JBtn></div>
     </div> : null}
   </div>;
 }

@@ -387,11 +387,9 @@
 
 /* ---------- 看板控件的公共样式（D55 + Juice UI 同心表面）---------- */
 @layer components {
-  /* 顶栏：温润通透表面，微弱发丝底线，取代生硬 1px 分隔墙 */
+  /* 顶栏：温润通透表面，微弱发丝底线，取代生硬 1px 分隔墙（免全宽 backdrop-blur 合成开销） */
   .jb-topbar-surface {
-    background: color-mix(in srgb, var(--jb-bg-surface) 88%, var(--jb-bg-app));
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: color-mix(in srgb, var(--jb-bg-surface) 95%, var(--jb-bg-app));
     box-shadow: 0 1px 0 color-mix(in srgb, var(--jb-fg-default) 7%, transparent);
   }
   /* 左栏：退后半阶的温润纸感轨道，服从于主舞台 */
@@ -405,17 +403,18 @@
   }
   /* 主舞台外框：20px 无重线同心雕塑板（Shed 1.5px black wireframe box） */
   .jb-stage-slab {
+    contain: layout style;
     border-radius: 20px;
     background: var(--jb-bg-surface);
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 8%, transparent),
-      0 18px 44px -16px rgba(24, 22, 18, 0.13),
-      0 2px 8px -2px rgba(24, 22, 18, 0.05);
+      0 14px 36px -14px rgba(24, 22, 18, 0.12),
+      0 2px 6px -2px rgba(24, 22, 18, 0.05);
   }
   .jb-dark .jb-stage-slab {
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 12%, transparent),
-      0 24px 56px -16px rgba(0, 0, 0, 0.62);
+      0 20px 48px -16px rgba(0, 0, 0, 0.58);
   }
   /* 舞台上沿的层级分段槽（12px 外槽 -> 9px 同心胶囊标签） */
   .jb-layer-track {
@@ -427,10 +426,9 @@
     border-radius: 9px;
     color: var(--jb-fg-muted);
     transition:
-      background-color 150ms ease,
-      color 150ms ease,
-      box-shadow 150ms ease,
-      transform 140ms var(--juice-out);
+      background-color 95ms ease,
+      color 95ms ease,
+      transform 95ms var(--juice-out);
   }
   .jb-layer-tab:hover {
     color: var(--jb-fg-default);
@@ -452,23 +450,21 @@
       0 2px 6px rgba(0, 0, 0, 0.36),
       0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 14%, transparent);
   }
-  /* 底部播放坞：18px 同心悬浮雕塑底座（p-1.5 -> 12px 内部主控） */
+  /* 底部播放坞：18px 同心悬浮雕塑底座（p-1.5 -> 12px 内部主控；常规态免 backdrop-blur，仅全屏浮层保留） */
   .jb-dock-slab {
     border-radius: 18px;
-    background: color-mix(in srgb, var(--jb-bg-surface) 94%, var(--jb-bg-app));
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: color-mix(in srgb, var(--jb-bg-surface) 97%, var(--jb-bg-app));
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 7.5%, transparent),
-      0 12px 30px -12px rgba(24, 22, 18, 0.11),
+      0 10px 26px -12px rgba(24, 22, 18, 0.11),
       0 2px 6px -1px rgba(24, 22, 18, 0.04),
       inset 0 1px 0 rgba(255, 255, 255, 0.78);
   }
   .jb-dark .jb-dock-slab,
   .jb-dock-slab.jb-dark {
-    background: color-mix(in srgb, var(--jb-bg-surface) 86%, transparent);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: color-mix(in srgb, var(--jb-bg-surface) 88%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 12%, transparent),
       0 16px 40px -10px rgba(0, 0, 0, 0.56),
@@ -486,9 +482,8 @@
       0 3px 10px -2px rgba(210, 160, 10, 0.38),
       0 1px 2px rgba(24, 22, 18, 0.08);
     transition:
-      transform 140ms var(--juice-out),
-      background-color 140ms ease,
-      box-shadow 140ms ease;
+      transform 90ms var(--juice-out),
+      background-color 90ms ease;
   }
   .j-btn.jb-play-pill:hover:enabled {
     background: var(--jb-accent-hover);
@@ -508,9 +503,8 @@
     border-radius: 14px;
     background: transparent;
     transition:
-      background-color 150ms ease,
-      box-shadow 160ms ease,
-      transform 140ms var(--juice-out);
+      background-color 95ms ease,
+      transform 95ms var(--juice-out);
   }
   .jb-work-card:hover {
     background: color-mix(in srgb, var(--jb-fg-default) 5%, transparent);
@@ -532,24 +526,22 @@
       inset 0 0 0 1px color-mix(in srgb, var(--jb-accent) 32%, transparent),
       0 4px 12px -4px rgba(0, 0, 0, 0.4);
   }
-  /* 首页与发布站作品卡片：20px -> 14px -> 8px 同心浮升雕塑板 */
+  /* 首页与发布站作品卡片：20px -> 14px -> 8px 同心浮升雕塑板（隔离绘制并仅合成 transform） */
   .jb-home-slab {
+    contain: layout style;
     border-radius: 20px;
     padding: 8px;
     background: var(--jb-bg-surface);
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 7%, transparent),
-      0 4px 16px -6px rgba(24, 22, 18, 0.06);
-    transition:
-      transform 200ms var(--juice-out),
-      box-shadow 200ms var(--juice-out);
+      0 4px 14px -6px rgba(24, 22, 18, 0.06);
+    transition: transform 130ms var(--juice-out);
   }
   .jb-home-slab[data-interactive="true"]:hover {
     transform: translateY(-2px);
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 12%, transparent),
-      0 16px 36px -12px rgba(24, 22, 18, 0.14),
-      0 4px 10px -2px rgba(24, 22, 18, 0.05);
+      0 12px 28px -10px rgba(24, 22, 18, 0.13);
   }
   /* 暖黄拨动开关（36x20 轨道，16x16 圆钮，行程 16px 严丝合缝，零溢出） */
   .jb-switch-warm.j-switch {

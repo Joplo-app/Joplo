@@ -9,7 +9,8 @@ import { entryOfScenario, sliceLabel } from './work-view';
  */
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, CirclePlay, Pause, Play, RotateCcw, RectangleHorizontal, X } from 'lucide-react';
-import { Button, IconButton, Progress, playJuiceSound, useIdleVisibility } from '@tokenroll/juice/primitives';
+import { Progress, playJuiceSound, useIdleVisibility } from '@tokenroll/juice/primitives';
+import { JBtn, JIconBtn } from '@/lib/juice';
 import type { Scenario } from '@joplo-app/core/runtime';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { useI18n } from '../i18n/context';
@@ -189,9 +190,9 @@ export function WatchView(p: Props) {
         </RoundBtn>
         <Progress compact value={progress} aria-label={`${pos} / ${total}`} className="mx-1 min-w-0 flex-1" />
         {p.voice}
-        <Button variant="primary" size="md" sound="tap" leftIcon={<RectangleHorizontal className="size-4" />} onClick={() => void enter()} className="h-9 shrink-0 rounded-[11px] px-3 text-[13px] font-semibold" data-testid="watch-landscape">
+        <JBtn variant="primary" size="md" sound="tap" leftIcon={<RectangleHorizontal className="size-4" />} onClick={() => void enter()} className="h-9 shrink-0 rounded-[11px] px-3 text-[13px] font-semibold" data-testid="watch-landscape">
           {i18n.player.watchLandscape}
-        </Button>
+        </JBtn>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto border-t border-[var(--juice-edge)] px-2 pb-6 pt-2" data-testid="watch-chapters">
         {/* 按能力分组（D102 修订）：顺序里的一组、支线一组；不传 naming 时是一组（与以前一样） */}
@@ -249,7 +250,7 @@ export function WatchView(p: Props) {
 
 function RoundBtn({ label, onClick, disabled, testid, primary, sound, children }: { label: string; onClick: () => void; disabled?: boolean; testid: string; primary?: boolean; sound?: 'tap' | 'tick'; children: ReactNode }) {
   return (
-    <IconButton
+    <JIconBtn
       label={label}
       title={label}
       variant={primary ? 'primary' : 'ghost'}
@@ -264,7 +265,7 @@ function RoundBtn({ label, onClick, disabled, testid, primary, sound, children }
       data-testid={testid}
     >
       {children}
-    </IconButton>
+    </JIconBtn>
   );
 }
 
@@ -274,9 +275,9 @@ function Finished({ onRestart, dark, author }: { onRestart: () => void; dark?: b
     <div className={cn('absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px]', dark ? 'bg-black/70' : 'bg-black/65')} data-testid="watch-finished">
       <div className="text-[18px] font-bold text-white">{i18n.player.watchFinished}</div>
       {author}
-      <Button sound="tap" onClick={onRestart} size="lg" leftIcon={<RotateCcw className="size-4" />} className="h-10 rounded-full bg-white px-5 text-[14px] font-semibold text-black shadow-lg hover:bg-white/92" data-testid="watch-again">
+      <JBtn sound="tap" onClick={onRestart} size="lg" leftIcon={<RotateCcw className="size-4" />} className="h-10 rounded-full bg-white px-5 text-[14px] font-semibold text-black shadow-lg hover:bg-white/92" data-testid="watch-again">
         {i18n.player.watchAgain}
-      </Button>
+      </JBtn>
     </div>
   );
 }
@@ -371,12 +372,12 @@ export function UpNextCard({ ctl, snap, variant }: { ctl: DemoController; snap: 
       </div>
       <div className="line-clamp-2 text-[17px] font-bold leading-[1.35]">{name}</div>
       <div className="mt-1 flex gap-2">
-        <Button sound="tap" onClick={() => ctl.playNextNow()} size="md" leftIcon={<Play className="size-4" />} className="h-9 flex-1 rounded-[12px] bg-white px-3 text-[14px] font-semibold text-black hover:bg-white/90" data-testid="up-next-now">
+        <JBtn sound="tap" onClick={() => ctl.playNextNow()} size="md" leftIcon={<Play className="size-4" />} className="h-9 flex-1 rounded-[12px] bg-white px-3 text-[14px] font-semibold text-black hover:bg-white/90" data-testid="up-next-now">
           {i18n.player.upNextPlayNow}
-        </Button>
-        <Button sound="tap" onClick={() => ctl.cancelNext()} variant="outline" size="md" className="h-9 rounded-[12px] px-4 text-[14px] font-semibold text-white/85" data-testid="up-next-cancel">
+        </JBtn>
+        <JBtn sound="tap" onClick={() => ctl.cancelNext()} variant="outline" size="md" className="h-9 rounded-[12px] px-4 text-[14px] font-semibold text-white/85" data-testid="up-next-cancel">
           {i18n.player.upNextCancel}
-        </Button>
+        </JBtn>
       </div>
     </div>
   );
