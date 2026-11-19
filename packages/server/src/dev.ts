@@ -753,7 +753,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       web.mode === 'dist'
         ? { noDiscovery: true, include: [] }
         : {
-            include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime', 'react/jsx-runtime', 'motion', 'motion/react', 'roughjs', 'lucide-react', 'clsx', 'tailwind-merge', 'modern-screenshot', '@joplo-app/core > zod'],
+            include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime', 'react/jsx-runtime', 'motion', 'motion/react', 'roughjs', 'lucide-react', 'clsx', 'tailwind-merge', 'modern-screenshot', '@tokenroll/juice/primitives', '@tokenroll/juice/core', '@joplo-app/core > zod'],
           },
     server: {
       host: '127.0.0.1',
@@ -761,7 +761,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       strictPort: true,
       open: false,
       ...(web.mode === 'dist' ? { fs: { allow: [web.webDir] } } : {}),
-      ...(watch ? { watch: { ignored: (p: string) => { const s = slotOfFile(p) ?? [...slots.values()].find((x) => p.startsWith(x.dir + path.sep)); return !!s && p !== s.dir && !isProjectSource(s.dir, p, s.watchIgnore ?? []); } } } : { watch: null }),
+      ...(watch ? { watch: { ignored: (p: string) => { const s = slotOfFile(p) ?? [...slots.values()].find((x) => p.startsWith(x.dir + path.sep)); return !!s && p !== s.dir && !isProjectSource(s.dir, p, s.watchIgnore ?? []); } } } : { watch: null, hmr: false }),
     },
   });
 
