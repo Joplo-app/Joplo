@@ -16,6 +16,7 @@ import { useBoardI18n } from '../i18n/board/context';
  */
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, Copy, FolderX } from 'lucide-react';
+import { Alert, Badge, IconButton } from '@tokenroll/juice/primitives';
 import type { Diagnostic, Project } from '@joplo-app/core/runtime';
 import { removeProject, type ProjectSummary } from '../runtime/dev-client';
 import { Brand, TopBar } from '../player/PlayerPage';
@@ -73,17 +74,17 @@ export function Home({
         <Brand />
       </TopBar>
       {error ? (
-        <div role="alert" className="border-b border-jb-danger bg-jb-danger-bg px-4 py-2 text-[13px] text-jb-danger" data-testid="load-error">
-          {translate(error, i18n)}
+        <div className="px-4 pt-2" data-testid="load-error">
+          <Alert tone="danger">{translate(error, i18n)}</Alert>
         </div>
       ) : null}
       {flash ? (
-        <div role="status" className="jb-tip fixed left-1/2 top-16 z-50 -translate-x-1/2 whitespace-nowrap px-3 py-2 text-[13px]" data-testid="flash">
+        <div role="status" className="j-tooltip-pill jb-tip fixed left-1/2 top-16 z-50 -translate-x-1/2 whitespace-nowrap px-3 py-2 text-[13px]" data-testid="flash">
           {flash}
         </div>
       ) : null}
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-[276px] shrink-0 flex-col border-r border-jb-line bg-jb-surface px-3 py-4" data-testid="project-list">
+        <aside className="flex w-[276px] shrink-0 flex-col bg-jb-surface px-3 py-4 shadow-[1px_0_0_var(--juice-edge)]" data-testid="project-list">
           <div className="flex items-baseline justify-between px-2 pb-1.5 pt-2 text-[12px]">
             <span className="font-semibold tracking-[1px] text-jb-muted">{i18n.board.projects}</span>
             <span className="text-jb-faint">{i18n.board.recentlyOpened}</span>
@@ -100,7 +101,7 @@ export function Home({
                     data-testid={`home-project-${p.id}`}
                     data-status={p.status}
                     aria-current={on ? 'true' : undefined}
-                    className={cn('jb-focus flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 text-left', on ? 'bg-jb-selected' : 'hover:bg-jb-hover active:bg-jb-press')}
+                    className={cn('jb-focus flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left transition-colors', on ? 'bg-jb-selected' : 'hover:bg-jb-hover active:bg-jb-press')}
                   >
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className={cn('truncate text-[14px]', on && 'font-semibold', p.status === 'missing' && 'text-jb-faint')}>{p.name}</span>
@@ -108,13 +109,13 @@ export function Home({
                         {shortPath(p.dir)}
                       </span>
                     </span>
-                    {badge ? <span className={cn('shrink-0 rounded-[4px] px-1.5 py-px text-[11px] font-medium', badge.tone === 'danger' ? 'bg-jb-danger-bg text-jb-danger' : 'bg-jb-sunken text-jb-faint')}>{badge.text}</span> : null}
+                    {badge ? <Badge tone={badge.tone === 'danger' ? 'danger' : 'neutral'} className="shrink-0">{badge.text}</Badge> : null}
                   </button>
                 </li>
               );
             })}
           </ul>
-          <div className="mt-3 flex flex-col gap-2 rounded-[10px] bg-jb-app p-3" data-testid="home-add">
+          <div className="mt-3 flex flex-col gap-2 rounded-[12px] bg-jb-app p-3" data-testid="home-add">
             <span className="text-[12px] text-jb-muted">{i18n.board.addAProjectRunInItsDirectory}</span>
             <CopyLine text="npx joplo dev" onCopy={copy} />
           </div>
@@ -133,11 +134,11 @@ function CopyLine({ text, onCopy }: { text: string; onCopy: (text: string) => vo
   const { t: i18n } = useBoardI18n();
 
   return (
-    <div className="flex h-8 items-center gap-2 rounded-[6px] border border-jb-line bg-jb-surface pl-2.5 pr-1">
+    <div className="j-copy-snippet h-8 bg-jb-surface py-0 pl-2.5 pr-1 shadow-[inset_0_0_0_1px_var(--juice-edge)]">
       <code className="min-w-0 flex-1 truncate font-jb-mono text-[12px]">{text}</code>
-      <button type="button" className="jb-focus flex size-6 shrink-0 items-center justify-center rounded-[4px] text-jb-muted hover:bg-jb-hover hover:text-jb-fg" aria-label={i18n.board.copy(text)} onClick={() => onCopy(text)}>
+      <IconButton label={i18n.board.copy(text)} variant="ghost" size="xs" onClick={() => onCopy(text)}>
         <Copy className="size-3.5" />
-      </button>
+      </IconButton>
     </div>
   );
 }
@@ -150,7 +151,7 @@ function Empty({ onCopy }: { onCopy: (text: string) => void }) {
     <div className="mx-auto mt-[12vh] flex max-w-[440px] flex-col items-center gap-4 text-center" data-testid="home-empty">
       <JoploMark size={56} />
       <h2 className="text-[20px] font-bold">{i18n.board.noProjectsOpenedYet}</h2>
-      <div className="flex w-full flex-col gap-1.5 rounded-[10px] border border-jb-line bg-jb-surface p-3">
+      <div className="j-slab flex w-full flex-col gap-1.5 p-3">
         {['npx joplo init my-demo', 'cd my-demo && npm install', 'npx joplo dev'].map((c) => (
           <CopyLine key={c} text={c} onCopy={onCopy} />
         ))}
@@ -257,10 +258,10 @@ function FeatureCardView({ project, card, look, onOpen }: { project: Project; ca
   const disabled = !card.open;
   return (
     // 整张可点：一个盖住整张卡片的按钮（缩略图里的舞台也有按钮，不能把卡片本身做成 button）
-    <div data-testid={`feature-${card.id}`} className={cn('group relative flex flex-col overflow-hidden rounded-[10px] border bg-jb-surface text-left has-[[data-card-open]:focus-visible]:border-jb-ink', disabled ? 'border-dashed border-jb-line' : 'border-jb-line hover:border-jb-ink hover:shadow-[var(--jb-e1)]')}>
-      {!disabled ? <button type="button" data-card-open="" onClick={onOpen} aria-label={card.work ? i18n.site.watchFor(card.name) : i18n.board.openDemoFor(card.name)} data-testid={`open-${card.id}`} className="jb-focus absolute inset-0 z-[2] rounded-[10px]" /> : null}
+    <div data-testid={`feature-${card.id}`} className={cn('group relative flex flex-col overflow-hidden rounded-[14px] bg-jb-surface text-left transition-shadow has-[[data-card-open]:focus-visible]:shadow-[0_0_0_2px_var(--jb-accent-press)]', disabled ? 'border border-dashed border-jb-line' : 'shadow-[0_0_0_1px_var(--juice-edge)] hover:shadow-[0_0_0_1.5px_var(--jb-border-strong),0_10px_28px_-8px_rgba(0,0,0,0.12)]')}>
+      {!disabled ? <button type="button" data-card-open="" onClick={onOpen} aria-label={card.work ? i18n.site.watchFor(card.name) : i18n.board.openDemoFor(card.name)} data-testid={`open-${card.id}`} className="jb-focus absolute inset-0 z-[2] rounded-[14px]" /> : null}
       <StageThumb project={project} scenarioId={card.thumb?.scenarioId ?? null} sceneId={card.thumb?.sceneId ?? null} look={look} testid={`thumb-${card.id}`} />
-      <div className="flex flex-col gap-1.5 border-t border-jb-line px-4 pb-4 pt-3">
+      <div className="flex flex-col gap-1.5 border-t border-[var(--juice-edge)] px-4 pb-4 pt-3">
         <div className="flex items-center gap-3">
           <span className="min-w-0 flex-1 truncate text-[17px] font-bold">{card.name}</span>
           {!disabled ? (
@@ -273,16 +274,16 @@ function FeatureCardView({ project, card, look, onOpen }: { project: Project; ca
         {card.work ? (
           <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px]" data-testid={`work-meta-${card.id}`}>
             <span className="text-jb-muted">{entryMetaText(card.work, i18n)}</span>
-            {card.work.draft ? <span className="rounded-[4px] border border-jb-line px-1.5 py-px text-[11px] text-jb-muted" data-testid={`work-draft-${card.id}`}>{i18n.board.draftNotPublished}</span> : null}
+            {card.work.draft ? <Badge className="h-[18px] px-1.5 text-[11px]" data-testid={`work-draft-${card.id}`}>{i18n.board.draftNotPublished}</Badge> : null}
           </div>
         ) : (
         <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px]" data-testid={`feature-gaps-${card.id}`}>
           {card.pick ? (
-            <span className="rounded-[4px] bg-jb-inverse px-1.5 py-px text-[11px] font-medium text-jb-on-inverse">
+            <Badge className="h-5 rounded-[5px] bg-jb-inverse px-2 text-[11px] text-jb-on-inverse">
               ✓ {card.pick.letter} · {card.pick.title}
-            </span>
+            </Badge>
           ) : (
-            <span className="rounded-[4px] border border-jb-line px-1.5 py-px text-[11px] text-jb-muted">{i18n.board.noPickedOptionYet}</span>
+            <Badge className="h-5 rounded-[5px] text-[11px]">{i18n.board.noPickedOptionYet}</Badge>
           )}
           <span className="text-jb-muted">{i18n.board.optionCount(card.workCount)}</span>
           {card.coverage.allExpressed ? (

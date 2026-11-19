@@ -76,6 +76,31 @@
   --jb-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   /* 浮层 e1：1.5px 墨线 + 3px 实色偏移阴影，圆角 10 */
   --jb-e1: 3px 3px 0 var(--jb-border-strong);
+
+  /* Juice UI 品牌映射：继承 Joplo 暖纸底与墨色，驱动 6 阶同心色阶 */
+  --juice-font-ui: var(--jb-font);
+  --juice-font-mono: var(--jb-mono);
+  --juice-bg: var(--jb-bg-app);
+  --juice-canvas: var(--jb-bg-sunken);
+  --juice-card: var(--jb-bg-surface);
+  --juice-ink: var(--jb-fg-default);
+  --juice-signal: var(--jb-cloud);
+  --juice-on-signal: var(--jb-fg-on-cloud);
+  --juice-ok: var(--jb-status-ok);
+  --juice-on-ok: var(--jb-fg-inverse);
+  --juice-warn: var(--jb-accent-press);
+  --juice-danger: var(--jb-status-danger);
+  --juice-recessed: var(--jb-bg-inverse);
+  --fill-on: var(--jb-fg-default);
+  --fill-slab: var(--jb-bg-surface);
+  --juice-soft: color-mix(in srgb, var(--fill-on) 74%, var(--fill-slab));
+  --juice-mute: color-mix(in srgb, var(--fill-on) 52%, var(--fill-slab));
+  --juice-faint: color-mix(in srgb, var(--fill-on) 34%, var(--fill-slab));
+  --juice-w4: color-mix(in srgb, var(--fill-on) 4%, var(--fill-slab));
+  --juice-w6: color-mix(in srgb, var(--fill-on) 6.5%, var(--fill-slab));
+  --juice-w12: color-mix(in srgb, var(--fill-on) 12%, var(--fill-slab));
+  --juice-w20: color-mix(in srgb, var(--fill-on) 20%, var(--fill-slab));
+  --juice-edge: color-mix(in srgb, var(--fill-on) 8%, transparent);
 }
 
 /* 深色（全屏演示、深色舞台四周） */
@@ -111,6 +136,29 @@
   --jb-cloud-bg: #182638;
   --jb-fg-on-cloud: #FFFFFF;
   --jb-e1: 3px 3px 0 var(--jb-border-strong);
+
+  /* Juice UI 深色映射与阶梯提亮（见 TokenRollAI/juice#6） */
+  --juice-bg: var(--jb-bg-app);
+  --juice-canvas: var(--jb-bg-sunken);
+  --juice-card: var(--jb-bg-surface);
+  --juice-ink: var(--jb-fg-default);
+  --juice-signal: var(--jb-cloud);
+  --juice-on-signal: var(--jb-fg-on-cloud);
+  --juice-ok: var(--jb-status-ok);
+  --juice-on-ok: var(--jb-fg-inverse);
+  --juice-warn: var(--jb-accent);
+  --juice-danger: var(--jb-status-danger);
+  --juice-recessed: var(--jb-bg-app);
+  --fill-on: var(--jb-fg-default);
+  --fill-slab: var(--jb-bg-surface);
+  --juice-soft: color-mix(in srgb, var(--fill-on) 84%, var(--fill-slab));
+  --juice-mute: color-mix(in srgb, var(--fill-on) 60%, var(--fill-slab));
+  --juice-faint: color-mix(in srgb, var(--fill-on) 38%, var(--fill-slab));
+  --juice-w4: color-mix(in srgb, var(--fill-on) 5%, var(--fill-slab));
+  --juice-w6: color-mix(in srgb, var(--fill-on) 8.5%, var(--fill-slab));
+  --juice-w12: color-mix(in srgb, var(--fill-on) 17%, var(--fill-slab));
+  --juice-w20: color-mix(in srgb, var(--fill-on) 27%, var(--fill-slab));
+  --juice-edge: color-mix(in srgb, var(--fill-on) 11%, transparent);
   color: var(--jb-fg-default);
 }
 
@@ -329,27 +377,48 @@
   }
 }
 
-/* ---------- 看板控件的公共样式（D55）---------- */
+/* ---------- 看板控件的公共样式（D55 + Juice UI 同心表面）---------- */
 /* 键盘焦点：2px 深黄（accent-press）描边，外移 2px；鼠标点击不显示 */
-.jb-focus:focus-visible {
+.jb-focus:focus-visible,
+.j-btn:focus-visible,
+.j-seg-btn:focus-visible,
+.j-switch:focus-visible,
+.j-checkbox:focus-visible,
+.j-radio-card:has(> input:focus-visible) {
   outline: 2px solid var(--jb-accent-press);
   outline-offset: 2px;
 }
-/* 浮层 e1：菜单、外观浮层、悬停卡片共用（portal 渲染，position: fixed） */
+/* 浮层表面：与 Juice .j-floating-pop 对齐的同心无重线浮层 */
 .jb-pop {
-  background: var(--jb-bg-surface);
-  color: var(--jb-fg-default);
-  border: 1.5px solid var(--jb-border-strong);
-  border-radius: 10px;
-  box-shadow: var(--jb-e1);
+  background: var(--fill-slab);
+  color: var(--fill-on);
+  border-radius: var(--juice-r-inner);
+  box-shadow:
+    0 0 0 1px var(--juice-edge),
+    0 14px 36px -8px rgba(0, 0, 0, 0.2),
+    0 4px 12px -2px rgba(0, 0, 0, 0.08);
   font-family: var(--jb-font);
+  animation: j-pop-enter 140ms var(--juice-out) both;
 }
-/* 轻提示 e2：墨底白字 */
+/* 轻提示：与 Juice .j-tooltip-pill 对齐的墨底胶囊 */
 .jb-tip {
-  background: var(--jb-bg-inverse);
-  color: var(--jb-fg-inverse);
-  border-radius: 6px;
+  background: var(--fill-on);
+  color: var(--fill-slab);
+  border-radius: 9px;
+  box-shadow: 0 6px 18px -4px rgba(0, 0, 0, 0.24);
   font-family: var(--jb-font);
+  animation: j-pop-enter 110ms var(--juice-out) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .jb-pop,
+  .jb-tip {
+    animation: none;
+  }
+}
+[data-render="1"] .jb-pop,
+[data-render="1"] .jb-tip {
+  animation: none !important;
+  transition-duration: 0ms !important;
 }
 .jb-noscrollbar {
   scrollbar-width: none;

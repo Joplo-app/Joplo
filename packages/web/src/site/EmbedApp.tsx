@@ -18,6 +18,7 @@ import { projectThemes } from '@joplo-app/core/runtime';
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ChevronLeft, ChevronRight, Expand, ExternalLink, ListVideo, Pause, Play, Shrink } from 'lucide-react';
+import { Alert } from '@tokenroll/juice/primitives';
 import type { Project } from '@joplo-app/core/runtime';
 import { DemoController } from '../runtime/demo';
 import { Stage } from '../renderer/Stage';
@@ -335,9 +336,13 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
           </div>
         )}
         {snap.playbackError && !covered ? (
-          <div role="alert" className="absolute inset-x-3 top-3 z-30 rounded-[8px] border border-jb-danger bg-jb-danger-bg px-3 py-2 text-[13px] text-jb-danger" data-testid="playback-error">
-            <strong>{i18n.player.demoReplayFailed}</strong>
-            {translate(snap.playbackError, i18n)}
+          <div role="alert" className="absolute inset-x-3 top-3 z-30" data-testid="playback-error">
+            <Alert tone="danger">
+              <span>
+                <strong>{i18n.player.demoReplayFailed}</strong>
+                {translate(snap.playbackError, i18n)}
+              </span>
+            </Alert>
           </div>
         ) : null}
         {picking ? (
@@ -386,13 +391,13 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
         // 功能差异页统一控制两侧播放器：字幕与标题条浮在画面上，控制条与封面页脚都不显示，把高度留给画面
         null
       ) : covered || !scenario ? (
-        <div ref={rowRef} className="flex h-9 shrink-0 items-center justify-between gap-3 border-t border-jb-line bg-jb-surface px-2.5" data-testid="embed-cover-footer">
+        <div ref={rowRef} className="flex h-9 shrink-0 items-center justify-between gap-3 border-t border-[var(--juice-edge)] bg-jb-surface px-2.5" data-testid="embed-cover-footer">
           {brand ?? <span aria-hidden />}
           {scenario && !L.compact ? <span className="min-w-0 truncate text-[12px] text-jb-muted">{i18n.site.embedCoverHint}</span> : null}
         </div>
       ) : (
         <>
-          <div ref={rowRef} className="flex h-12 shrink-0 items-center gap-1.5 border-t border-jb-line bg-jb-surface px-2" role="toolbar" aria-label={i18n.site.embedPlayer} data-testid="embed-bar">
+          <div ref={rowRef} className="j-transport-bar flex h-12 shrink-0 items-center gap-1.5 rounded-none border-t border-[var(--juice-edge)] bg-jb-surface px-2 shadow-none" role="toolbar" aria-label={i18n.site.embedPlayer} data-testid="embed-bar">
             <Btn icon={<ChevronLeft className="size-4" />} label={i18n.player.previousStep} kbd="←" iconOnly variant="ghost" size={32} onClick={() => ctl.prev()} disabled={pos === 0 && !snap.busy} data-testid="embed-prev" />
             <Btn ref={playRef} icon={playing ? <Pause className="size-4" /> : <Play className="size-4" />} label={playLabel} kbd={i18n.player.space} iconOnly variant="play" size={32} onClick={() => ctl.togglePlay()} disabled={total === 0} data-testid="embed-toggle" />
             <Btn icon={<ChevronRight className="size-4" />} label={i18n.player.nextStep} kbd="→" iconOnly variant="ghost" size={32} onClick={() => void ctl.next()} disabled={total === 0} data-testid="embed-next" />
@@ -402,7 +407,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
             {L.tiny ? (
               <span className="flex-1" />
             ) : (
-              <div className="mx-1 h-1.5 min-w-[40px] flex-1 overflow-hidden rounded-full bg-jb-line" role="progressbar" aria-label={i18n.site.embedStepProgress(shown, total)} aria-valuemin={0} aria-valuemax={total} aria-valuenow={shown} data-testid="embed-progress">
+              <div className="mx-1 h-1.5 min-w-[40px] flex-1 overflow-hidden rounded-full bg-[var(--juice-w12)]" role="progressbar" aria-label={i18n.site.embedStepProgress(shown, total)} aria-valuemin={0} aria-valuemax={total} aria-valuenow={shown} data-testid="embed-progress">
                 <div className="h-full rounded-full bg-jb-accent-press transition-[width] duration-300" style={{ width: `${embedProgress(shown, total) * 100}%` }} />
               </div>
             )}
@@ -417,7 +422,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
                 variant="ghost"
                 size={32}
                 width={260}
-                className={cn(!L.compact && 'max-w-[220px] px-2 text-[13px] [&>span:first-child]:truncate')}
+                className={cn(!L.compact && 'max-w-[220px] px-2 text-[13px] [&_[data-jb-label]]:truncate')}
               />
             ) : L.compact ? null : (
               <span className="min-w-0 max-w-[220px] truncate px-1 text-[13px] text-jb-muted" data-testid="embed-scenario-name">

@@ -22,14 +22,14 @@ import { FONT_CHOICES, STROKE_CHOICES, THEME_TEMPLATE, appearanceLabel, appearan
 
 const PREVIEW_DELAY = 150;
 
-/** 三个小色块：底色、墨色、强调色。 */
+/** 三个小色块（对齐 Juice .j-tri-swatch）：底色、墨色、强调色。 */
 export function Swatch({ css, className }: { css: string; className?: string }) {
   const s = themeSwatch(css);
   return (
-    <span aria-hidden className={cn('flex h-4 w-[22px] shrink-0 overflow-hidden rounded-[4px] border border-jb-line', className)}>
-      <span className="flex-1" style={{ background: s.bg }} />
-      <span className="flex-1" style={{ background: s.ink }} />
-      <span className="flex-1" style={{ background: s.accent }} />
+    <span aria-hidden className={cn('j-tri-swatch h-4 w-[22px]', className)}>
+      <span style={{ background: s.bg }} />
+      <span style={{ background: s.ink }} />
+      <span style={{ background: s.accent }} />
     </span>
   );
 }
@@ -53,7 +53,7 @@ function onGridKey(e: React.KeyboardEvent<HTMLDivElement>) {
 
 function Section({ title, right, children, first }: { title: string; right?: ReactNode; children: ReactNode; first?: boolean }) {
   return (
-    <section className={cn('flex flex-col gap-2 px-4 pb-3 pt-2', !first && 'border-t border-jb-line')}>
+    <section className={cn('flex flex-col gap-2 px-4 pb-3 pt-2.5', !first && 'border-t border-[var(--juice-edge)]')}>
       <div className="flex items-baseline justify-between text-[12px]">
         <span className="font-semibold tracking-[1px] text-jb-muted">{title}</span>
         {right ? <span className="text-jb-faint">{right}</span> : null}
@@ -193,7 +193,7 @@ export function AppearancePopover(p: AppearanceProps) {
               onClick={() => void p.copy(THEME_TEMPLATE(i18n)).then((ok) => p.onFlash(<LocalText value={ok ? m.board.themeTemplateCopiedSaveAsThemesNameCssSee : m.board.clipboardUnavailable} />))}
               className="jb-focus group flex min-w-0 flex-col gap-[5px] rounded-[8px] text-left"
             >
-              <span className="flex h-[42px] w-full items-center justify-center rounded-[7px] bg-jb-subtle text-jb-muted outline-1 outline-jb-line group-hover:outline-jb-ink" style={{ outlineStyle: 'solid' }}>
+              <span className="flex h-[42px] w-full items-center justify-center rounded-[8px] bg-[var(--juice-w6)] text-jb-muted shadow-[inset_0_0_0_1px_var(--juice-edge)] transition-shadow group-hover:shadow-[inset_0_0_0_1.5px_var(--jb-border-strong)]">
                 <Plus className="size-4" aria-hidden />
               </span>
               <span className="text-[12px] text-jb-muted">{i18n.board.custom}</span>
@@ -211,9 +211,10 @@ export function AppearancePopover(p: AppearanceProps) {
                   type="button"
                   role="radio"
                   aria-checked={on}
+                  data-selected={on}
                   data-testid={`font-${f.value ?? 'auto'}`}
                   {...cellProps({ font: f.value }, () => (on ? unpreview() : void apply({ font: f.value }, '')))}
-                  className={cn('jb-focus flex h-[50px] min-w-0 flex-col justify-center gap-0.5 rounded-[8px] px-2.5 text-left', on ? 'border-[1.5px] border-jb-ink bg-jb-selected' : 'border border-jb-line bg-jb-surface hover:bg-jb-hover')}
+                  className={cn('j-swatch-cell jb-focus flex h-[52px] min-w-0 flex-col items-start justify-center gap-0.5 rounded-[10px] px-2.5 text-left', on && 'bg-jb-selected shadow-[inset_0_0_0_1.5px_var(--jb-border-strong)]')}
                 >
                   <span className={cn('flex items-center gap-1 truncate leading-5', f.value ? 'text-[18px] text-jb-fg' : 'text-[15px] text-jb-muted')} style={f.value ? { fontFamily: FONT_STACKS[f.value] } : undefined}>
                     {f.value ? null : <Wand2 className="size-3.5" aria-hidden />}
@@ -227,7 +228,7 @@ export function AppearancePopover(p: AppearanceProps) {
         </Section>
 
         <Section title={i18n.board.strokes}>
-          <div role="radiogroup" aria-label={i18n.board.strokes} className="flex h-9 items-center gap-[3px] rounded-[8px] bg-jb-sunken p-[3px]" data-cell-group="" data-cols="3">
+          <div role="radiogroup" aria-label={i18n.board.strokes} className="j-seg flex h-9 w-full items-center rounded-[10px] p-[3px]" data-cell-group="" data-cols="3">
             {STROKE_CHOICES(i18n).map((k) => {
               const on = look.stroke === k.value;
               const Icon = k.value === 'rough' ? PenLine : k.value === 'clean' ? Square : Wand2;
@@ -237,9 +238,10 @@ export function AppearancePopover(p: AppearanceProps) {
                   type="button"
                   role="radio"
                   aria-checked={on}
+                  data-active={on ? 'true' : undefined}
                   data-testid={`stroke-${k.value ?? 'auto'}`}
                   {...cellProps({ stroke: k.value }, () => (on ? unpreview() : void apply({ stroke: k.value }, '')))}
-                  className={cn('jb-focus flex h-full flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] text-[13px]', on ? 'border-[1.5px] border-jb-ink bg-jb-surface font-semibold text-jb-fg' : 'text-jb-muted hover:text-jb-fg')}
+                  className={cn('j-seg-btn jb-focus h-full flex-1 justify-center gap-1.5 whitespace-nowrap rounded-[7px] text-[13px]', on && 'font-semibold')}
                 >
                   <Icon className="size-3.5" aria-hidden />
                   {k.name}
@@ -249,19 +251,19 @@ export function AppearancePopover(p: AppearanceProps) {
           </div>
         </Section>
 
-        <footer className="flex flex-col gap-2.5 rounded-b-[9px] border-t border-jb-line bg-jb-subtle px-4 pb-3.5 pt-3">
+        <footer className="flex flex-col gap-2.5 rounded-b-[14px] border-t border-[var(--juice-edge)] bg-[var(--juice-w4)] px-4 pb-3.5 pt-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Btn
               icon={<RotateCcw className="size-3.5" />}
               label={p.scope === 'project' && p.projectId ? i18n.board.resetToProjectDefault(p.configTheme) : i18n.board.clearChoicesForAllProjects}
               variant="ghost"
               size={28}
-              className="max-w-full font-normal text-jb-muted [&>span]:truncate"
+              className="max-w-full font-normal text-jb-muted [&_[data-jb-label]]:truncate"
               onClick={() => void p.save(resetAppearance(p.settings, p.scope, p.projectId)).then((r) => p.onFlash(<LocalText value={r.ok ? (p.scope === 'project' ? m.board.projectDefaultRestored(p.configTheme) : m.board.appearanceChoicesClearedForAllProjects) : m.board.couldNotSave(r.message)} />))}
               data-testid="appearance-reset"
             />
             {p.scope === 'project' && p.projectId ? (
-              <Btn label={i18n.board.setAsDefaultForAllProjects} className="max-w-full [&>span]:truncate" size={28} onClick={() => void p.save(setAsDefault(p.settings, p.projectId, look)).then((r) => p.onFlash(<LocalText value={r.ok ? m.board.allProjectsNowUseExceptProjectsWithTheirOwn(appearanceMessage(look, p.catalog)) : m.board.couldNotSave(r.message)} />))} data-testid="appearance-default" />
+              <Btn label={i18n.board.setAsDefaultForAllProjects} className="max-w-full [&_[data-jb-label]]:truncate" size={28} onClick={() => void p.save(setAsDefault(p.settings, p.projectId, look)).then((r) => p.onFlash(<LocalText value={r.ok ? m.board.allProjectsNowUseExceptProjectsWithTheirOwn(appearanceMessage(look, p.catalog)) : m.board.couldNotSave(r.message)} />))} data-testid="appearance-default" />
             ) : null}
           </div>
           <div className="flex items-center gap-1.5 text-[12px]">

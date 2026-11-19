@@ -30,6 +30,7 @@ import { DemoController } from '../runtime/demo';
 import { exportImage, openInEditor, selectionWriter } from '../runtime/dev-client';
 import { boardHash, parseBoardHash, warnUnknownPlayParams, type BoardRoute, type PlayRoute } from '../runtime/route';
 import { ArrowRight, BookOpen, CircleCheck, Cloud, Loader2, Smartphone, CircleX, Code, Copy, Film, ImageDown, LayoutGrid, Link, ScanSearch, Volume2, VolumeX } from 'lucide-react';
+import { Badge, Button } from '@tokenroll/juice/primitives';
 import { PlayerPage, useBoardLayout, type MenuEntry } from '../player/PlayerPage';
 import { Btn, Kbd } from '../player/controls';
 import type { ProjectSummary } from '../runtime/dev-client';
@@ -173,15 +174,15 @@ function DiagnosticsBanner({ list }: { list: Diagnostic[] }) {
   if (!sum) return null;
   const errors = list.filter((d) => d.severity === 'error');
   return (
-    <div role="alert" className="max-h-[40%] w-full shrink-0 overflow-y-auto rounded-[8px] border-l-4 border-jb-danger bg-jb-danger-bg px-3 py-2 text-left font-jb text-[13px]" data-testid="diagnostics">
+    <div role="alert" className="max-h-[40%] w-full shrink-0 overflow-y-auto rounded-[12px] bg-jb-danger-bg px-3.5 py-2.5 text-left font-jb text-[13px] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--jb-status-danger)_24%,transparent)]" data-testid="diagnostics">
       <div className="flex items-center gap-2">
         <CircleX className="size-4 shrink-0 text-jb-danger" aria-hidden />
         <strong className="text-jb-danger">{i18n.board.compilationCount(sum.count)}</strong>
         <span className="text-jb-danger">{i18n.board.showingTheLastSuccessfulStage}</span>
         <span className="flex-1" />
-        <button type="button" className="jb-focus shrink-0 rounded-[4px] px-1.5 text-[12px] font-medium text-jb-fg hover:underline" onClick={() => setOpen((v) => !v)} aria-expanded={open} data-testid="diag-toggle">
+        <Button variant="ghost" size="xs" onClick={() => setOpen((v) => !v)} aria-expanded={open} data-testid="diag-toggle">
           {open ? i18n.board.collapse : i18n.board.expand}
-        </button>
+        </Button>
       </div>
       <ul className="mt-1 flex flex-col gap-0.5 pl-6">
         {(open ? errors.slice(0, 50) : errors.slice(0, 1)).map((d, i) => (
@@ -414,7 +415,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
       {ir.payload && !ir.payload.ok ? <DiagnosticsBanner list={ir.payload.diagnostics} /> : null}
       {ir.payload?.ok ? <ResourceWarnings list={ir.payload.diagnostics} /> : null}
       {gap && work && gb ? (
-        <div role="status" className="flex shrink-0 flex-col gap-2 rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface px-4 py-3 font-jb" data-testid="gap-notice" data-status={gap.status}>
+        <div role="status" className="flex shrink-0 flex-col gap-2 rounded-[14px] bg-jb-surface px-4 py-3 font-jb shadow-[0_0_0_1px_var(--juice-edge)]" data-testid="gap-notice" data-status={gap.status}>
           <div className="flex items-center gap-2 text-[14px] font-semibold">
             <StatusIcon status={gap.status} size={16} />
             {i18n.board.gapTitle(gb.letter, caseTitle ?? '', gap.status !== 'none' && gap.status !== 'missing' ? COVERAGE_LABEL(i18n)[gap.status].text : '')}
@@ -492,13 +493,13 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
           </>
         }
         inspectMode={inspectMode}
-        completeAction={nc ? <Btn icon={<ArrowRight className="size-4" />} iconAfter label={i18n.board.nextCase(nc.title)} kbd="Enter" variant="primary" className="max-w-[360px] [&>span]:truncate" onClick={() => nextRef.current?.()} data-testid="next-case" /> : null}
+        completeAction={nc ? <Btn icon={<ArrowRight className="size-4" />} iconAfter label={i18n.board.nextCase(nc.title)} kbd="Enter" variant="primary" className="max-w-[360px] [&_[data-jb-label]]:truncate" onClick={() => nextRef.current?.()} data-testid="next-case" /> : null}
         navRail={independentWork ? <WorkRail entry={independentWork} scenarioId={snap.scenarioId} /> : <CaseRail project={project} featureId={entry.id} workId={resolved.workId} caseId={resolved.caseId} />}
         exportBadge={vid.running && vid.job ? <ProgressRing percent={vid.job.percent} /> : rt.installing && rt.job ? <ProgressRing percent={rt.job.percent} /> : null}
         deviceTag={
-          <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-[6px] border border-jb-line bg-jb-surface px-2.5 font-jb text-[12px] text-jb-muted" data-testid="device-tag">
+          <Badge className="h-7 rounded-[8px] bg-jb-surface px-2.5 font-jb text-[12px] text-jb-muted shadow-[0_0_0_1px_var(--juice-edge)]" data-testid="device-tag">
             <Smartphone className="size-3.5" aria-hidden />
-            {i18n.board.mobilePageDetails(VIEWPORT_SIZE.mobile.width)}</span>
+            {i18n.board.mobilePageDetails(VIEWPORT_SIZE.mobile.width)}</Badge>
         }
         voice={<VoiceButton api={voice} open={voiceOpen} onToggle={() => setVoiceOpen((v) => !v)} btnRef={setVoiceAnchor} />}
         fullscreenVoice={<Btn icon={voice.on ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />} label={voice.on ? i18n.player.turnNarrationOff : i18n.player.turnNarrationOn} iconOnly variant="ghost" size={32} selected={voice.on} onClick={() => voice.setOn(!voice.on)} data-testid="fs-voice" />}

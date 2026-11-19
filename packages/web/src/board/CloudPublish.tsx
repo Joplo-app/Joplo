@@ -11,6 +11,7 @@ import { m } from '../i18n/board/messages';
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Check, Cloud, Copy, ExternalLink, Loader2, RotateCw, X } from 'lucide-react';
+import { Alert, Button, RadioCard, TextField } from '@tokenroll/juice/primitives';
 import { cn } from '@/lib/utils';
 import { Btn } from '../player/controls';
 import { Popover } from '../player/popover';
@@ -85,7 +86,7 @@ function LoginBlock({ command, message, onCheck, checking, stillOut }: { command
     <div className="flex flex-col gap-2.5" data-testid="cloud-login">
       <div className="text-[14px] font-semibold">{i18n.board.cloudLoginTitle}</div>
       <p className="text-[13px] leading-[1.5] text-jb-muted">{i18n.board.cloudLoginBody}</p>
-      <div className="flex items-start gap-2 rounded-[8px] border border-jb-line bg-jb-sunken py-1.5 pl-3 pr-1.5">
+      <div className="j-copy-snippet items-start gap-2 rounded-[10px] py-1.5 pl-3 pr-1.5">
         {/* 要复制的命令完整显示（可能带 JOPLO_HOME 与 --server），长了就换行，不截断 */}
         <code className="min-w-0 flex-1 select-all whitespace-pre-wrap break-all py-1 font-jb-mono text-[13px] leading-[1.45]" data-testid="cloud-login-command">{command}</code>
         <Btn
@@ -117,15 +118,19 @@ export function StorageUsage({ storage, server, plan, full }: { storage: CloudSt
           <span className="font-semibold tracking-[0.5px] text-jb-muted">{i18n.board.cloudStorage}</span>
           <span className="text-jb-muted">{i18n.board.cloudStorageOf(view.used, view.quota)}</span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-jb-sunken" role="meter" aria-label={i18n.board.cloudStorage} aria-valuemin={0} aria-valuemax={100} aria-valuenow={view.pct}>
-          <div className={cn('h-full rounded-full', level === 'over' ? 'bg-jb-danger' : 'bg-[#E0AE00]')} style={{ width: `${view.pct}%` }} />
+        <div className="h-1.5 overflow-hidden rounded-full bg-[var(--juice-w12)]" role="meter" aria-label={i18n.board.cloudStorage} aria-valuemin={0} aria-valuemax={100} aria-valuenow={view.pct}>
+          <div className={cn('h-full rounded-full', level === 'over' ? 'bg-jb-danger' : 'bg-jb-accent-press')} style={{ width: `${view.pct}%` }} />
         </div>
       </div>
       {level === 'near' ? (
-        <div className="flex flex-col gap-1 rounded-[8px] border border-[#E0AE00] bg-jb-selected px-3 py-2" data-testid="cloud-storage-near">
-          <div className="text-[13px] font-semibold">{i18n.board.cloudStorageNearTitle}</div>
-          <p className="text-[12px] leading-[1.5]">{plan === 'pro' ? i18n.board.cloudStorageNearBodyPro : i18n.board.cloudStorageNearBody}</p>
-          <StorageLinks manageUrl={`${server}/shares`} upgradeUrl={plan === 'pro' ? null : `${server}/settings/billing`} />
+        <div data-testid="cloud-storage-near">
+          <Alert tone="warn">
+            <div className="flex flex-col gap-1">
+              <div className="text-[13px] font-semibold">{i18n.board.cloudStorageNearTitle}</div>
+              <p className="text-[12px] leading-[1.5]">{plan === 'pro' ? i18n.board.cloudStorageNearBodyPro : i18n.board.cloudStorageNearBody}</p>
+              <StorageLinks manageUrl={`${server}/shares`} upgradeUrl={plan === 'pro' ? null : `${server}/settings/billing`} />
+            </div>
+          </Alert>
         </div>
       ) : null}
     </div>
@@ -149,11 +154,15 @@ export function StorageFull({ full, plan }: { full: CloudStorageFull; plan: 'fre
   const f = storageFull(full);
   const text = f.kind === 'need' ? i18n.board.cloudStorageFullNeed(f.size, f.left, f.short) : f.kind === 'update' ? i18n.board.cloudStorageFullUpdate(f.size, f.left) : i18n.board.cloudStorageFullGeneric;
   return (
-    <div className="flex flex-col gap-1 rounded-[8px] border border-jb-danger bg-jb-danger-bg px-3 py-2" data-testid="cloud-storage-full" role="alert">
-      <div className="text-[13px] font-semibold text-jb-danger">{i18n.board.cloudStorageFullTitle}</div>
-      <p className="text-[12px] leading-[1.5]">{text}</p>
-      <p className="text-[12px] font-semibold leading-[1.5]">{i18n.board.cloudStorageExisting}</p>
-      <StorageLinks manageUrl={f.manageUrl} upgradeUrl={plan === 'pro' ? null : f.upgradeUrl} />
+    <div data-testid="cloud-storage-full">
+      <Alert tone="danger">
+        <div className="flex flex-col gap-1">
+          <div className="text-[13px] font-semibold text-jb-danger">{i18n.board.cloudStorageFullTitle}</div>
+          <p className="text-[12px] leading-[1.5]">{text}</p>
+          <p className="text-[12px] font-semibold leading-[1.5]">{i18n.board.cloudStorageExisting}</p>
+          <StorageLinks manageUrl={f.manageUrl} upgradeUrl={plan === 'pro' ? null : f.upgradeUrl} />
+        </div>
+      </Alert>
     </div>
   );
 }
@@ -166,12 +175,18 @@ function ScopeRadio({ value, onChange, ctx, names, disabled }: { value: CloudSco
     { id: 'project', label: i18n.board.cloudScopeProject },
   ];
   return (
-    <div role="radiogroup" aria-label={i18n.board.cloudScope} className="flex flex-col gap-1">
+    <div role="radiogroup" aria-label={i18n.board.cloudScope} className="flex flex-col gap-1.5">
       {rows.map((r) => (
-        <label key={r.id} className={cn('flex cursor-pointer items-center gap-2.5 rounded-[6px] px-2 py-1.5 text-[13px] hover:bg-jb-hover', value === r.id && 'bg-jb-cloud-bg hover:bg-jb-cloud-bg', (r.off || disabled) && 'pointer-events-none opacity-40')}>
-          <input type="radio" name="cloud-scope" className="accent-[var(--jb-cloud)]" checked={value === r.id} disabled={r.off || disabled} onChange={() => onChange(r.id)} data-testid={`cloud-scope-${r.id}`} />
-          <span className="min-w-0 flex-1 truncate">{r.label}</span>
-        </label>
+        <RadioCard
+          key={r.id}
+          name="cloud-scope"
+          label={r.label}
+          checked={value === r.id}
+          disabled={r.off || disabled}
+          onChange={() => onChange(r.id)}
+          className="py-2 text-[13px]"
+          data-testid={`cloud-scope-${r.id}`}
+        />
       ))}
     </div>
   );
@@ -203,7 +218,7 @@ function Result({ job, onFlash, server }: { job: CloudJob & { result: NonNullabl
   return (
     <div className="flex flex-col gap-2.5" data-testid="cloud-result">
       <div className="flex items-center gap-2 text-[14px] font-semibold text-jb-ok"><Check className="size-4" />{i18n.board.cloudPublished}</div>
-      <div className="flex items-center gap-1.5 rounded-[8px] border border-jb-line bg-jb-sunken py-1.5 pl-3 pr-1.5">
+      <div className="j-copy-snippet gap-1.5 py-1.5 pl-3 pr-1.5">
         <a href={r.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate font-jb-mono text-[13px] text-jb-cloud underline-offset-2 hover:underline" data-testid="cloud-url">{r.url}</a>
         <Btn size={28} icon={<Copy className="size-4" />} label={i18n.board.cloudCopyLink} iconOnly onClick={() => void copyText(r.url).then((ok) => onFlash(<LocalText value={ok ? m.board.cloudLinkCopied : m.board.clipboardUnavailableCopyFromTheAddressBar} />))} data-testid="cloud-copy-link" />
         <Btn size={28} icon={<ExternalLink className="size-4" />} label={i18n.board.cloudOpenLink} iconOnly onClick={() => window.open(r.url, '_blank', 'noopener')} data-testid="cloud-open-link" />
@@ -241,15 +256,21 @@ export function VisibilityFields({ visibility, review, onVisibility, onReview, d
   return <div className="flex flex-col gap-2" data-testid="cloud-choices">
     <fieldset disabled={disabled} className="flex flex-col gap-1.5">
       <legend className="text-[12px] font-semibold text-jb-muted">{i18n.board.cloudVisibility}</legend>
-      <div className="flex gap-4">
-        {(['public', 'private'] as const).map((v) => <label key={v} className="flex min-h-8 items-center gap-2 text-[13px]">
-          <input type="radio" name="cloud-visibility" value={v} disabled={disabled || (v === 'public' && (restricted || protectedLink))} checked={visibility === v} onChange={() => onVisibility(v)} className="accent-[var(--jb-cloud)]" />
-          {v === 'public' ? i18n.board.cloudPublic : i18n.board.cloudPrivate}
-        </label>)}
+      <div className="grid grid-cols-2 gap-1.5">
+        {(['public', 'private'] as const).map((v) => <RadioCard
+          key={v}
+          name="cloud-visibility"
+          value={v}
+          label={v === 'public' ? i18n.board.cloudPublic : i18n.board.cloudPrivate}
+          disabled={disabled || (v === 'public' && (restricted || protectedLink))}
+          checked={visibility === v}
+          onChange={() => onVisibility(v)}
+          className="py-2 text-[13px]"
+        />)}
       </div>
       <p className="text-[12px] leading-[1.5] text-jb-faint">{protectedLink ? i18n.board.cloudPasswordPublicBlocked : restricted ? i18n.board.cloudPrivateOnly : visibility === 'public' ? i18n.board.cloudPublicNote : i18n.board.cloudPrivateNote}</p>
     </fieldset>
-    <label className="flex min-h-8 items-center gap-2 text-[13px]"><input type="checkbox" checked={review} disabled={disabled} onChange={(e) => onReview(e.target.checked)} className="accent-[var(--jb-cloud)]" />{i18n.board.cloudAlsoReview}</label>
+    <label className="flex min-h-8 cursor-pointer items-center gap-2 text-[13px]"><input type="checkbox" checked={review} disabled={disabled} onChange={(e) => onReview(e.target.checked)} className="size-4 rounded accent-[var(--jb-cloud)]" />{i18n.board.cloudAlsoReview}</label>
     {review ? <p className="text-[12px] text-jb-faint">{i18n.board.cloudReviewNote}</p> : null}
   </div>;
 }
@@ -264,17 +285,23 @@ export function PasswordFields({ visibility, plan, server, protectedLink, value,
   useEffect(() => { setShow(false); }, [value === undefined, visibility]);
   if (visibility !== 'private') return null;
   const editing = typeof value === 'string' && plan === 'pro';
-  return <fieldset disabled={disabled} className="flex flex-col gap-2 rounded-[8px] border border-jb-line p-3" data-testid="cloud-password">
+  return <fieldset disabled={disabled} className="flex flex-col gap-2 rounded-[12px] bg-[var(--juice-w6)] p-3" data-testid="cloud-password">
     <legend className="px-1 text-[12px] font-semibold text-jb-muted">{i18n.board.cloudPasswordTitle}</legend>
     {protectedLink ? <p className="text-[12px] font-semibold">{i18n.board.cloudPasswordProtected} · {value === undefined ? i18n.board.cloudPasswordKeep : value === null ? i18n.board.cloudPasswordRemoving : i18n.board.cloudPasswordChange}</p> : null}
     {plan !== 'pro' ? <p className="text-[12px] text-jb-muted">{i18n.board.cloudPasswordUpgrade} <a href={`${server}/settings/billing`} target="_blank" rel="noopener noreferrer" className="jb-focus text-jb-cloud hover:underline">{i18n.board.cloudStorageUpgrade}</a></p> : null}
-    {editing ? <>
-      <label className="flex flex-col gap-1 text-[12px]">{i18n.board.cloudPasswordLabel}
-        <input type={show ? 'text' : 'password'} value={value} onChange={e => onChange(e.target.value)} autoComplete="new-password" spellCheck={false} autoCapitalize="none" aria-describedby="cloud-password-length" aria-invalid={Array.from(value).length < 8 || Array.from(value).length > 128} className="jb-focus h-9 rounded-[6px] border border-jb-line bg-jb-surface px-2 text-[14px]" />
-      </label>
-      <p id="cloud-password-length" className="text-[12px] text-jb-muted">{i18n.board.cloudPasswordLength}</p>
-      <button type="button" aria-pressed={show} className="jb-focus self-start text-[12px] text-jb-cloud" onClick={() => setShow(v => !v)}>{show ? i18n.board.cloudPasswordHide : i18n.board.cloudPasswordShow}</button>
-    </> : null}
+    {editing ? <TextField
+      label={i18n.board.cloudPasswordLabel}
+      hint={i18n.board.cloudPasswordLength}
+      type={show ? 'text' : 'password'}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      autoComplete="new-password"
+      spellCheck={false}
+      autoCapitalize="none"
+      aria-invalid={Array.from(value).length < 8 || Array.from(value).length > 128}
+      suffix={<button type="button" aria-pressed={show} className="jb-focus shrink-0 text-[12px] font-medium text-jb-cloud" onClick={() => setShow(v => !v)}>{show ? i18n.board.cloudPasswordHide : i18n.board.cloudPasswordShow}</button>}
+    /> : null}
     <div className="flex flex-wrap gap-3 text-[12px] text-jb-cloud">
       {plan === 'pro' && !editing ? <button type="button" className="jb-focus" onClick={() => onChange('')}>{protectedLink ? i18n.board.cloudPasswordChange : i18n.board.cloudPasswordSet}</button> : null}
       {protectedLink && value !== null ? <button type="button" className="jb-focus" onClick={() => onChange(null)}>{i18n.board.cloudPasswordRemove}</button> : null}
@@ -390,23 +417,28 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
         {job?.state === 'done' && job.result ? <Result job={job as CloudJob & { result: NonNullable<CloudJob['result']> }} onFlash={onFlash} server={account?.server ?? 'https://cloud.joplo.app'} /> : null}
         {job?.state === 'failed' && job.error?.storage && !unpicked ? <StorageFull full={job.error.storage} plan={account?.signedIn ? account.plan : null} /> : null}
         {job?.state === 'failed' && job.error && !job.error.storage && !unpicked ? (
-          <div className="flex flex-col gap-1 rounded-[8px] border border-jb-danger bg-jb-danger-bg px-3 py-2" data-testid="cloud-error">
-            <div className="text-[13px] font-semibold text-jb-danger">{i18n.board.cloudFailed}</div>
-            <p className="whitespace-pre-wrap break-words font-jb-mono text-[12px]">{job.error.message}</p>
-            {job.error.upgradeUrl ? <a href={job.error.upgradeUrl} target="_blank" rel="noopener noreferrer" className="jb-focus text-[12px] text-jb-cloud">{i18n.board.cloudStorageUpgrade}</a> : null}
+          <div data-testid="cloud-error">
+            <Alert tone="danger">
+              <div className="flex flex-col gap-1">
+                <div className="text-[13px] font-semibold text-jb-danger">{i18n.board.cloudFailed}</div>
+                <p className="whitespace-pre-wrap break-words font-jb-mono text-[12px]">{job.error.message}</p>
+                {job.error.upgradeUrl ? <a href={job.error.upgradeUrl} target="_blank" rel="noopener noreferrer" className="jb-focus text-[12px] text-jb-cloud">{i18n.board.cloudStorageUpgrade}</a> : null}
+              </div>
+            </Alert>
           </div>
         ) : null}
         {model.startError ? <p className="text-[12px] text-jb-danger"><LocalText value={model.startError} /></p> : null}
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          size="md"
           disabled={running || !model.linksReady || !!unpicked || !!passwordInvalid}
           onClick={() => { const secret = password; setPassword(undefined); void model.publish(ctx, choice, restricted ? 'private' : visibility, review, secret); }}
-          className="jb-focus inline-flex h-9 items-center justify-center gap-2 rounded-[8px] bg-jb-cloud px-4 font-jb text-[14px] font-semibold text-jb-on-cloud hover:bg-jb-cloud-hover disabled:opacity-60"
+          leftIcon={running ? <Loader2 className="size-4 animate-spin" /> : <Cloud className="size-4" />}
+          className="h-9 w-full bg-jb-cloud font-jb text-[14px] font-semibold text-jb-on-cloud hover:bg-jb-cloud-hover"
           data-testid="cloud-publish"
         >
-          {running ? <Loader2 className="size-4 animate-spin" /> : <Cloud className="size-4" />}
           {model.linksError ? i18n.board.cloudPublishButton : !model.linksReady ? i18n.board.cloudStageChecking : running ? i18n.board.cloudPublishing : job?.state === 'done' ? i18n.board.cloudPublishAgain : job?.state === 'failed' ? i18n.board.cloudTryAgain : i18n.board.cloudPublishButton}
-        </button>
+        </Button>
       </div>
     );
   }

@@ -1,0 +1,2 @@
+/* Import Juice UI stylesheet inside Tailwind's components layer so @layer utilities overrides cleanly without !important. */
+@import "@tokenroll/juice/styles.css" layer(components);

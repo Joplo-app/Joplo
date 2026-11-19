@@ -10,6 +10,7 @@ import { useBoardI18n } from '../i18n/board/context';
  * 视图计算在 nav-model.ts（纯函数）。创作侧信息，只由看板传给 PlayerPage 的 nav，不进发布站。
  */
 import type { Project } from '@joplo-app/core/runtime';
+import { Badge, Separator } from '@tokenroll/juice/primitives';
 import { alternativeOf, worksOf, scenariosOf } from '../runtime/views';
 import { Popover, useHoverCard, useTip } from '../player/popover';
 import { StatusIcon } from '../player/StatusIcon';
@@ -28,7 +29,7 @@ export function GroupHead({ title, right }: { title: string; right?: string }) {
 }
 
 function Letter({ letter, on }: { letter: string; on: boolean }) {
-  return <span className={cn('flex size-6 shrink-0 items-center justify-center rounded-[6px] border-[1.5px] font-jb text-[13px] font-bold text-jb-fg', on ? 'border-jb-ink bg-jb-accent' : 'border-jb-line bg-jb-surface')}>{letter}</span>;
+  return <span className={cn('flex size-6 shrink-0 items-center justify-center rounded-[7px] font-jb text-[13px] font-bold text-jb-fg', on ? 'bg-jb-accent shadow-[inset_0_0_0_1.5px_var(--jb-border-strong)]' : 'bg-[var(--juice-w6)]')}>{letter}</span>;
 }
 
 function WorkRow({ project, workId, index, active, onPick }: { project: Project; workId: string; index: number; active: boolean; onPick: () => void }) {
@@ -40,13 +41,13 @@ function WorkRow({ project, workId, index, active, onPick }: { project: Project;
   const hc = useHoverCard();
   return (
     <li>
-      <button type="button" onClick={onPick} {...hc.trigger} data-testid={`work-${workId}`} aria-current={active ? 'true' : undefined} className={cn('jb-focus flex w-full items-start gap-2.5 rounded-[8px] px-2 py-2.5 text-left font-jb', active ? 'bg-jb-selected' : 'hover:bg-jb-hover active:bg-jb-press')}>
+      <button type="button" onClick={onPick} {...hc.trigger} data-testid={`work-${workId}`} aria-current={active ? 'true' : undefined} className={cn('jb-focus flex w-full items-start gap-2.5 rounded-[10px] px-2 py-2.5 text-left font-jb transition-colors', active ? 'bg-jb-selected' : 'hover:bg-jb-hover active:bg-jb-press')}>
         <Letter letter={letter} on={active} />
         <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
           <span className={cn('truncate text-[14px] leading-[19px] text-jb-fg', active && 'font-semibold')}>{title}</span>
           {meta.picked || meta.text ? (
             <span className="flex items-center gap-1.5 whitespace-nowrap text-[12px] text-jb-muted">
-              {meta.picked ? <span className="rounded-[4px] bg-jb-inverse px-1.5 py-px text-[11px] font-medium text-jb-on-inverse">{i18n.board.picked}</span> : null}
+              {meta.picked ? <Badge className="h-[18px] rounded-[5px] bg-jb-inverse px-1.5 text-[11px] text-jb-on-inverse">{i18n.board.picked}</Badge> : null}
               <span className="truncate">{meta.text || i18n.board.allCovered}</span>
             </span>
           ) : null}
@@ -88,7 +89,7 @@ function OtherTag({ letter, status, tip, onClick, testid }: { letter: string; st
   const [tp, tipNode] = useTip(i18n.board.clickToSwitch(tip));
   return (
     <>
-      <button type="button" onClick={onClick} aria-label={tip} data-testid={testid} {...tp} className="jb-focus flex h-[18px] shrink-0 items-center gap-0.5 rounded-[4px] border border-jb-line bg-jb-surface px-[5px] font-jb text-[11px] font-semibold text-jb-muted hover:bg-jb-hover">
+      <button type="button" onClick={onClick} aria-label={tip} data-testid={testid} {...tp} className="jb-focus flex h-[18px] shrink-0 items-center gap-0.5 rounded-[5px] bg-[var(--juice-w6)] px-[5px] font-jb text-[11px] font-semibold text-jb-muted transition-colors hover:bg-[var(--juice-w12)]">
         {letter}
         <StatusIcon status={status} size={11} labelPrefix={i18n.board.labelPrefix(letter)} />
       </button>
@@ -258,7 +259,7 @@ export function CaseRail({ project, featureId, workId, caseId }: { project: Proj
           </span>
         );
       })}
-      <span aria-hidden className="my-1 h-px w-6 bg-jb-line" />
+      <Separator style={{ width: 24, margin: '4px auto' }} />
       {f.caseIds.map((cid) => {
         const c = project.cases[cid];
         if (!c) return null;

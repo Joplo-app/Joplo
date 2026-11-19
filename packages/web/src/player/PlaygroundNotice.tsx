@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Button } from '@tokenroll/juice/primitives';
 import { useI18n } from '../i18n/context';
 import type { DemoController, Snapshot } from '../runtime/demo';
 
@@ -19,11 +20,11 @@ export function PlaygroundNotice({ ctl, snap }: { ctl: DemoController; snap: Sna
   }, [snap.switchPrompt]);
   if (!snap.switchPrompt) return null;
   return <div className="flex flex-col gap-2 text-[12px]" data-testid="playground-notice">
-    {snap.switchPrompt ? <div ref={prompt} role="dialog" aria-label={t.player.freeSwitchConfirm} className="jb-pop rounded-lg p-3 text-[13px]" onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ctl.dismissSwitch(); } }}>
+    {snap.switchPrompt ? <div ref={prompt} role="dialog" aria-label={t.player.freeSwitchConfirm} className="j-floating-pop jb-pop p-3 text-[13px]" onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ctl.dismissSwitch(); } }}>
       {snap.switchPrompt.some(candidate => snap.project?.scenarios[candidate.scenarioId]?.actionEntry !== 'after') ? <p className="mb-2 text-jb-muted">{t.player.freeSwitchDescription}</p> : null}
-      <div className="flex flex-col gap-2">{snap.switchPrompt.map((candidate, index) => <button key={`${candidate.scenarioId}:${candidate.position}`} type="button" className="jb-focus rounded-md bg-jb-inverse px-3 py-2 text-left text-jb-on-inverse hover:bg-jb-inverse-hover" onClick={() => ctl.confirmSwitch(index)}>
+      <div className="flex flex-col gap-1.5">{snap.switchPrompt.map((candidate, index) => <Button key={`${candidate.scenarioId}:${candidate.position}`} variant="primary" size="sm" className="w-full justify-start text-left" onClick={() => ctl.confirmSwitch(index)}>
         {t.player.freeSwitchPrompt(snap.project?.scenarios[candidate.scenarioId]?.name ?? candidate.scenarioId)} <span className="opacity-70">· {candidate.position + 1}</span>
-      </button>)}<button type="button" className="jb-focus rounded-md px-3 py-2 text-jb-muted hover:bg-jb-hover" onClick={() => ctl.dismissSwitch()}>{t.player.freeSwitchCancel}</button></div>
+      </Button>)}<Button variant="ghost" size="sm" className="w-full justify-center" onClick={() => ctl.dismissSwitch()}>{t.player.freeSwitchCancel}</Button></div>
     </div> : null}
   </div>;
 }

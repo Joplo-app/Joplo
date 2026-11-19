@@ -9,6 +9,7 @@ import { entryOfScenario, sliceLabel } from './work-view';
  */
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, CirclePlay, Pause, Play, RotateCcw, RectangleHorizontal, X } from 'lucide-react';
+import { Button, IconButton } from '@tokenroll/juice/primitives';
 import type { Scenario } from '@joplo-app/core/runtime';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { useI18n } from '../i18n/context';
@@ -186,14 +187,13 @@ export function WatchView(p: Props) {
         <RoundBtn label={i18n.player.nextStep} onClick={() => void ctl.next()} disabled={!scenario || total === 0} testid="watch-next">
           <ChevronRight className="size-5" />
         </RoundBtn>
-        <div className="mx-1 h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-jb-line" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`${pos} / ${total}`}>
+        <div className="mx-1 h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--juice-w12)]" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`${pos} / ${total}`}>
           <div className="h-full rounded-full bg-jb-ink transition-[width] duration-300" style={{ width: `${progress}%` }} />
         </div>
         {p.voice}
-        <button type="button" onClick={() => void enter()} className="jb-focus inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[8px] bg-jb-inverse px-3 text-[13px] font-semibold text-jb-on-inverse" data-testid="watch-landscape">
-          <RectangleHorizontal className="size-4" />
+        <Button variant="primary" size="md" leftIcon={<RectangleHorizontal className="size-4" />} onClick={() => void enter()} className="h-9 shrink-0 px-3 text-[13px] font-semibold" data-testid="watch-landscape">
           {i18n.player.watchLandscape}
-        </button>
+        </Button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto border-t border-jb-line px-2 pb-6 pt-2" data-testid="watch-chapters">
         {/* 按能力分组（D102 修订）：顺序里的一组、支线一组；不传 naming 时是一组（与以前一样） */}
@@ -245,17 +245,19 @@ export function WatchView(p: Props) {
 
 function RoundBtn({ label, onClick, disabled, testid, primary, children }: { label: string; onClick: () => void; disabled?: boolean; testid: string; primary?: boolean; children: ReactNode }) {
   return (
-    <button
-      type="button"
-      aria-label={label}
+    <IconButton
+      label={label}
       title={label}
+      variant={primary ? 'primary' : 'ghost'}
+      size="md"
       onClick={onClick}
       disabled={disabled}
-      className={cn('jb-focus inline-flex size-10 shrink-0 items-center justify-center rounded-full disabled:opacity-40', primary ? 'bg-jb-accent text-jb-on-accent' : 'text-jb-fg active:bg-jb-hover')}
+      style={{ width: 40, height: 40, borderRadius: 20 }}
+      className={cn('jb-focus', primary && 'bg-jb-accent text-jb-on-accent hover:bg-jb-accent-hover')}
       data-testid={testid}
     >
       {children}
-    </button>
+    </IconButton>
   );
 }
 
@@ -265,10 +267,9 @@ function Finished({ onRestart, dark, author }: { onRestart: () => void; dark?: b
     <div className={cn('absolute inset-0 z-20 flex flex-col items-center justify-center gap-3', dark ? 'bg-black/70' : 'bg-black/65')} data-testid="watch-finished">
       <div className="text-[18px] font-bold text-white">{i18n.player.watchFinished}</div>
       {author}
-      <button type="button" onClick={onRestart} className="jb-focus inline-flex h-10 items-center gap-2 rounded-full bg-white px-5 text-[14px] font-semibold text-black" data-testid="watch-again">
-        <RotateCcw className="size-4" />
+      <Button onClick={onRestart} size="lg" leftIcon={<RotateCcw className="size-4" />} className="h-10 rounded-[20px] bg-white px-5 text-[14px] font-semibold text-black hover:bg-white/90" data-testid="watch-again">
         {i18n.player.watchAgain}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -332,19 +333,18 @@ export function UpNextCard({ ctl, snap, variant }: { ctl: DemoController; snap: 
   const entry = snap.project ? entryOfScenario(snap.project, up.scenarioId) : null;
   const name = entry ? sliceLabel(entry, up.scenarioId, title, i18n) : title;
   const card = (
-    <div className="flex w-[300px] max-w-[86%] flex-col gap-2 rounded-[12px] bg-black/85 p-4 font-jb text-white shadow-lg" role="status" aria-live="polite" data-testid="up-next">
+    <div className="jb-dark j-slab flex w-[300px] max-w-[86%] flex-col gap-2 bg-black/90 p-4 font-jb text-white shadow-xl" role="status" aria-live="polite" data-testid="up-next">
       <div className="text-[12px] font-semibold tracking-[1px] text-white/70">
         {i18n.player.upNextTitle} · {i18n.player.upNextIn(up.left)}
       </div>
       <div className="line-clamp-2 text-[17px] font-bold leading-[1.35]">{name}</div>
       <div className="mt-1 flex gap-2">
-        <button type="button" onClick={() => ctl.playNextNow()} className="jb-focus inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[14px] font-semibold text-black" data-testid="up-next-now">
-          <Play className="size-4" />
+        <Button onClick={() => ctl.playNextNow()} size="md" leftIcon={<Play className="size-4" />} className="h-9 flex-1 rounded-[18px] bg-white px-3 text-[14px] font-semibold text-black hover:bg-white/90" data-testid="up-next-now">
           {i18n.player.upNextPlayNow}
-        </button>
-        <button type="button" onClick={() => ctl.cancelNext()} className="jb-focus inline-flex h-9 items-center justify-center rounded-full px-4 text-[14px] font-semibold text-white/85 ring-1 ring-white/40" data-testid="up-next-cancel">
+        </Button>
+        <Button onClick={() => ctl.cancelNext()} variant="outline" size="md" className="h-9 rounded-[18px] px-4 text-[14px] font-semibold text-white/85" data-testid="up-next-cancel">
           {i18n.player.upNextCancel}
-        </button>
+        </Button>
       </div>
     </div>
   );

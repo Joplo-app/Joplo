@@ -1,14 +1,10 @@
 /**
- * 看板首页左栏底部的 Joplo Cloud 账号卡片（D85，原型 examples/joplo 的 cloud_usage，用户确认方案 A）：
+ * 看板首页左栏底部的 Joplo Cloud 账号卡片（D85 + Juice UI Badge / IconButton / .j-copy-snippet）：
  * 套餐、邮箱、空间（已用 / 上限，C27 的 storage）、朗读（免费写“体验额度”，Pro 写“本月 · 几号重置”）、“用量与音色 ↗”（`<server>/usage`）。
- * - 没登录：写一句说明和可复制的登录命令；
- * - 云端连不上（已登录但账号接口失败，或旧云端没有这些数字）：不显示数字，只写连不上；
- * - 旧 CLI 启动的看板（没有 cloud bridge）：整张卡片不显示。
- *
- * 数据流：GET /__joplo/cloud/account（本机令牌）→ CLI 的 cloudBridge.account()（`/api/v1/me` 的 storage + `/api/v1/voice` 的 quota）→ CloudAccount → 这张卡片。
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { Check, Copy } from 'lucide-react';
+import { Badge, IconButton } from '@tokenroll/juice/primitives';
 import { cn } from '@/lib/utils';
 import { useBoardI18n } from '../i18n/board/context';
 import { copyText } from '../player/util';
@@ -31,8 +27,8 @@ export function HomeCloudCard() {
 
 function Bar({ pct, tone, label }: { pct: number; tone: 'storage' | 'voice'; label: string }) {
   return (
-    <div className="h-1 overflow-hidden rounded-full bg-jb-sunken" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
-      <div className={cn('h-full rounded-full', tone === 'voice' ? 'bg-[#9C6ADE]' : pct >= 80 ? 'bg-[#E0AE00]' : 'bg-jb-ink')} style={{ width: `${pct}%` }} />
+    <div className="h-1.5 overflow-hidden rounded-full bg-[var(--juice-w12)]" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+      <div className={cn('h-full rounded-full transition-[width]', tone === 'voice' ? 'bg-jb-cloud' : pct >= 80 ? 'bg-jb-accent-press' : 'bg-jb-ink')} style={{ width: `${pct}%` }} />
     </div>
   );
 }
@@ -40,7 +36,7 @@ function Bar({ pct, tone, label }: { pct: number; tone: 'storage' | 'voice'; lab
 function Row({ label, value, children, testid }: { label: string; value: ReactNode; children?: ReactNode; testid: string }) {
   return (
     <div className="flex flex-col gap-1" data-testid={testid}>
-      <div className="flex items-baseline justify-between gap-2 text-[11.5px]">
+      <div className="flex items-baseline justify-between gap-2 text-[11.5px] tabular-nums">
         <span className="font-semibold text-jb-muted">{label}</span>
         <span className="truncate text-jb-muted">{value}</span>
       </div>
@@ -54,7 +50,7 @@ export function CloudAccountCard({ account }: { account: CloudAccount }) {
   const { t: i18n, locale } = useBoardI18n();
   const [copied, setCopied] = useState(false);
   const shell = (children: ReactNode, state: string) => (
-    <section className="mt-3 flex flex-col gap-2 rounded-[10px] border border-jb-line bg-jb-surface p-3" data-testid="home-cloud" data-state={state} aria-label="Joplo Cloud">
+    <section className="mt-3 flex flex-col gap-2 rounded-[14px] bg-jb-app p-3" data-testid="home-cloud" data-state={state} aria-label="Joplo Cloud">
       {children}
     </section>
   );
@@ -63,11 +59,11 @@ export function CloudAccountCard({ account }: { account: CloudAccount }) {
       <>
         <span className="text-[13px] font-semibold">Joplo Cloud</span>
         <p className="text-[12px] leading-[1.45] text-jb-muted">{i18n.board.cloudCardSignedOut}</p>
-        <div className="flex h-8 items-center gap-2 rounded-[6px] border border-jb-line bg-jb-app pl-2.5 pr-1">
+        <div className="j-copy-snippet h-8 bg-jb-surface py-0 pl-2.5 pr-1 shadow-[inset_0_0_0_1px_var(--juice-edge)]">
           <code className="min-w-0 flex-1 truncate font-jb-mono text-[12px]" data-testid="home-cloud-login">{account.loginCommand}</code>
-          <button type="button" className="jb-focus flex size-6 shrink-0 items-center justify-center rounded-[4px] text-jb-muted hover:bg-jb-hover hover:text-jb-fg" aria-label={i18n.board.copy(account.loginCommand)} onClick={() => void copyText(account.loginCommand).then(setCopied)}>
+          <IconButton label={i18n.board.copy(account.loginCommand)} variant="ghost" size="xs" onClick={() => void copyText(account.loginCommand).then(setCopied)}>
             {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-          </button>
+          </IconButton>
         </div>
       </>,
       'signed-out',
@@ -89,7 +85,7 @@ export function CloudAccountCard({ account }: { account: CloudAccount }) {
     <>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[13px] font-semibold">Joplo Cloud</span>
-        {plan ? <span className="shrink-0 rounded-[4px] bg-jb-sunken px-1.5 py-px text-[11px] font-medium text-jb-muted" data-testid="home-cloud-plan">{plan}</span> : null}
+        {plan ? <Badge tone={account.plan === 'pro' ? 'signal' : 'neutral'} className="shrink-0" data-testid="home-cloud-plan">{plan}</Badge> : null}
       </div>
       <span className="truncate text-[12px] text-jb-faint" title={account.email}>{account.email}</span>
       {storage || voice ? (
@@ -115,4 +111,3 @@ export function CloudAccountCard({ account }: { account: CloudAccount }) {
     storage || voice ? 'signed-in' : 'offline',
   );
 }
-

@@ -40,6 +40,7 @@ import { Overlay } from './Overlay';
 import { StageViewport, type StageWatermark } from './StageViewport';
 import { resolveLook, type AppearanceFont, type AppearanceStroke } from '../renderer/appearance';
 import { AudioLines, PanelLeftOpen } from 'lucide-react';
+import { Alert, Separator } from '@tokenroll/juice/primitives';
 import { Btn, DirectorTag, Kbd, MenuButton, Segmented, Switch, useWidth, type MenuEntry } from './controls';
 import { SHORTCUTS } from './states';
 import { fullscreenBarCollapse } from './controls-fit';
@@ -87,7 +88,7 @@ export function Brand({ onClick, href }: { onClick?: () => void; href?: string }
 
 export function TopBar({ children, right }: { children?: ReactNode; right?: ReactNode }) {
   return (
-    <header className="flex h-[52px] shrink-0 items-center gap-3 border-b border-jb-line bg-jb-surface px-4 font-jb text-jb-fg" data-testid="topbar">
+    <header className="flex h-[52px] shrink-0 items-center gap-3 bg-jb-surface px-4 font-jb text-jb-fg shadow-[0_1px_0_var(--juice-edge)]" data-testid="topbar">
       {children}
       {right ? <div data-topbar-actions="" className="ml-auto flex shrink-0 items-center gap-3">{right}</div> : null}
     </header>
@@ -111,11 +112,11 @@ function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
               placement="bottom-start"
               variant="ghost"
               width={300}
-              className="h-8 min-w-0 max-w-[260px] px-2 text-[14px] [&>span:first-child]:truncate"
+              className="h-8 min-w-0 max-w-[260px] px-2 text-[14px] [&_[data-jb-label]]:truncate"
               chevron={<ChevronsUpDown className="size-3.5 text-jb-faint" aria-hidden />}
             />
           ) : c.onClick ? (
-            <button type="button" onClick={c.onClick} data-testid={c.testid} className="jb-focus truncate rounded-[6px] px-2 py-1.5 font-medium hover:bg-jb-hover">
+            <button type="button" onClick={c.onClick} data-testid={c.testid} className="jb-focus truncate rounded-[8px] px-2 py-1.5 font-medium transition-colors hover:bg-jb-hover">
               {c.label}
             </button>
           ) : (
@@ -151,9 +152,9 @@ function NavButtons({ snap, scenario, ctl, iconOnly, size, ids }: { snap: Snapsh
   );
 }
 
-const Divider = () => <span aria-hidden className="h-5 w-px shrink-0 bg-jb-line" />;
+const Divider = () => <Separator orientation="vertical" style={{ height: 20, alignSelf: 'center' }} />;
 
-/** 时间线的一格：当前步是宽块并写说明；其余只有序号，悬停写“序号 · 说明”。 */
+/** 时间线的一格（对齐 Juice .j-timeline-chip 同心胶囊，保留停留进度 jb-dwell 与分叉标记）：当前步展开写说明，其余只有序号。 */
 function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; width: number; onClick: () => void; testid: string; kind?: string }) {
   const { t: i18n } = useI18n();
   const [tip, tipNode] = useTip(chip.state === 'current' && !chip.fork ? null : chip.tip, { placement: 'top-center', delay: 200 });
@@ -172,10 +173,10 @@ function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; widt
         {...tip}
         style={cur ? { width } : undefined}
         className={cn(
-          'jb-focus relative flex h-7 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[6px] font-jb-mono text-[11px] font-bold',
-          cur ? 'justify-start border-[1.5px] border-jb-ink bg-jb-accent px-2.5 text-jb-on-accent' : 'min-w-[34px] justify-center px-1.5',
-          chip.state === 'done' && 'border border-jb-ink bg-jb-inverse text-jb-accent hover:bg-jb-inverse-hover',
-          chip.state === 'todo' && 'border border-jb-line bg-jb-surface text-jb-faint hover:bg-jb-hover hover:text-jb-fg',
+          'j-timeline-chip jb-focus relative flex h-7 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[8px] font-jb-mono text-[11px] font-bold',
+          cur ? 'justify-start bg-jb-accent px-2.5 text-jb-on-accent shadow-[inset_0_0_0_1.5px_var(--jb-border-strong)] hover:bg-jb-accent-hover hover:text-jb-on-accent' : 'min-w-[34px] justify-center px-1.5',
+          chip.state === 'done' && 'bg-jb-inverse text-jb-accent hover:bg-jb-inverse-hover hover:text-jb-accent',
+          chip.state === 'todo' && 'bg-[var(--juice-w6)] text-jb-muted hover:bg-[var(--juice-w12)] hover:text-jb-fg',
         )}
       >
         {/* 播放中的停留进度：从左往右填深黄，暂停时停住（D55） */}
@@ -220,7 +221,7 @@ function Timeline({ snap, scenario, ctl, currentW }: { snap: Snapshot; scenario:
     else if (l + li.offsetWidth > ol.scrollLeft + ol.clientWidth) ol.scrollLeft = l + li.offsetWidth - ol.clientWidth + 6;
   }, [cur]);
   return (
-    <ol ref={ref} className="jb-noscrollbar flex h-[34px] min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1.5" aria-label={i18n.player.steps} data-testid="step-bar">
+    <ol ref={ref} className="j-timeline-track jb-noscrollbar flex h-[34px] min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1.5" aria-label={i18n.player.steps} data-testid="step-bar">
       {chips.map((c) => (
         <Chip key={c.index} chip={c} width={currentW} onClick={() => ctl.clickStepChip(c.stepIndex)} testid={c.index === 0 ? 'chip-initial' : `chip-${scenario.steps[c.index - 1]!.id}`} kind={c.index === 0 ? undefined : scenario.steps[c.index - 1]!.kind} />
       ))}
@@ -251,13 +252,13 @@ function CompactTimeline({ snap, scenario, ctl }: { snap: Snapshot; scenario: Sc
   );
 }
 
-/** 播放坞：⟲ ‹ 播放 › │ 时间线 │ 速度 ▾ · 缩放 − 适应 +。 */
+/** 播放坞：⟲ ‹ 播放 › │ 时间线 │ 速度 ▾ · 缩放 − 适应 +（Juice .j-transport-bar 同心底座）。 */
 function Dock({ snap, scenario, ctl, speed, onSpeed, L, zoom, voice }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; speed: number; onSpeed?: (v: number) => void; L: BoardLayout; zoom: ReactNode; voice?: ReactNode }) {
   const { t: i18n } = useI18n();
 
   const off = !scenario || snap.view !== 'stage';
   return (
-    <div className="flex h-[56px] shrink-0 items-center gap-1.5 rounded-[10px] border border-jb-line bg-jb-surface px-3 font-jb" role="toolbar" aria-label={i18n.player.playbackControls} data-testid="controls">
+    <div className="j-transport-bar flex h-[56px] shrink-0 items-center justify-start gap-1.5 rounded-[14px] bg-jb-surface px-3 font-jb shadow-[0_0_0_1px_var(--juice-edge)]" role="toolbar" aria-label={i18n.player.playbackControls} data-testid="controls">
       <Btn icon={<RotateCcw className="size-4" />} label={i18n.player.goToStart} kbd="Home" iconOnly variant="ghost" size={34} className="rounded-[8px]" onClick={() => ctl.reset()} disabled={off} data-testid="ctl-reset" />
       <NavButtons snap={snap} scenario={scenario} ctl={ctl} iconOnly={false} size={34} ids={{ prev: 'ctl-prev', play: 'ctl-play', next: 'ctl-next' }} />
       <Divider />
@@ -276,9 +277,9 @@ function FullscreenBar({ snap, scenario, ctl, speed, onSpeed, layers, viewLayer,
 
   const current = layers.find((l) => l.id === viewLayer)?.title ?? viewLayer;
   const c = fullscreenBarCollapse(avail, playLabelOf(snap, i18n), onSpeed ? SPEEDS : [], layers.map((l) => l.title), director, current, i18n);
-  const sep = <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-jb-line" />;
+  const sep = <Separator orientation="vertical" style={{ height: 20, marginInline: 4, alignSelf: 'center' }} />;
   return (
-    <div className="jb-dark flex h-12 max-w-full shrink-0 items-center gap-1.5 overflow-hidden rounded-full border border-jb-line bg-jb-surface px-2 [&_[data-testid=fs-play]]:rounded-full" role="toolbar" aria-label={i18n.player.fullscreenPlaybackControls} data-testid="fullscreen-controls" data-collapsed={[...c].join(' ') || undefined}>
+    <div className="jb-dark j-transport-bar flex h-12 max-w-full shrink-0 items-center justify-start gap-1.5 overflow-hidden rounded-[24px] bg-jb-surface px-2 shadow-[0_0_0_1px_var(--juice-edge),0_12px_32px_-8px_rgba(0,0,0,0.45)] [&_[data-testid=fs-play]]:rounded-full" role="toolbar" aria-label={i18n.player.fullscreenPlaybackControls} data-testid="fullscreen-controls" data-collapsed={[...c].join(' ') || undefined}>
       <NavButtons snap={snap} scenario={scenario} ctl={ctl} iconOnly={c.has('nav')} size={32} ids={{ prev: 'fs-prev', play: 'fs-play', next: 'fs-next' }} />
       {onSpeed ? (
         <>
@@ -504,7 +505,7 @@ export function PlayerPage(p: PlayerPageProps) {
     if (!railOpen) return;
     const down = (e: PointerEvent) => {
       const t = e.target as HTMLElement;
-      if (!t.closest?.('[data-testid="left-nav-float"],[data-rail],[data-jb-pop]')) setRailOpen(false);
+      if (!t.closest?.('[data-testid="left-nav-float"],[data-rail],[data-jb-pop],[data-floating-popover]')) setRailOpen(false);
     };
     const key = (e: KeyboardEvent) => e.key === 'Escape' && setRailOpen(false);
     window.addEventListener('pointerdown', down, true);
@@ -633,9 +634,9 @@ export function PlayerPage(p: PlayerPageProps) {
   const zoomIn = () => zoomApi.current?.zoomBy(1.25);
   const zoomOut = () => zoomApi.current?.zoomBy(1 / 1.25);
   const fit = () => zoomApi.current?.fit();
-  // 缩放（D55：从画面右上角移到播放坞）。< 1440 只剩 − +；手动缩放后才出现「适应」
+  // 缩放（D55：从画面右上角移到播放坞，Juice .j-zoom-bar 同心胶囊）。< 1440 只剩 − +；手动缩放后才出现「适应」
   const dockZoom = hasStage ? (
-    <div className="flex h-[34px] shrink-0 items-center gap-0.5 rounded-[8px] bg-jb-app px-1" role="group" aria-label={i18n.player.zoom} data-testid="zoom-bar" data-zoom={userZoom === null ? 'camera' : userZoom.toFixed(2)}>
+    <div className="j-zoom-bar flex h-[34px] shrink-0 items-center gap-0.5 rounded-[9px] px-1" role="group" aria-label={i18n.player.zoom} data-testid="zoom-bar" data-zoom={userZoom === null ? 'camera' : userZoom.toFixed(2)}>
       <Btn icon={<Minus className="size-4" />} label={i18n.player.zoomOut} title={i18n.player.zoomOutYouCanAlsoScrollOrPinch} iconOnly variant="ghost" size={28} onClick={zoomOut} data-testid="zoom-out" />
       {L.zoomLabel ? (
         <Btn label={i18n.player.fit} title={i18n.player.returnToTheShotResetManualZoomAndPan} variant="ghost" size={28} className="px-1.5 text-[12px] font-normal text-jb-muted" onClick={fit} disabled={userZoom === null} data-testid="zoom-fit" />
@@ -772,7 +773,7 @@ export function PlayerPage(p: PlayerPageProps) {
           {completed ? <div className="flex justify-end"><AuthorLink author={p.author} /></div> : null}
           {hasStage ? (
             <div className={cn('absolute right-3 top-3 z-10 transition-opacity duration-300', idle.visible ? 'opacity-100' : 'pointer-events-none opacity-0')}>
-              <div className="flex items-center gap-0.5 rounded-[8px] border border-jb-line bg-jb-surface p-0.5" role="group" aria-label={i18n.player.zoom} data-testid="zoom-bar">
+              <div className="j-zoom-bar flex h-8 items-center gap-0.5 rounded-[10px] bg-jb-surface p-0.5 shadow-[0_0_0_1px_var(--juice-edge)]" role="group" aria-label={i18n.player.zoom} data-testid="zoom-bar">
                 <Btn icon={<Minus className="size-4" />} label={i18n.player.zoomOut} iconOnly variant="ghost" size={28} onClick={zoomOut} data-testid="zoom-out" />
                 <Btn icon={<Maximize className="size-3.5" />} label={i18n.player.fit} iconOnly variant="ghost" size={28} onClick={fit} disabled={userZoom === null} data-testid="zoom-fit" />
                 <Btn icon={<Plus className="size-4" />} label={i18n.player.zoomIn} iconOnly variant="ghost" size={28} onClick={zoomIn} data-testid="zoom-in" />
@@ -832,26 +833,26 @@ export function PlayerPage(p: PlayerPageProps) {
         }
       >
         <Brand onClick={p.onBrand} href={p.brandHref} />
-        <span aria-hidden className="h-5 w-px shrink-0 bg-jb-line" />
+        <Separator orientation="vertical" style={{ height: 20, alignSelf: 'center' }} />
         <Breadcrumbs crumbs={p.crumbs} />
       </TopBar>
       <div className="flex min-h-0 flex-1">
         {L.rail ? (
           // 窄屏（< 1100）：左栏收成 56px 竖条；点竖条或按 [ 浮出完整左栏，选完自动收回
-          <aside className="flex w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-jb-line bg-jb-surface py-3" data-testid="left-nav" data-rail="">
+          <aside className="flex w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto bg-jb-surface py-3 shadow-[1px_0_0_var(--juice-edge)]" data-testid="left-nav" data-rail="">
             <Btn icon={<PanelLeftOpen className="size-4" />} label={i18n.player.expandSidebar} kbd="[" iconOnly variant="ghost" size={32} selected={railOpen} onClick={() => setRailOpen((v) => !v)} data-testid="rail-open" tipPlacement="bottom-start" />
             <button type="button" className="flex w-full flex-1 flex-col items-center gap-1 pt-1" onClick={() => setRailOpen(true)} aria-label={i18n.player.expandSidebar}>
               {p.navRail}
             </button>
           </aside>
         ) : (
-          <aside className="flex shrink-0 flex-col overflow-y-auto border-r border-jb-line bg-jb-surface px-3 py-4" style={{ width: L.navWidth }} data-testid="left-nav">
+          <aside className="flex shrink-0 flex-col overflow-y-auto bg-jb-surface px-3 py-4 shadow-[1px_0_0_var(--juice-edge)]" style={{ width: L.navWidth }} data-testid="left-nav">
             {p.nav}
           </aside>
         )}
         {L.rail && railOpen ? (
           <aside
-            className="jb-pop absolute bottom-3 left-[64px] top-[60px] z-30 flex w-[276px] flex-col overflow-y-auto px-3 py-4"
+            className="j-floating-pop jb-pop absolute bottom-3 left-[64px] top-[60px] z-30 flex w-[276px] flex-col overflow-y-auto px-3 py-4"
             data-testid="left-nav-float"
             onClickCapture={(e) => {
               // 选完自动收回（点到了按钮）
@@ -864,9 +865,11 @@ export function PlayerPage(p: PlayerPageProps) {
         <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-hidden px-4 py-3" data-inspecting={inspecting ? '' : undefined}>
           {p.banner}
           {snap.playbackError ? (
-            <div role="alert" className="shrink-0 rounded-[8px] border border-jb-danger bg-jb-danger-bg px-3 py-2 text-[13px] text-jb-danger" data-testid="playback-error">
-              <strong>{i18n.player.demoReplayFailed}</strong>
-              {translate(snap.playbackError, i18n)}
+            <div className="shrink-0" data-testid="playback-error">
+              <Alert tone="danger">
+                <strong>{i18n.player.demoReplayFailed}</strong>
+                {translate(snap.playbackError, i18n)}
+              </Alert>
             </div>
           ) : null}
           <div className="flex min-h-0 flex-1 flex-col">
