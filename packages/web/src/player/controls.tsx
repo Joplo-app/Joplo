@@ -309,8 +309,8 @@ export function Switch({ on, onChange, label, testid, title, className }: { on: 
   return (
     <>
       <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} data-testid={testid} className={cn('jb-focus inline-flex h-7 shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] px-1.5 font-jb text-[13px] font-medium text-jb-fg hover:bg-jb-hover', className)} {...tip}>
-        <span aria-hidden data-checked={on ? 'true' : 'false'} className={cn('j-switch pointer-events-none h-[20px] w-[34px] p-[2px]', on && 'bg-jb-accent shadow-[inset_0_0_0_1px_var(--jb-border-strong)]')}>
-          <i className={cn('j-switch-thumb size-4', on ? 'translate-x-[14px] bg-jb-on-accent' : 'bg-jb-surface')} />
+        <span aria-hidden data-checked={on ? 'true' : 'false'} className={cn('j-switch pointer-events-none h-[20px] w-[36px] p-[2px]', on && 'bg-jb-accent shadow-[inset_0_0_0_1px_var(--jb-border-strong)]')}>
+          <i className={cn('j-switch-thumb size-4', on ? 'bg-jb-on-accent' : 'bg-jb-surface')} />
         </span>
         {label}
       </button>
