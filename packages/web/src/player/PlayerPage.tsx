@@ -817,7 +817,7 @@ export function PlayerPage(p: PlayerPageProps) {
             <AuthorLink author={p.author} />
             {p.actions}
             {p.onInspect ? <LanguageMenu iconOnly={L.languageIconOnly} /> : null}
-            {p.menu.length ? <MenuButton trigger={{ icon: p.exportBadge && !L.topLabels ? p.exportBadge : p.menuLabel ? <Ellipsis className="size-4" /> : <Share className="size-4" />, label: p.menuLabel ?? i18n.player.export, iconOnly: !L.topLabels, extra: L.topLabels ? p.exportBadge : null }} label={p.menuLabel ?? i18n.player.export} testid="more-menu" items={p.menu} placement="bottom-end" width={240} /> : null}
+            {p.menu.length ? <MenuButton trigger={{ icon: p.exportBadge && !L.topLabels ? p.exportBadge : p.menuLabel ? <Ellipsis className="size-4" /> : <Share className="size-4" />, label: p.menuLabel ?? i18n.player.export, iconOnly: !L.topLabels, extra: L.topLabels ? p.exportBadge : null }} label={p.menuLabel ?? i18n.player.export} testid="more-menu" items={p.menu} placement="bottom-end" width={p.menu.some((m) => 'custom' in m) ? 296 : 240} /> : null}
             <Btn
               icon={<Expand className="size-4" />}
               label={i18n.player.fullscreen}

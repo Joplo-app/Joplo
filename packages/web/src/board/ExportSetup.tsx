@@ -129,10 +129,10 @@ export function ExportSetupCard({ rt }: { rt: ExportRuntime }) {
   const failed = job?.status === 'error';
   const p = job ? setupProgress(job, i18n) : null;
   return (
-    <div className="m-1 mb-0 flex w-[300px] flex-col gap-2 rounded-[12px] bg-[var(--juice-w6)] p-2.5 font-jb" data-testid="export-setup" data-status={job?.status ?? 'missing'}>
-      <div className="flex flex-col gap-0.5 text-[12px]">
+    <div className="m-1 mb-0 box-border flex w-[calc(100%-8px)] min-w-0 flex-col gap-2 rounded-[12px] bg-[var(--juice-w6)] p-2.5 font-jb" data-testid="export-setup" data-status={job?.status ?? 'missing'}>
+      <div className="flex min-w-0 flex-col gap-0.5 text-[12px]">
         <span className="font-semibold">{i18n.board.exportSetupTitle}</span>
-        <span className="text-jb-muted">{i18n.board.exportSetupBody(rt.downloadMB)}</span>
+        <span className="break-words text-jb-muted">{i18n.board.exportSetupBody(rt.downloadMB)}</span>
       </div>
       {running && p ? (
         <TaskProgressCard step={p.text} value={p.percent}>

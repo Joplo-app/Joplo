@@ -85,7 +85,7 @@ export function CloudAccountCard({ account }: { account: CloudAccount }) {
     <>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[13px] font-semibold">Joplo Cloud</span>
-        {plan ? <Badge tone={account.plan === 'pro' ? 'signal' : 'neutral'} className="shrink-0" data-testid="home-cloud-plan">{plan}</Badge> : null}
+        {plan ? <Badge tone={account.plan === 'pro' ? 'signal' : 'neutral'} className="shrink-0 px-2.5" data-testid="home-cloud-plan">{plan}</Badge> : null}
       </div>
       <span className="truncate text-[12px] text-jb-faint" title={account.email}>{account.email}</span>
       {storage || voice ? (

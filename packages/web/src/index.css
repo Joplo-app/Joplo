@@ -400,8 +400,12 @@
   font-family: var(--jb-font);
   animation: j-pop-enter 140ms var(--juice-out) both;
 }
-/* 轻提示：与 Juice .j-tooltip-pill 对齐的墨底胶囊 */
+/* 轻提示：与 Juice .j-tooltip-pill 对齐的墨底胶囊（允许长提示安全折行，不冲出视口） */
 .jb-tip {
+  display: block;
+  max-width: min(320px, calc(100vw - 24px));
+  white-space: normal;
+  overflow-wrap: break-word;
   background: var(--fill-on);
   color: var(--fill-slab);
   border-radius: 9px;
