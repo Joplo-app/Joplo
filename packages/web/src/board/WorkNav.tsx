@@ -11,7 +11,7 @@ import { useBoardI18n } from '../i18n/board/context';
  */
 import type { Entry, Project } from '@joplo-app/core/runtime';
 import { CirclePlay, Copy, LayoutList } from 'lucide-react';
-import { Badge, Separator } from '@tokenroll/juice/primitives';
+import { Badge, Separator, playJuiceSound } from '@tokenroll/juice/primitives';
 import { cn } from '@/lib/utils';
 import { Btn } from '../player/controls';
 import { entryMetaText, sliceRows, sliceWords, type ChapterRow } from '../player/work-view';
@@ -26,11 +26,15 @@ function SliceItem({ row, onPick }: { row: ChapterRow; onPick: () => void }) {
     <li>
       <button
         type="button"
-        onClick={onPick}
+        onClick={() => {
+          if (!row.current) playJuiceSound('tap');
+          onPick();
+        }}
         title={row.title}
         aria-current={row.current ? 'true' : undefined}
+        data-active={row.current ? 'true' : undefined}
         data-testid={`slice-${row.id}`}
-        className={cn('jb-focus flex w-full items-start gap-2.5 rounded-[8px] px-2 py-2 text-left font-jb', row.current ? 'bg-jb-selected' : 'hover:bg-jb-hover active:bg-jb-press')}
+        className="jb-work-card jb-focus flex w-full items-start gap-2.5 rounded-[12px] px-2.5 py-2 text-left font-jb"
       >
         {row.no ? (
           <span className={cn('w-6 shrink-0 font-jb-mono text-[12px] font-bold leading-[18px]', row.current ? 'text-jb-fg' : 'text-jb-muted')} data-testid="slice-no">
@@ -67,10 +71,10 @@ export function WorkNav({ project, entry, scenarioId, onScenario, onCopy }: { pr
         {entry.audience ? <p className="line-clamp-2 text-[12px] leading-[18px] text-jb-fg" title={entry.audience} data-testid="work-audience">{i18n.player.forRoles([entry.audience])}</p> : null}
       </div>
       {entry.slices.length === 0 ? (
-        <div className="mx-2 mt-2 flex flex-col gap-2 rounded-[12px] bg-[var(--juice-w6)] p-3" role="status" data-testid="work-empty">
+        <div className="mx-2 mt-2 flex flex-col gap-2 rounded-[14px] bg-[var(--juice-w6)] p-3" role="status" data-testid="work-empty">
           <p className="text-[13px] font-semibold text-jb-fg">{i18n.board.workEmptyTitle}</p>
           <p className="text-[12px] leading-[18px] text-jb-muted [overflow-wrap:anywhere]">{i18n.board.workEmptyBody(workFile(project, entry.id))}</p>
-          <pre className="m-0 whitespace-pre-wrap rounded-[8px] bg-jb-surface p-2 font-jb-mono text-[11px] leading-[16px] text-jb-fg shadow-[inset_0_0_0_1px_var(--juice-edge)] [overflow-wrap:anywhere]">{EMPTY_SNIPPET}</pre>
+          <pre className="m-0 whitespace-pre-wrap rounded-[10px] bg-jb-surface p-2.5 font-jb-mono text-[11px] leading-[16px] text-jb-fg shadow-[inset_0_0_0_1px_var(--juice-edge)] [overflow-wrap:anywhere]">{EMPTY_SNIPPET}</pre>
         </div>
       ) : null}
       {rows.main.length ? (
@@ -92,12 +96,22 @@ export function WorkNav({ project, entry, scenarioId, onScenario, onCopy }: { pr
       ) : null}
       <div className="min-h-4 flex-1" />
       {command ? (
-        <div className="sticky bottom-0 flex shrink-0 flex-col gap-1.5 rounded-[12px] bg-jb-app p-2.5" data-testid="review-strip">
+        <div className="sticky bottom-0 flex shrink-0 flex-col gap-1.5 rounded-[14px] bg-[var(--juice-w6)] p-3 shadow-[inset_0_0_0_1px_var(--juice-edge)]" data-testid="review-strip">
           <span className="text-[12px] font-semibold text-jb-fg">{i18n.board.reviewStrip}</span>
           <span className="text-[12px] leading-[17px] text-jb-muted">{i18n.board.reviewStripHint}</span>
-          <div className="j-copy-snippet items-start bg-jb-surface py-1.5 pl-2.5 pr-1">
+          <div className="j-copy-snippet items-start rounded-[10px] bg-jb-surface py-1.5 pl-2.5 pr-1 shadow-[inset_0_0_0_1px_var(--juice-edge)]">
             <code className="min-w-0 flex-1 font-jb-mono text-[11px] leading-[16px] text-jb-fg [overflow-wrap:anywhere]" data-testid="review-strip-command">{command}</code>
-            <Btn icon={<Copy className="size-3.5" />} label={i18n.board.copyCommand} title={i18n.board.copy(command)} iconOnly size={28} className="shrink-0" onClick={() => onCopy(command)} data-testid="review-strip-copy" />
+            <Btn
+              icon={<Copy className="size-3.5" />}
+              label={i18n.board.copyCommand}
+              title={i18n.board.copy(command)}
+              iconOnly
+              size={28}
+              sound="pop"
+              className="shrink-0"
+              onClick={() => onCopy(command)}
+              data-testid="review-strip-copy"
+            />
           </div>
         </div>
       ) : null}
@@ -111,7 +125,7 @@ export function WorkRail({ entry, scenarioId }: { entry: Entry; scenarioId: stri
   const rows = sliceRows(entry, scenarioId, i18n);
   return (
     <span className="flex flex-col items-center gap-1 font-jb" data-testid="work-rail">
-      <span title={entry.title} className="flex size-6 items-center justify-center rounded-[6px] bg-jb-inverse text-jb-on-inverse">
+      <span title={entry.title} className="flex size-6 items-center justify-center rounded-[7px] bg-jb-inverse text-jb-on-inverse">
         <LayoutList className="size-3.5" aria-label={entry.title} />
       </span>
       <Separator style={{ width: 24, margin: '4px auto' }} />

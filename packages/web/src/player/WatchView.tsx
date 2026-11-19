@@ -7,9 +7,9 @@ import { entryOfScenario, sliceLabel } from './work-view';
  *   手机还竖着时提示把手机横过来；手机真的横过来后不再旋转。
  * 连续播放（一章接一章）由控制器的 autoNext 负责，发布站设置。
  */
-import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, CirclePlay, Pause, Play, RotateCcw, RectangleHorizontal, X } from 'lucide-react';
-import { Button, IconButton } from '@tokenroll/juice/primitives';
+import { Button, IconButton, Progress, playJuiceSound, useIdleVisibility } from '@tokenroll/juice/primitives';
 import type { Scenario } from '@joplo-app/core/runtime';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { useI18n } from '../i18n/context';
@@ -164,7 +164,7 @@ export function WatchView(p: Props) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" style={SAFE_X} data-testid="watch-portrait">
-      <header className="flex shrink-0 items-center gap-2 border-b border-jb-line bg-jb-surface px-3" style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(48px + env(safe-area-inset-top))' }}>
+      <header className="jb-topbar-surface flex shrink-0 items-center gap-2 px-3" style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(48px + env(safe-area-inset-top))' }}>
         {p.brand}
         <span className="min-w-0 flex-1 truncate text-[14px] font-semibold" data-testid="watch-title">{p.title}</span>
         {p.actions}
@@ -178,24 +178,22 @@ export function WatchView(p: Props) {
         {caption}
       </p>
       <div className="flex shrink-0 items-center gap-1.5 px-3 py-2" data-testid="watch-controls">
-        <RoundBtn label={i18n.player.previousStep} onClick={() => ctl.prev()} disabled={!scenario || (pos === 0 && !snap.busy)} testid="watch-prev">
+        <RoundBtn label={i18n.player.previousStep} sound="tick" onClick={() => ctl.prev()} disabled={!scenario || (pos === 0 && !snap.busy)} testid="watch-prev">
           <ChevronLeft className="size-5" />
         </RoundBtn>
-        <RoundBtn label={playing ? i18n.player.pause : i18n.player.play} onClick={() => ctl.togglePlay()} disabled={!scenario || total === 0} testid="watch-play" primary>
+        <RoundBtn label={playing ? i18n.player.pause : i18n.player.play} sound="tap" onClick={() => ctl.togglePlay()} disabled={!scenario || total === 0} testid="watch-play" primary>
           {playing ? <Pause className="size-5" /> : <Play className="size-5" />}
         </RoundBtn>
-        <RoundBtn label={i18n.player.nextStep} onClick={() => void ctl.next()} disabled={!scenario || total === 0} testid="watch-next">
+        <RoundBtn label={i18n.player.nextStep} sound="tick" onClick={() => void ctl.next()} disabled={!scenario || total === 0} testid="watch-next">
           <ChevronRight className="size-5" />
         </RoundBtn>
-        <div className="mx-1 h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--juice-w12)]" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`${pos} / ${total}`}>
-          <div className="h-full rounded-full bg-jb-ink transition-[width] duration-300" style={{ width: `${progress}%` }} />
-        </div>
+        <Progress compact value={progress} aria-label={`${pos} / ${total}`} className="mx-1 min-w-0 flex-1" />
         {p.voice}
-        <Button variant="primary" size="md" leftIcon={<RectangleHorizontal className="size-4" />} onClick={() => void enter()} className="h-9 shrink-0 px-3 text-[13px] font-semibold" data-testid="watch-landscape">
+        <Button variant="primary" size="md" sound="tap" leftIcon={<RectangleHorizontal className="size-4" />} onClick={() => void enter()} className="h-9 shrink-0 rounded-[11px] px-3 text-[13px] font-semibold" data-testid="watch-landscape">
           {i18n.player.watchLandscape}
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto border-t border-jb-line px-2 pb-6 pt-2" data-testid="watch-chapters">
+      <div className="min-h-0 flex-1 overflow-y-auto border-t border-[var(--juice-edge)] px-2 pb-6 pt-2" data-testid="watch-chapters">
         {/* 按能力分组（D102 修订）：顺序里的一组、支线一组；不传 naming 时是一组（与以前一样） */}
         {(grouped
           ? [{ key: 'main', title: p.naming === 'chapters' ? i18n.player.watchChapters : i18n.site.scenarios, list: main }, { key: 'side', title: p.naming === 'chapters' ? i18n.player.sideChapters : i18n.player.sideScenarios, list: p.chapters.filter((c) => c.side) }]
@@ -212,9 +210,15 @@ export function WatchView(p: Props) {
                   <li key={c.id}>
                     <button
                       type="button"
-                      onClick={() => p.onChapter(c.id)}
+                      onClick={() => {
+                        playJuiceSound('tap');
+                        p.onChapter(c.id);
+                      }}
                       aria-current={c.current ? 'true' : undefined}
-                      className={cn('jb-focus flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2.5 text-left text-[14px]', c.current ? 'bg-jb-selected font-semibold' : 'active:bg-jb-hover')}
+                      className={cn(
+                        'jb-focus flex w-full items-center gap-2.5 rounded-[11px] px-2.5 py-2.5 text-left text-[14px] transition-[background-color,box-shadow,transform] duration-150 active:scale-[0.99]',
+                        c.current ? 'bg-jb-selected font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]' : 'active:bg-jb-hover',
+                      )}
                       data-testid={`watch-chapter-${c.id}`}
                     >
                       {c.no ? (
@@ -243,17 +247,20 @@ export function WatchView(p: Props) {
   );
 }
 
-function RoundBtn({ label, onClick, disabled, testid, primary, children }: { label: string; onClick: () => void; disabled?: boolean; testid: string; primary?: boolean; children: ReactNode }) {
+function RoundBtn({ label, onClick, disabled, testid, primary, sound, children }: { label: string; onClick: () => void; disabled?: boolean; testid: string; primary?: boolean; sound?: 'tap' | 'tick'; children: ReactNode }) {
   return (
     <IconButton
       label={label}
       title={label}
       variant={primary ? 'primary' : 'ghost'}
       size="md"
-      onClick={onClick}
+      onClick={() => {
+        if (sound) playJuiceSound(sound);
+        onClick();
+      }}
       disabled={disabled}
       style={{ width: 40, height: 40, borderRadius: 20 }}
-      className={cn('jb-focus', primary && 'bg-jb-accent text-jb-on-accent hover:bg-jb-accent-hover')}
+      className={cn('jb-focus', primary && 'jb-play-pill')}
       data-testid={testid}
     >
       {children}
@@ -264,10 +271,10 @@ function RoundBtn({ label, onClick, disabled, testid, primary, children }: { lab
 function Finished({ onRestart, dark, author }: { onRestart: () => void; dark?: boolean; author?: ReactNode }) {
   const { t: i18n } = useI18n();
   return (
-    <div className={cn('absolute inset-0 z-20 flex flex-col items-center justify-center gap-3', dark ? 'bg-black/70' : 'bg-black/65')} data-testid="watch-finished">
+    <div className={cn('absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px]', dark ? 'bg-black/70' : 'bg-black/65')} data-testid="watch-finished">
       <div className="text-[18px] font-bold text-white">{i18n.player.watchFinished}</div>
       {author}
-      <Button onClick={onRestart} size="lg" leftIcon={<RotateCcw className="size-4" />} className="h-10 rounded-[20px] bg-white px-5 text-[14px] font-semibold text-black hover:bg-white/90" data-testid="watch-again">
+      <Button sound="tap" onClick={onRestart} size="lg" leftIcon={<RotateCcw className="size-4" />} className="h-10 rounded-full bg-white px-5 text-[14px] font-semibold text-black shadow-lg hover:bg-white/92" data-testid="watch-again">
         {i18n.player.watchAgain}
       </Button>
     </div>
@@ -295,12 +302,23 @@ function Immersive(p: {
 }) {
   const { t: i18n } = useI18n();
   useBlackPage(true);
+  const idle = useIdleVisibility(p.playing && !p.finished, HIDE_MS);
   const box = p.rotated
     ? { position: 'fixed' as const, left: 0, top: 0, width: p.viewport.h, height: p.viewport.w, transform: `translateX(${p.viewport.w}px) rotate(90deg)`, transformOrigin: 'top left' }
     : { position: 'fixed' as const, inset: 0 };
   return (
-    <div className="z-50 flex flex-col overflow-hidden bg-black font-jb text-white" style={box} data-testid="watch-immersive" data-rotated={p.rotated ? '' : undefined} {...(p.rotated ? { [ROTATED_ATTR]: '' } : {})}>
-      <header className="flex h-11 shrink-0 items-center gap-2 px-3" style={p.rotated ? undefined : SAFE_X}>
+    <div
+      className="z-50 flex flex-col overflow-hidden bg-black font-jb text-white"
+      style={box}
+      onPointerDown={() => idle.poke()}
+      data-testid="watch-immersive"
+      data-rotated={p.rotated ? '' : undefined}
+      {...(p.rotated ? { [ROTATED_ATTR]: '' } : {})}
+    >
+      <header
+        className={cn('flex h-11 shrink-0 items-center gap-2 px-3 transition-opacity duration-200', !idle.visible && 'opacity-35')}
+        style={p.rotated ? undefined : SAFE_X}
+      >
         {p.canExit ? <button type="button" aria-label={i18n.player.watchExitLandscape} onClick={p.onExit} className="jb-focus inline-flex size-9 items-center justify-center rounded-full active:bg-white/20" data-testid="watch-exit"><X className="size-5" /></button> : null}
         <div className="min-w-0 flex-1 truncate text-[13px] font-semibold">{p.title} <span className="font-normal text-white/70">{p.chapter}</span></div>
         <div className="[&_button]:text-white">{p.voice}</div>
@@ -311,11 +329,25 @@ function Immersive(p: {
         <UpNextCard ctl={p.ctl} snap={p.snap} variant="center" />
       </div>
       {/* D88: playback controls are siblings of Stage; no transparent swipe layer steals prototype gestures. */}
-      <div role="toolbar" aria-label={i18n.player.playbackControls} className="flex min-h-14 shrink-0 items-center gap-3 bg-black px-3 py-2" style={p.rotated ? undefined : SAFE_X} data-testid="watch-overlay">
-        <button type="button" aria-label={i18n.player.previousStep} onClick={() => p.ctl.prev()} className="jb-focus inline-flex size-9 shrink-0 items-center justify-center rounded-full active:bg-white/20" data-testid="watch-imm-prev"><ChevronLeft className="size-6" /></button>
-        <button type="button" aria-label={p.playing ? i18n.player.pause : i18n.player.play} onClick={() => p.ctl.togglePlay()} className="jb-focus inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-black" data-testid="watch-imm-play">{p.playing ? <Pause className="size-5" /> : <Play className="size-5" />}</button>
-        <button type="button" aria-label={i18n.player.nextStep} onClick={() => void p.ctl.next()} className="jb-focus inline-flex size-9 shrink-0 items-center justify-center rounded-full active:bg-white/20" data-testid="watch-imm-next"><ChevronRight className="size-6" /></button>
-        <div className="min-w-0 flex-1"><p className="truncate text-[13px]" data-testid="watch-immersive-caption">{p.caption}</p><div className="mt-2 h-1 overflow-hidden rounded-full bg-white/30"><div className="h-full rounded-full bg-jb-accent" style={{width:`${p.progress}%`}} /></div></div>
+      <div
+        role="toolbar"
+        aria-label={i18n.player.playbackControls}
+        className={cn(
+          'jb-dark jb-dock-slab mx-2 mb-1.5 flex min-h-14 shrink-0 items-center gap-3 rounded-[18px] px-3 py-2 text-white transition-opacity duration-200',
+          !idle.visible && 'opacity-45',
+        )}
+        style={p.rotated ? undefined : SAFE_X}
+        data-testid="watch-overlay"
+      >
+        <button type="button" aria-label={i18n.player.previousStep} onClick={() => { playJuiceSound('tick'); p.ctl.prev(); }} className="jb-focus inline-flex size-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/10 active:bg-white/20" data-testid="watch-imm-prev"><ChevronLeft className="size-6" /></button>
+        <button type="button" aria-label={p.playing ? i18n.player.pause : i18n.player.play} onClick={() => { playJuiceSound('tap'); p.ctl.togglePlay(); }} className="j-btn jb-play-pill jb-focus inline-flex size-10 shrink-0 items-center justify-center !rounded-full !p-0" data-testid="watch-imm-play">{p.playing ? <Pause className="size-5" /> : <Play className="size-5" />}</button>
+        <button type="button" aria-label={i18n.player.nextStep} onClick={() => { playJuiceSound('tick'); void p.ctl.next(); }} className="jb-focus inline-flex size-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/10 active:bg-white/20" data-testid="watch-imm-next"><ChevronRight className="size-6" /></button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px]" data-testid="watch-immersive-caption">{p.caption}</p>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/20">
+            <div className="h-full rounded-full bg-jb-accent transition-[width] duration-300" style={{ width: `${p.progress}%` }} />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -333,16 +365,16 @@ export function UpNextCard({ ctl, snap, variant }: { ctl: DemoController; snap: 
   const entry = snap.project ? entryOfScenario(snap.project, up.scenarioId) : null;
   const name = entry ? sliceLabel(entry, up.scenarioId, title, i18n) : title;
   const card = (
-    <div className="jb-dark j-slab flex w-[300px] max-w-[86%] flex-col gap-2 bg-black/90 p-4 font-jb text-white shadow-xl" role="status" aria-live="polite" data-testid="up-next">
+    <div className="jb-dark jb-dock-slab flex w-[308px] max-w-[86%] flex-col gap-2.5 rounded-[20px] p-4 font-jb text-white" role="status" aria-live="polite" data-testid="up-next">
       <div className="text-[12px] font-semibold tracking-[1px] text-white/70">
         {i18n.player.upNextTitle} · {i18n.player.upNextIn(up.left)}
       </div>
       <div className="line-clamp-2 text-[17px] font-bold leading-[1.35]">{name}</div>
       <div className="mt-1 flex gap-2">
-        <Button onClick={() => ctl.playNextNow()} size="md" leftIcon={<Play className="size-4" />} className="h-9 flex-1 rounded-[18px] bg-white px-3 text-[14px] font-semibold text-black hover:bg-white/90" data-testid="up-next-now">
+        <Button sound="tap" onClick={() => ctl.playNextNow()} size="md" leftIcon={<Play className="size-4" />} className="h-9 flex-1 rounded-[12px] bg-white px-3 text-[14px] font-semibold text-black hover:bg-white/90" data-testid="up-next-now">
           {i18n.player.upNextPlayNow}
         </Button>
-        <Button onClick={() => ctl.cancelNext()} variant="outline" size="md" className="h-9 rounded-[18px] px-4 text-[14px] font-semibold text-white/85" data-testid="up-next-cancel">
+        <Button sound="tap" onClick={() => ctl.cancelNext()} variant="outline" size="md" className="h-9 rounded-[12px] px-4 text-[14px] font-semibold text-white/85" data-testid="up-next-cancel">
           {i18n.player.upNextCancel}
         </Button>
       </div>

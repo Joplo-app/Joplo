@@ -1,13 +1,20 @@
 import { useI18n } from '../i18n/context';
 /**
- * 看板控件原语（基于 @tokenroll/juice/primitives 构建，继承看板 Token --jb-*）：
- * - 按钮（Juice Button）、快捷键（Juice Kbd）、分段控件（.j-seg / .j-seg-btn）、下拉菜单（.j-menu-list / .j-menu-item + Juice Separator）、开关（.j-switch）。
- * - 全屏的深色控制条在 .jb-dark 里，Token 自动映射到深色阶梯。
+ * 看板控件原语（基于 @tokenroll/juice v0.2.0 primitives 构建，继承看板 Token --jb-*）：
+ * - 按钮（Juice Button + 程序化触觉音效）、快捷键（Juice Kbd）、分段控件（.j-seg / .j-seg-btn）、下拉菜单（.j-menu-list / .j-menu-item + Juice Separator）、开关（Juice Switch v0.2.0）。
+ * - 剥离生硬 1.5px 黑线框，统一使用同心圆角、微妙色阶对比与弹簧按压反馈。
  * - 文字一律不换行（whitespace-nowrap）；收起成图标的按钮，悬停提示里写全称和快捷键（useTip）。
  */
 import { useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Check, ChevronDown, Clapperboard, Ellipsis } from 'lucide-react';
-import { Button as JuiceButton, Kbd as JuiceKbd, Separator as JuiceSeparator } from '@tokenroll/juice/primitives';
+import {
+  Button as JuiceButton,
+  Kbd as JuiceKbd,
+  Separator as JuiceSeparator,
+  Switch as JuiceSwitch,
+  playJuiceSound,
+  type JuiceSoundName,
+} from '@tokenroll/juice/primitives';
 import { cn } from '@/lib/utils';
 import { Popover, useTip } from './popover';
 import type { Placement } from './popover-place';
@@ -41,23 +48,23 @@ const JUICE_VARIANT: Record<BtnVariant, 'primary' | 'secondary' | 'ghost'> = {
   ghost: 'ghost',
 };
 
-const base = 'jb-focus shrink-0 gap-1.5 whitespace-nowrap rounded-[8px] font-jb text-[13px] font-medium leading-none disabled:pointer-events-none';
+const base = 'jb-focus shrink-0 gap-1.5 whitespace-nowrap rounded-[10px] font-jb text-[13px] font-medium leading-none transition-[transform,background-color,box-shadow,color] duration-150 active:scale-[0.96] disabled:pointer-events-none';
 const VARIANT: Record<BtnVariant, { off: string; on: string }> = {
   default: {
-    off: 'bg-jb-sunken/70 text-jb-fg hover:bg-jb-press',
-    on: 'bg-jb-selected font-semibold text-jb-fg shadow-[inset_0_0_0_1.5px_var(--jb-border-strong)] hover:bg-jb-selected',
+    off: 'bg-[var(--juice-w6)] text-jb-fg hover:bg-[var(--juice-w12)] active:bg-jb-press',
+    on: 'bg-jb-selected font-semibold text-jb-fg shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--jb-accent-press)_42%,transparent)] hover:bg-jb-selected',
   },
   primary: {
-    off: 'bg-jb-inverse text-jb-on-inverse hover:bg-jb-inverse-hover active:bg-jb-inverse-press',
-    on: 'bg-jb-inverse text-jb-on-inverse',
+    off: 'bg-jb-inverse text-jb-on-inverse shadow-[0_2px_8px_-2px_rgba(0,0,0,0.22)] hover:bg-jb-inverse-hover active:bg-jb-inverse-press',
+    on: 'bg-jb-inverse text-jb-on-inverse shadow-[0_2px_8px_-2px_rgba(0,0,0,0.22)]',
   },
   play: {
-    off: 'bg-jb-accent font-bold text-jb-on-accent shadow-[inset_0_0_0_1.5px_var(--jb-border-strong)] hover:bg-jb-accent-hover active:bg-jb-accent-press',
-    on: 'bg-jb-accent font-bold text-jb-on-accent shadow-[inset_0_0_0_1.5px_var(--jb-border-strong)]',
+    off: 'jb-play-pill',
+    on: 'jb-play-pill',
   },
   ghost: {
-    off: 'text-jb-fg hover:bg-jb-hover active:bg-jb-press',
-    on: 'bg-jb-selected font-semibold text-jb-fg hover:bg-jb-selected',
+    off: 'text-jb-fg hover:bg-[var(--juice-w6)] active:bg-[var(--juice-w12)]',
+    on: 'bg-jb-selected font-semibold text-jb-fg shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--jb-accent-press)_36%,transparent)] hover:bg-jb-selected',
   },
 };
 
@@ -85,13 +92,14 @@ type BtnProps = {
   /** 悬停提示里的快捷键。 */
   kbd?: string;
   tipPlacement?: Placement;
+  sound?: boolean | JuiceSoundName;
   className?: string;
   children?: ReactNode;
   ref?: Ref<HTMLButtonElement>;
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'title'>;
 
-/** 按钮（封装 Juice Button）：icon + 文字；iconOnly 时只有图标，文字作为悬停提示与无障碍标签。children 放在文字后面。 */
-export function Btn({ icon, label, iconOnly = false, iconAfter = false, size = 32, variant = 'default', selected, title, kbd, tipPlacement, className, children, ref, ...rest }: BtnProps) {
+/** 按钮（封装 Juice Button v0.2.0）：icon + 文字；iconOnly 时只有图标，文字作为悬停提示与无障碍标签。children 放在文字后面。 */
+export function Btn({ icon, label, iconOnly = false, iconAfter = false, size = 32, variant = 'default', selected, title, kbd, tipPlacement, sound, className, children, ref, ...rest }: BtnProps) {
   const tipText = title ?? (iconOnly ? label : null);
   const [tip, tipNode] = useTip(tipText || kbd ? <TipText text={tipText ?? label} kbd={kbd} /> : null, { placement: tipPlacement });
   const v = VARIANT[variant];
@@ -102,6 +110,7 @@ export function Btn({ icon, label, iconOnly = false, iconAfter = false, size = 3
         ref={ref}
         variant={JUICE_VARIANT[variant]}
         size={JUICE_SIZE[size]}
+        sound={sound}
         leftIcon={!iconAfter ? icon : undefined}
         rightIcon={iconAfter ? icon : undefined}
         data-full-label={label}
@@ -130,18 +139,22 @@ export function Kbd({ children, className }: { children: ReactNode; className?: 
   return <JuiceKbd className={cn('h-[18px] min-w-[18px] shrink-0 px-[5px] font-jb-mono text-[11px]', className)}>{children}</JuiceKbd>;
 }
 
-/** 分段控件（Juice .j-seg / .j-seg-btn 同心槽位，支持 value = null 与每项 testid，见 TokenRollAI/juice#9）。 */
+/** 分段控件（Juice .j-seg / .j-seg-btn 同心槽位，支持 value = null、每项 testid 与轻触音效）。 */
 export function Segmented<T extends string>({ value, items, onChange, label, testid, full, size = 32 }: { value: T | null; items: { value: T; label: ReactNode; testid?: string; title?: string; icon?: ReactNode }[]; onChange: (v: T) => void; label: string; testid?: string; full?: boolean; size?: 32 | 36 }) {
+  const select = (next: T) => {
+    if (next !== value) playJuiceSound('tap');
+    onChange(next);
+  };
   const onKey = (e: React.KeyboardEvent, i: number) => {
     const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
     if (!d) return;
     e.preventDefault();
     const next = items[(i + d + items.length) % items.length]!;
-    onChange(next.value);
+    select(next.value);
     ((e.currentTarget.parentElement?.children[(i + d + items.length) % items.length] as HTMLElement | undefined) ?? null)?.focus();
   };
   return (
-    <div role="radiogroup" aria-label={label} className={cn('j-seg shrink-0 rounded-[10px] p-[3px]', size === 32 ? 'h-8' : 'h-9', full && 'flex w-full')} data-testid={testid}>
+    <div role="radiogroup" aria-label={label} className={cn('j-seg shrink-0 rounded-[11px] p-[3px]', size === 32 ? 'h-8' : 'h-9', full && 'flex w-full')} data-testid={testid}>
       {items.map((it, i) => {
         const on = value === it.value;
         return (
@@ -154,10 +167,10 @@ export function Segmented<T extends string>({ value, items, onChange, label, tes
             tabIndex={on || (value === null && i === 0) ? 0 : -1}
             title={it.title}
             data-testid={it.testid}
-            onClick={() => onChange(it.value)}
+            onClick={() => select(it.value)}
             onKeyDown={(e) => onKey(e, i)}
             className={cn(
-              'j-seg-btn jb-focus h-full min-w-0 justify-center gap-1.5 whitespace-nowrap rounded-[7px] px-3 font-jb text-[13px] leading-none',
+              'j-seg-btn jb-focus h-full min-w-0 justify-center gap-1.5 whitespace-nowrap rounded-[8px] px-3 font-jb text-[13px] leading-none',
               full && 'flex-1 truncate',
               on && 'font-semibold',
             )}
@@ -190,7 +203,7 @@ export function MenuList({ items, onPick, testid }: { items: MenuEntry[]; onPick
     <div className="j-menu-list bg-transparent p-1.5" onKeyDown={onKey} data-testid={testid}>
       {items.map((it) =>
         'divider' in it ? (
-          <JuiceSeparator key={it.id} decorative={false} style={{ margin: '4px 4px' }} />
+          <JuiceSeparator key={it.id} decorative={false} style={{ margin: '5px 4px' }} />
         ) : 'custom' in it ? (
           <div key={it.id}>{it.custom}</div>
         ) : (
@@ -203,12 +216,15 @@ export function MenuList({ items, onPick, testid }: { items: MenuEntry[]; onPick
             disabled={it.disabled}
             data-menu-item=""
             data-testid={`menu-${it.id}`}
-            onClick={() => onPick(it)}
+            onClick={() => {
+              playJuiceSound('tap');
+              onPick(it);
+            }}
             className={cn(
-              'j-menu-item jb-focus w-full shrink-0 justify-start gap-2.5 whitespace-nowrap rounded-[9px] px-2.5 text-left font-jb text-[13px] text-jb-fg focus-visible:bg-jb-hover disabled:pointer-events-none disabled:opacity-40',
-              it.description ? 'h-auto py-1.5' : 'h-8',
+              'j-menu-item jb-focus w-full shrink-0 justify-start gap-2.5 whitespace-nowrap rounded-[11px] px-3 text-left font-jb text-[13px] text-jb-fg focus-visible:bg-jb-hover disabled:pointer-events-none disabled:opacity-40',
+              it.description ? 'h-auto py-2' : 'h-[34px]',
               it.checked && (it.description || it.highlight) && 'bg-jb-selected text-jb-fg hover:bg-jb-selected',
-              it.tone === 'cloud' && 'bg-jb-cloud font-semibold text-jb-on-cloud hover:bg-jb-cloud-hover hover:text-jb-on-cloud focus-visible:bg-jb-cloud-hover [&_.text-jb-muted]:text-jb-on-cloud/80',
+              it.tone === 'cloud' && 'bg-jb-cloud font-semibold text-jb-on-cloud shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_2px_8px_-2px_color-mix(in_srgb,var(--jb-cloud)_45%,transparent)] hover:bg-jb-cloud-hover hover:text-jb-on-cloud focus-visible:bg-jb-cloud-hover [&_.text-jb-muted]:text-jb-on-cloud/80',
             )}
           >
             {it.icon ? <span className="flex size-4 shrink-0 items-center justify-center [&_svg]:size-4">{it.icon}</span> : null}
@@ -303,17 +319,27 @@ export function MenuButton({
   );
 }
 
-/** 开关（Juice .j-switch / .j-switch-thumb 弹性轨道 + Joplo 暖黄开启态）：右侧文字，见 TokenRollAI/juice#9。 */
+/** 开关（直接封装 @tokenroll/juice v0.2.0 Switch + Joplo 暖黄开启态与 latch 声效，零圆钮溢出）。 */
 export function Switch({ on, onChange, label, testid, title, className }: { on: boolean; onChange: (on: boolean) => void; label: string; testid?: string; title?: string; className?: string }) {
   const [tip, tipNode] = useTip(title ?? null);
   return (
     <>
-      <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} data-testid={testid} className={cn('jb-focus inline-flex h-7 shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] px-1.5 font-jb text-[13px] font-medium text-jb-fg hover:bg-jb-hover', className)} {...tip}>
-        <span aria-hidden data-checked={on ? 'true' : 'false'} className={cn('j-switch pointer-events-none h-[20px] w-[36px] p-[2px]', on && 'bg-jb-accent shadow-[inset_0_0_0_1px_var(--jb-border-strong)]')}>
-          <i className={cn('j-switch-thumb size-4', on ? 'bg-jb-on-accent' : 'bg-jb-surface')} />
-        </span>
-        {label}
-      </button>
+      <label
+        className={cn(
+          'inline-flex h-8 shrink-0 cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded-[10px] px-2 font-jb text-[13px] font-medium text-jb-fg transition-colors hover:bg-[var(--juice-w6)]',
+          className,
+        )}
+        {...tip}
+      >
+        <JuiceSwitch
+          checked={on}
+          onChange={onChange}
+          aria-label={label}
+          data-testid={testid}
+          className="jb-switch-warm jb-focus whitespace-nowrap"
+        />
+        <span>{label}</span>
+      </label>
       {tipNode}
     </>
   );
@@ -324,6 +350,16 @@ export function DirectorTag({ on, layerTitle, onToggle }: { on: boolean; layerTi
   const { t: i18n } = useI18n();
 
   return (
-    <Btn icon={<Clapperboard className="size-4" aria-hidden />} label={on ? i18n.player.director(layerTitle) : i18n.player.directorPaused} size={32} variant="ghost" selected={on} onClick={onToggle} data-testid="director" title={on ? i18n.player.directorSwitchesLayersAndShotsWithEachStepClick : i18n.player.resumeDirectorReturnToThisStepSDirectorLayer} />
+    <Btn
+      icon={<Clapperboard className="size-4" aria-hidden />}
+      label={on ? i18n.player.director(layerTitle) : i18n.player.directorPaused}
+      size={32}
+      variant="ghost"
+      selected={on}
+      sound="latch"
+      onClick={onToggle}
+      data-testid="director"
+      title={on ? i18n.player.directorSwitchesLayersAndShotsWithEachStepClick : i18n.player.resumeDirectorReturnToThisStepSDirectorLayer}
+    />
   );
 }

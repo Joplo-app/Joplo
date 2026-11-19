@@ -3,13 +3,13 @@ import { selectionLabel } from '../i18n/step-caption';
 import { translate } from '../i18n/messages';
 import { useBoardI18n } from '../i18n/board/context';
 /**
- * 检查抽屉（看板，D39 / D55 + Juice UI .j-inspect-prop-card / .j-copy-snippet / Badge / Button）：
+ * 检查抽屉（看板，D39 / D55 + @tokenroll/juice v0.2.0 InspectorSheet / Badge / Button）：
  * 检查模式下单击、或 ⌥+单击画面元素后在右侧浮出（没有遮罩，可以接着点别的元素）；Esc 或 × 关闭。
- * 标题是元素名，第一块是 文件:行（复制、在编辑器中打开）；规则区分“已确认”和“AI 假设”（data-variant="dashed"）；底部是同步状态。
+ * 规则列表直接由 Juice InspectorSheet 渲染（完整多语言 labels + renderRuleBadge 展示来源与确认标记，AI 假设自动渲染虚线卡片）。
  */
 import { Fragment, useEffect, useState } from 'react';
 import { Check, Copy, ExternalLink, X } from 'lucide-react';
-import { Badge, Button, IconButton } from '@tokenroll/juice/primitives';
+import { Badge, Button, IconButton, InspectorSheet, playJuiceSound, type InspectorRule } from '@tokenroll/juice/primitives';
 import { disabledReasonOf, findNode, pluginSpec, resolveProps, type PlayState, type Project, type Rule, type Selection } from '@joplo-app/core/runtime';
 import type { SelectionSync } from '../runtime/demo';
 import { entryForWork, workOfNode, scenariosOf, shortName } from '../runtime/views';
@@ -18,27 +18,6 @@ import { CONFIRM_LABEL, ORIGIN_LABEL, pluginText, typeLabel } from './labels';
 
 function Chip({ cls, children }: { cls: string; children: React.ReactNode }) {
   return <span className={cn('inline-block shrink-0 rounded-[5px] border px-1.5 py-px text-[11px] leading-[16px]', cls)}>{children}</span>;
-}
-
-function RuleItem({ rule }: { rule: Rule }) {
-  const { t: i18n } = useBoardI18n();
-
-  const o = ORIGIN_LABEL(i18n)[rule.origin];
-  const c = CONFIRM_LABEL(i18n)[rule.confirmation];
-  return (
-    <li
-      className="j-inspect-prop-card list-none"
-      data-variant={rule.origin === 'ai_assumption' ? 'dashed' : undefined}
-      data-testid={`rule-${rule.id}`}
-      data-origin={rule.origin}
-    >
-      <div className="mb-0.5 flex flex-wrap items-center gap-1">
-        <Chip cls={o.cls}>{o.text}</Chip>
-        <Chip cls={c.cls}>{c.text}</Chip>
-      </div>
-      <div className="text-[13px] leading-snug">{rule.text}</div>
-    </li>
-  );
 }
 
 const H = ({ children }: { children: React.ReactNode }) => <h3 className="mb-1.5 mt-4 text-[12px] font-semibold tracking-[1px] text-jb-muted first:mt-0">{children}</h3>;
@@ -71,6 +50,17 @@ export function InspectDrawer({
   const globalBrowse = selection.workId === null && selection.featureId === null;
   const featureId = selection.workId === null ? selection.featureId : entryForWork(project, selection.workId)?.featureId;
   const rules = node ? Object.values(project.rules).filter((r) => r.elementIds.includes(node.id) && (globalBrowse || r.featureId === featureId) && (!r.workId || r.workId === selection.workId)) : [];
+  const ruleMap = new Map<string, Rule>(rules.map((r) => [r.id, r]));
+  const inspectorRules: InspectorRule[] = rules.map((r) => ({
+    id: r.id,
+    label: ORIGIN_LABEL(i18n)[r.origin].text,
+    detail: (
+      <span className="block text-[13px] leading-snug text-jb-fg" data-testid={`rule-${r.id}`} data-origin={r.origin}>
+        {r.text}
+      </span>
+    ),
+    status: r.origin === 'ai_assumption' ? 'provisional' : 'verified',
+  }));
   // 覆盖的情况：本方案里有步骤操作这个元素的场景所覆盖的情况；没有这样的场景时取当前场景的情况
   const scs = scenariosOf(project, selection.workId);
   const targeting = node ? scs.filter((sc) => sc.steps.some((s) => 'target' in s.action && s.action.target === node.id)) : [];
@@ -87,7 +77,7 @@ export function InspectDrawer({
   }, [onClose]);
   return (
     <div data-testid="inspect-drawer-root">
-      <aside role="dialog" aria-label={i18n.board.inspect2} data-jb-pop="" className="j-floating-pop jb-pop fixed bottom-3 right-3 top-[64px] z-40 flex w-[360px] max-w-[92vw] flex-col overflow-y-auto p-4 text-[13px]" data-testid="inspect-drawer">
+      <aside role="dialog" aria-label={i18n.board.inspect2} data-jb-pop="" className="j-floating-pop jb-pop fixed bottom-3 right-3 top-[64px] z-40 flex w-[368px] max-w-[92vw] flex-col overflow-y-auto rounded-[20px] p-4 text-[13px]" data-testid="inspect-drawer">
         <div className="mb-3 flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="truncate text-[17px] font-bold" data-testid="sel-label">
@@ -105,7 +95,7 @@ export function InspectDrawer({
           </IconButton>
         </div>
         {at ? (
-          <div className="j-copy-snippet mb-1.5 gap-1 py-1.5 pl-2.5 pr-1">
+          <div className="j-copy-snippet mb-2 gap-1 rounded-[12px] py-1.5 pl-3 pr-1.5">
             <code className="min-w-0 flex-1 break-all font-jb-mono text-[12px]" data-testid="sel-at">
               {at}
             </code>
@@ -118,6 +108,7 @@ export function InspectDrawer({
               onClick={() =>
                 void navigator.clipboard?.writeText(at).then(
                   () => {
+                    playJuiceSound('pop');
                     setCopied(true);
                     setTimeout(() => setCopied(false), 1500);
                   },
@@ -136,7 +127,7 @@ export function InspectDrawer({
         )}
 
         {node && fields.length ? (
-          <dl className="mb-2 grid grid-cols-[64px_1fr] gap-x-2 gap-y-1 rounded-[11px] bg-[var(--juice-w6)] px-3 py-2 text-[13px]" data-testid="sel-fields">
+          <dl className="mb-2 grid grid-cols-[64px_1fr] gap-x-2 gap-y-1 rounded-[12px] bg-[var(--juice-w6)] px-3 py-2.5 text-[13px]" data-testid="sel-fields">
             {(() => {
               // 插件清单声明的专属信息行（例如图表元素的说明、连线两端、状态）：看板只照着声明显示属性的当前值
               const p = state && state.sceneId === selection.sceneId ? resolveProps(node, state) : (node.props ?? {});
@@ -161,13 +152,13 @@ export function InspectDrawer({
           </dl>
         ) : null}
         {node?.note ? (
-          <p className="rounded-[8px] bg-jb-selected px-2.5 py-1.5 text-[13px]" data-testid="sel-note">
+          <p className="rounded-[10px] bg-jb-selected px-3 py-2 text-[13px]" data-testid="sel-note">
             <span className="font-semibold text-jb-fg">{i18n.board.designNote}</span>
             {node.note}
           </p>
         ) : null}
         {node?.disabledReason ? (
-          <p className="mt-2 rounded-[8px] bg-[var(--juice-w6)] px-2.5 py-1.5 text-[13px]">
+          <p className="mt-2 rounded-[10px] bg-[var(--juice-w6)] px-3 py-2 text-[13px]">
             <span className="text-jb-muted">{i18n.board.disabledReason}</span>
             {/* 绑定状态的原因（D65）：显示当前状态下的文字，后面附上绑定本身 */}
             {node.disabledReason.startsWith('$') ? (state ? disabledReasonOf(node, state) ?? '' : '') : node.disabledReason}
@@ -175,13 +166,33 @@ export function InspectDrawer({
           </p>
         ) : null}
 
-        <H>{i18n.board.ruleCount(rules.length)}</H>
-        {rules.length === 0 ? <p className="text-[13px] text-jb-muted">{i18n.board.noRulesDirectlyReferenceThisElement}</p> : null}
-        <ul className="flex flex-col gap-1.5" data-testid="sel-rules">
-          {rules.map((r) => (
-            <RuleItem key={r.id} rule={r} />
-          ))}
-        </ul>
+        <div className="mt-3" data-testid="sel-rules">
+          <InspectorSheet
+            title={i18n.board.ruleCount(rules.length)}
+            aria-label={i18n.board.ruleCount(rules.length)}
+            targetControl={<span className="text-[12px] font-semibold tracking-[1px] text-jb-muted">{i18n.board.ruleCount(rules.length)}</span>}
+            rules={inspectorRules}
+            labels={{
+              pending: CONFIRM_LABEL(i18n).pending.text,
+              synced: CONFIRM_LABEL(i18n).confirmed.text,
+              copied: i18n.board.copyLocation,
+              copySource: i18n.board.copyLocation,
+              openInEditor: i18n.board.openInEditor,
+              verified: CONFIRM_LABEL(i18n).confirmed.text,
+              provisional: ORIGIN_LABEL(i18n).ai_assumption.text,
+              propertiesSuffix: '',
+              copyFailed: i18n.board.clipboardUnavailable,
+            }}
+            renderRuleBadge={(item) => {
+              const r = ruleMap.get(item.id);
+              if (!r) return null;
+              const c = CONFIRM_LABEL(i18n)[r.confirmation];
+              return <Chip cls={c.cls}>{c.text}</Chip>;
+            }}
+          >
+            {rules.length === 0 ? <p className="text-[13px] text-jb-muted">{i18n.board.noRulesDirectlyReferenceThisElement}</p> : null}
+          </InspectorSheet>
+        </div>
 
         <H>{i18n.board.coveredCaseCount(caseIds.length)}</H>
         <div className="flex flex-wrap gap-1.5" data-testid="sel-cases">
@@ -203,9 +214,9 @@ export function InspectDrawer({
         </p>
 
         <div className="mt-auto flex justify-between pt-5">
-          <Button variant="secondary" size="sm" onClick={onClear} data-testid="clear-selection">
+          <Button variant="secondary" size="sm" sound="tap" onClick={onClear} data-testid="clear-selection">
             {i18n.board.clearSelection}</Button>
-          <Button variant="primary" size="sm" onClick={onClose}>
+          <Button variant="primary" size="sm" sound="tap" onClick={onClose}>
             {i18n.board.resumeDemo}</Button>
         </div>
       </aside>

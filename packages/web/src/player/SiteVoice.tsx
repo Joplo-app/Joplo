@@ -60,9 +60,10 @@ export function SiteVoiceButton({ voice, size = 34, testid = 'site-voice' }: { v
       title={!voice.on && voice.hasAudio ? `${i18n.player.narrationAvailable} · ${label}` : label}
       iconOnly
       variant="ghost"
-      size={size}
+      size={size === 34 ? 28 : size}
+      sound="latch"
       selected={voice.on}
-      className="rounded-[8px]"
+      className={size === 34 ? 'h-[30px] w-[30px] rounded-[9px]' : 'rounded-[9px]'}
       onClick={() => voice.setOn(!voice.on)}
       data-testid={testid}
     />

@@ -1,16 +1,17 @@
 /**
- * 浮层与悬停提示（D55 不变量 8 + Juice UI portal 同心浮层）：
- * - Popover：菜单、外观浮层、悬停卡片共用。挂在 body（全屏时挂在全屏元素里），position: fixed，坐标由 placePopover（底层 Juice placeFloating）计算；
- *   点外面或 Esc 关闭，焦点在浮层内时还给锚点（悬停卡片关闭不抢焦点，见 TokenRollAI/juice#7）。
+ * 浮层与悬停提示（D55 不变量 8 + @tokenroll/juice v0.2.0 FloatingPopover / CenterPopover）：
+ * - Popover：菜单、外观浮层、悬停卡片共用。底层由 Juice FloatingPopover 托管 portal（全屏元素优先，否则 body）、
+ *   动态坐标翻转（placeFloating）、外部点击与 Esc 关闭、以及焦点归还（restoreFocus="focused-within"）。
+ * - CenterPanel：快捷键面板等居中浮层，底层由 Juice CenterPopover 托管。
  * - useTip：悬停 / 键盘聚焦一段时间后显示的墨底胶囊提示（.j-tooltip-pill / .jb-tip）。
  */
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { FloatingPopover, Tooltip } from '@tokenroll/juice/primitives';
+import { CenterPopover, FloatingPopover, Tooltip } from '@tokenroll/juice/primitives';
 import { cn } from '@/lib/utils';
 import { placePopover, portalHostOf, type Placement } from './popover-place';
 
-export { FloatingPopover, Tooltip };
+export { CenterPopover, FloatingPopover, Tooltip };
 
 const PORTAL_TOKENS = [
   '--fill-slab',
@@ -44,8 +45,8 @@ function usePortalHost(): Element | null {
   return host;
 }
 
-/** 跟着锚点的 fixed 定位层：同步锚点所在作用域的 Juice / 看板 Token，锚点移动或尺寸变化时重新计算。 */
-function Floating({ anchor, placement, children, className, style, onEl, autoFocus = false, ...rest }: { anchor: HTMLElement; placement: Placement; children: ReactNode; className?: string; style?: CSSProperties; onEl?: (el: HTMLDivElement | null) => void; autoFocus?: boolean } & Omit<React.HTMLAttributes<HTMLDivElement>, 'style' | 'className' | 'children'>) {
+/** 轻量无交互悬停锚定层（供 useTip 胶囊提示使用，不进入焦点栈）。 */
+function TipFloating({ anchor, placement, children, className, style, ...rest }: { anchor: HTMLElement; placement: Placement; children: ReactNode; className?: string; style?: CSSProperties } & Omit<React.HTMLAttributes<HTMLDivElement>, 'style' | 'className' | 'children'>) {
   const host = usePortalHost();
   const ref = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<ReturnType<typeof placePopover> | null>(null);
@@ -80,23 +81,13 @@ function Floating({ anchor, placement, children, className, style, onEl, autoFoc
       window.removeEventListener('scroll', update, true);
     };
   }, [update, anchor]);
-  // A hidden measuring pass cannot accept focus. Wait until the positioned surface is visible.
-  const positioned = pos !== null;
-  useLayoutEffect(() => {
-    if (!positioned || !autoFocus) return;
-    const first = ref.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]),[role="menuitemcheckbox"]:not([disabled]),[role="menuitemradio"]:not([disabled]),button:not([disabled]),[tabindex="0"]');
-    (first ?? ref.current)?.focus();
-  }, [positioned, autoFocus]);
   if (!host) return null;
   return createPortal(
     <div
-      ref={(el) => {
-        ref.current = el;
-        onEl?.(el);
-      }}
+      ref={ref}
       className={cn(inDark && 'jb-dark', className)}
       data-side={pos?.side}
-      style={{ position: 'fixed', left: pos?.x ?? 0, top: pos?.y ?? 0, zIndex: 1000, visibility: pos ? 'visible' : 'hidden', ...style }}
+      style={{ position: 'fixed', left: pos?.x ?? 0, top: pos?.y ?? 0, zIndex: 1001, visibility: pos ? 'visible' : 'hidden', ...style }}
       {...rest}
     >
       {children}
@@ -125,67 +116,51 @@ export type PopoverProps = {
   onMouseLeave?: () => void;
 };
 
-/** 同心浮层表面（对齐 Juice .j-floating-pop 与 .jb-pop）。 */
-export function Popover({ open, anchor, onClose, placement = 'bottom-end', children, className, width, role = 'dialog', label, testid, autoFocus = false, ignore = [], onKeyDown, onMouseEnter, onMouseLeave }: PopoverProps) {
-  const el = useRef<HTMLDivElement | null>(null);
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
-  const ignoreRef = useRef(ignore);
-  ignoreRef.current = ignore;
-  useEffect(() => {
-    if (!open) return;
-    const down = (e: PointerEvent) => {
-      const t = e.target as Node;
-      if (el.current?.contains(t) || anchor?.contains(t) || ignoreRef.current.some((x) => x?.contains(t))) return;
-      closeRef.current();
-    };
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.stopPropagation();
-      closeRef.current();
-      anchor?.focus();
-    };
-    window.addEventListener('pointerdown', down, true);
-    window.addEventListener('keydown', key);
-    return () => {
-      window.removeEventListener('pointerdown', down, true);
-      window.removeEventListener('keydown', key);
-    };
-  }, [open, anchor]);
-  // 关闭时，如果焦点在浮层里，还给锚点
-  const focused = useRef(false);
-  useEffect(() => {
-    if (!open) return;
-    return () => {
-      if (focused.current) anchor?.focus();
-      focused.current = false;
-    };
-  }, [open, anchor]);
-  if (!open || !anchor) return null;
+/** 同心浮层表面（直接基于 @tokenroll/juice v0.2.0 FloatingPopover）。 */
+export function Popover({
+  open,
+  anchor,
+  onClose,
+  placement = 'bottom-end',
+  children,
+  className,
+  width,
+  role = 'dialog',
+  label,
+  testid,
+  autoFocus = false,
+  ignore = [],
+  onKeyDown,
+  onMouseEnter,
+  onMouseLeave,
+}: PopoverProps) {
+  const ignoreRefs = useMemo<ReadonlyArray<RefObject<HTMLElement | null>>>(
+    () => ignore.map((current) => ({ current })),
+    [ignore],
+  );
+  const inDark = Boolean(anchor?.closest('.jb-dark'));
   return (
-    <Floating
+    <FloatingPopover
+      open={open}
       anchor={anchor}
+      onClose={onClose}
       placement={placement}
+      width={width ?? 'auto'}
       autoFocus={autoFocus}
-      onEl={(x) => (el.current = x)}
+      restoreFocus="focused-within"
+      ignoreRefs={ignoreRefs}
       role={role}
       aria-label={label}
-      tabIndex={-1}
       data-testid={testid}
       data-jb-pop=""
-      data-floating-popover=""
-      className={cn('j-floating-pop jb-pop max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain p-0 outline-none', className)}
-      style={width ? { width } : undefined}
+      className={cn(inDark && 'jb-dark', 'jb-pop max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain p-0 outline-none', className)}
+      style={{ maxHeight: 'calc(100dvh - 24px)' }}
       onKeyDown={onKeyDown}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      onFocusCapture={() => (focused.current = true)}
-      onBlurCapture={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) focused.current = false;
-      }}
     >
       {children}
-    </Floating>
+    </FloatingPopover>
   );
 }
 
@@ -226,9 +201,9 @@ export function useTip(content: ReactNode | null | undefined, { placement = 'bot
     : {};
   const node =
     content && anchor && anchor.isConnected ? (
-      <Floating anchor={anchor} placement={placement} id={id} role="tooltip" className="j-tooltip-pill jb-tip pointer-events-none max-w-[320px] whitespace-normal px-2.5 py-1.5 text-[12px] leading-[16px]" data-testid="tooltip">
+      <TipFloating anchor={anchor} placement={placement} id={id} role="tooltip" className="j-tooltip-pill jb-tip pointer-events-none max-w-[320px] whitespace-normal px-2.5 py-1.5 text-[12px] leading-[16px]" data-testid="tooltip">
         {content}
-      </Floating>
+      </TipFloating>
     ) : null;
   return [props, node] as const;
 }
@@ -279,36 +254,23 @@ export function useHoverCard(delay = 350) {
   };
 }
 
-/** 居中的浮层（portal）：快捷键面板等。点外面或 Esc 关闭。 */
+/** 居中的浮层（portal）：快捷键面板等。底层直接采用 @tokenroll/juice v0.2.0 CenterPopover。 */
 export function CenterPanel({ open, onClose, label, testid, width, children }: { open: boolean; onClose: () => void; label: string; testid?: string; width: number; children: ReactNode }) {
-  const host = usePortalHost();
-  const el = useRef<HTMLDivElement | null>(null);
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
-  useEffect(() => {
-    if (!open) return;
-    const down = (e: PointerEvent) => {
-      if (!el.current?.contains(e.target as Node)) closeRef.current();
-    };
-    const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        closeRef.current();
-      }
-    };
-    window.addEventListener('pointerdown', down, true);
-    window.addEventListener('keydown', key);
-    el.current?.focus();
-    return () => {
-      window.removeEventListener('pointerdown', down, true);
-      window.removeEventListener('keydown', key);
-    };
-  }, [open]);
-  if (!open || !host) return null;
-  return createPortal(
-    <div ref={el} role="dialog" aria-label={label} tabIndex={-1} data-testid={testid} data-jb-pop="" data-floating-popover="" className="j-floating-pop jb-pop fixed left-1/2 top-1/2 z-[1000] max-h-[86vh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto p-1.5 outline-none" style={{ width }}>
+  return (
+    <CenterPopover
+      open={open}
+      onClose={onClose}
+      width={width}
+      backdrop
+      autoFocus
+      restoreFocus="focused-within"
+      role="dialog"
+      aria-label={label}
+      data-testid={testid}
+      data-jb-pop=""
+      className="jb-pop max-h-[86vh] overflow-y-auto p-1.5 outline-none"
+    >
       {children}
-    </div>,
-    host,
+    </CenterPopover>
   );
 }

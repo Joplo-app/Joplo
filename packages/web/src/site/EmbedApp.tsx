@@ -18,7 +18,7 @@ import { projectThemes } from '@joplo-app/core/runtime';
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ChevronLeft, ChevronRight, Expand, ExternalLink, ListVideo, Pause, Play, Shrink } from 'lucide-react';
-import { Alert } from '@tokenroll/juice/primitives';
+import { Alert, playJuiceSound } from '@tokenroll/juice/primitives';
 import type { Project } from '@joplo-app/core/runtime';
 import { DemoController } from '../runtime/demo';
 import { Stage } from '../renderer/Stage';
@@ -125,6 +125,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
   const playLabel = !snap.playing ? (state?.completed ? i18n.player.replay : i18n.player.play) : snap.paused ? i18n.player.resume : i18n.player.pause;
 
   const start = () => {
+    playJuiceSound('tap');
     setCovered(false);
     void ctl.play();
   };
@@ -346,7 +347,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
           </div>
         ) : null}
         {picking ? (
-          <div data-review-ui="" className="absolute left-1/2 top-3 z-40 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-2 rounded-full border border-jb-ink bg-jb-inverse py-1 pl-3.5 pr-1 text-[13px] font-medium text-jb-on-inverse shadow-[2px_2px_0_rgba(30,30,30,0.18)]" role="status" data-testid="review-pick-hint">
+          <div data-review-ui="" className="jb-dark jb-dock-slab absolute left-1/2 top-3 z-40 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-2 rounded-full py-1 pl-3.5 pr-1 text-[13px] font-medium text-jb-fg" role="status" data-testid="review-pick-hint">
             <span className="min-w-0 truncate">{i18n.site.reviewPickHint}</span>
             <button type="button" onClick={() => endPick(null)} className="jb-focus shrink-0 rounded-full px-2.5 py-0.5 text-[12px] hover:bg-white/15" data-testid="review-pick-cancel">
               {i18n.site.reviewPickCancel}
@@ -355,7 +356,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
         ) : null}
         {picking && pickBox ? (
           <div className="pointer-events-none absolute z-30 border-[1.5px] border-dashed border-jb-ink" style={{ left: pickBox.x - 3, top: pickBox.y - 3, width: pickBox.w + 6, height: pickBox.h + 6 }} data-testid="review-pick-hover">
-            <span className="absolute -top-[22px] left-[-1.5px] whitespace-nowrap rounded-[4px] bg-jb-inverse px-1.5 py-0.5 font-jb text-[11px] font-medium text-jb-on-inverse">
+            <span className="absolute -top-[22px] left-[-1.5px] whitespace-nowrap rounded-[6px] bg-jb-inverse px-1.5 py-0.5 font-jb text-[11px] font-medium text-jb-on-inverse">
               {pickBox.type ?? i18n.player.element}{pickBox.name ? ` · ${pickBox.name}` : ''}
             </span>
           </div>
@@ -370,10 +371,10 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
             }}
             aria-label={`${coverText.play} · ${coverText.title}`}
             data-testid="embed-cover"
-            className="group absolute inset-0 z-20 flex cursor-pointer flex-col items-center justify-center gap-3 bg-[rgba(24,24,24,0.55)] px-6 text-center text-white outline-none"
+            className="group absolute inset-0 z-20 flex cursor-pointer flex-col items-center justify-center gap-3 bg-[rgba(20,19,18,0.58)] px-6 text-center text-white outline-none backdrop-blur-[1.5px]"
           >
             <span
-              className="flex items-center gap-2.5 rounded-full border-[1.5px] border-jb-ink bg-jb-accent px-7 py-3.5 text-[20px] font-bold leading-none text-jb-on-accent transition-colors group-hover:bg-jb-accent-hover group-active:bg-jb-accent-press group-focus-visible:outline-[3px] group-focus-visible:outline-offset-4 group-focus-visible:outline-white group-focus-visible:[outline-style:solid]"
+              className="flex items-center gap-2.5 rounded-full bg-jb-accent px-7 py-3.5 text-[20px] font-bold leading-none text-jb-on-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_12px_32px_-6px_rgba(255,210,63,0.48),0_2px_8px_rgba(0,0,0,0.22)] transition-[transform,background-color,box-shadow] duration-150 group-hover:-translate-y-0.5 group-hover:bg-jb-accent-hover group-active:translate-y-0 group-active:scale-[0.97] group-active:bg-jb-accent-press group-focus-visible:outline-[3px] group-focus-visible:outline-offset-4 group-focus-visible:outline-white group-focus-visible:[outline-style:solid]"
               data-testid="embed-play"
             >
               <Play className="size-6 fill-current" aria-hidden />
@@ -397,18 +398,18 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
         </div>
       ) : (
         <>
-          <div ref={rowRef} className="j-transport-bar flex h-12 shrink-0 items-center gap-1.5 rounded-none border-t border-[var(--juice-edge)] bg-jb-surface px-2 shadow-none" role="toolbar" aria-label={i18n.site.embedPlayer} data-testid="embed-bar">
-            <Btn icon={<ChevronLeft className="size-4" />} label={i18n.player.previousStep} kbd="←" iconOnly variant="ghost" size={32} onClick={() => ctl.prev()} disabled={pos === 0 && !snap.busy} data-testid="embed-prev" />
-            <Btn ref={playRef} icon={playing ? <Pause className="size-4" /> : <Play className="size-4" />} label={playLabel} kbd={i18n.player.space} iconOnly variant="play" size={32} onClick={() => ctl.togglePlay()} disabled={total === 0} data-testid="embed-toggle" />
-            <Btn icon={<ChevronRight className="size-4" />} label={i18n.player.nextStep} kbd="→" iconOnly variant="ghost" size={32} onClick={() => void ctl.next()} disabled={total === 0} data-testid="embed-next" />
-            <span className="shrink-0 whitespace-nowrap px-1 text-[13px] font-semibold" data-testid="embed-step">
+          <div ref={rowRef} className="j-transport-bar flex h-12 shrink-0 items-center gap-1.5 rounded-none border-t border-[var(--juice-edge)] bg-jb-surface px-2.5 shadow-none" role="toolbar" aria-label={i18n.site.embedPlayer} data-testid="embed-bar">
+            <Btn icon={<ChevronLeft className="size-4" />} label={i18n.player.previousStep} kbd="←" iconOnly variant="ghost" size={32} sound="tick" onClick={() => ctl.prev()} disabled={pos === 0 && !snap.busy} data-testid="embed-prev" />
+            <Btn ref={playRef} icon={playing ? <Pause className="size-4" /> : <Play className="size-4" />} label={playLabel} kbd={i18n.player.space} iconOnly variant="play" size={32} sound="tap" onClick={() => ctl.togglePlay()} disabled={total === 0} data-testid="embed-toggle" />
+            <Btn icon={<ChevronRight className="size-4" />} label={i18n.player.nextStep} kbd="→" iconOnly variant="ghost" size={32} sound="tick" onClick={() => void ctl.next()} disabled={total === 0} data-testid="embed-next" />
+            <span className="shrink-0 whitespace-nowrap px-1 text-[13px] font-semibold tabular-nums" data-testid="embed-step">
               {i18n.site.embedStepProgress(shown, total)}
             </span>
             {L.tiny ? (
               <span className="flex-1" />
             ) : (
-              <div className="mx-1 h-1.5 min-w-[40px] flex-1 overflow-hidden rounded-full bg-[var(--juice-w12)]" role="progressbar" aria-label={i18n.site.embedStepProgress(shown, total)} aria-valuemin={0} aria-valuemax={total} aria-valuenow={shown} data-testid="embed-progress">
-                <div className="h-full rounded-full bg-jb-accent-press transition-[width] duration-300" style={{ width: `${embedProgress(shown, total) * 100}%` }} />
+              <div className="j-slider-rail mx-1 h-1.5 min-w-[40px] flex-1" role="progressbar" aria-label={i18n.site.embedStepProgress(shown, total)} aria-valuemin={0} aria-valuemax={total} aria-valuenow={shown} data-testid="embed-progress">
+                <div className="j-slider-fill rounded-full bg-jb-accent-press transition-[width] duration-300" style={{ width: `${embedProgress(shown, total) * 100}%` }} />
               </div>
             )}
             {!params.diff && <SiteVoiceButton voice={voice} size={32} testid="embed-voice" />}
@@ -437,6 +438,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
               iconOnly
               variant="default"
               size={32}
+              sound="tap"
               onClick={(e) => {
                 e.currentTarget.blur();
                 toggleFull();

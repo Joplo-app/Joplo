@@ -78,7 +78,7 @@ export function VideoProgressCard({ job, scenarioName, onCancel }: { job: VideoJ
       <TaskProgressCard step={v.text} value={v.percent}>
         <span className="text-[12px] text-jb-muted">{job.phase === 'recording' ? i18n.board.recordingStep(job.step, job.total) : v.step}</span>
         <div className="flex items-center gap-2">
-          <Btn icon={<X className="size-3.5" aria-hidden />} label={i18n.board.cancel} size={28} variant="default" onClick={onCancel} data-testid="video-cancel" />
+          <Btn icon={<X className="size-3.5" aria-hidden />} label={i18n.board.cancel} size={28} variant="default" sound="tap" onClick={onCancel} data-testid="video-cancel" />
           <span className="text-[11px] text-jb-faint">{i18n.board.closingThisMenuWillNotStopTheExport}</span>
         </div>
       </TaskProgressCard>

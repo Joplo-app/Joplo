@@ -10,8 +10,8 @@ import { MenuButton, type MenuEntry, type MenuItem } from './controls';
 function ContentTag({ text, stale }: { text: string; stale?: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 font-jb">
-      {stale ? <Badge tone="warn" className="h-[18px] px-1.5 text-[10.5px]" data-testid="content-stale">{stale}</Badge> : null}
-      <Badge tone="signal" className="h-[18px] px-1.5 text-[10.5px]">{text}</Badge>
+      {stale ? <Badge tone="warn" className="px-2 py-0.5 text-[10.5px]" data-testid="content-stale">{stale}</Badge> : null}
+      <Badge tone="signal" className="px-2 py-0.5 text-[10.5px]">{text}</Badge>
     </span>
   );
 }

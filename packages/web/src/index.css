@@ -106,7 +106,7 @@
 /* 深色（全屏演示、深色舞台四周） */
 .jb-dark {
   --jb-bg-app: #141413;
-  --jb-bg-surface: #1E1E1E;
+  --jb-bg-surface: #1E1E1D;
   --jb-bg-subtle: #242320;
   --jb-bg-sunken: #2C2A26;
   --jb-bg-hover: #2C2A26;
@@ -151,6 +151,14 @@
   --juice-recessed: var(--jb-bg-app);
   --fill-on: var(--jb-fg-default);
   --fill-slab: var(--jb-bg-surface);
+  --juice-soft-stop: 84%;
+  --juice-mute-stop: 60%;
+  --juice-faint-stop: 38%;
+  --juice-w4-stop: 5%;
+  --juice-w6-stop: 8.5%;
+  --juice-w12-stop: 17%;
+  --juice-w20-stop: 27%;
+  --juice-edge-stop: 11%;
   --juice-soft: color-mix(in srgb, var(--fill-on) 84%, var(--fill-slab));
   --juice-mute: color-mix(in srgb, var(--fill-on) 60%, var(--fill-slab));
   --juice-faint: color-mix(in srgb, var(--fill-on) 38%, var(--fill-slab));
@@ -378,12 +386,201 @@
 }
 
 /* ---------- 看板控件的公共样式（D55 + Juice UI 同心表面）---------- */
+@layer components {
+  /* 顶栏：温润通透表面，微弱发丝底线，取代生硬 1px 分隔墙 */
+  .jb-topbar-surface {
+    background: color-mix(in srgb, var(--jb-bg-surface) 88%, var(--jb-bg-app));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--jb-fg-default) 7%, transparent);
+  }
+  /* 左栏：退后半阶的温润纸感轨道，服从于主舞台 */
+  .jb-sidebar-surface {
+    background: color-mix(in srgb, var(--jb-bg-surface) 64%, var(--jb-bg-app));
+    box-shadow: 1px 0 0 color-mix(in srgb, var(--jb-fg-default) 6.5%, transparent);
+  }
+  .jb-dark .jb-sidebar-surface {
+    background: color-mix(in srgb, var(--jb-bg-surface) 78%, var(--jb-bg-app));
+    box-shadow: 1px 0 0 color-mix(in srgb, var(--jb-fg-default) 10%, transparent);
+  }
+  /* 主舞台外框：20px 无重线同心雕塑板（Shed 1.5px black wireframe box） */
+  .jb-stage-slab {
+    border-radius: 20px;
+    background: var(--jb-bg-surface);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 8%, transparent),
+      0 18px 44px -16px rgba(24, 22, 18, 0.13),
+      0 2px 8px -2px rgba(24, 22, 18, 0.05);
+  }
+  .jb-dark .jb-stage-slab {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 12%, transparent),
+      0 24px 56px -16px rgba(0, 0, 0, 0.62);
+  }
+  /* 舞台上沿的层级分段槽（12px 外槽 -> 9px 同心胶囊标签） */
+  .jb-layer-track {
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--jb-fg-default) 6.5%, transparent);
+    box-shadow: inset 0 1px 2px rgba(24, 22, 18, 0.04);
+  }
+  .jb-layer-tab {
+    border-radius: 9px;
+    color: var(--jb-fg-muted);
+    transition:
+      background-color 150ms ease,
+      color 150ms ease,
+      box-shadow 150ms ease,
+      transform 140ms var(--juice-out);
+  }
+  .jb-layer-tab:hover {
+    color: var(--jb-fg-default);
+    background: color-mix(in srgb, var(--jb-fg-default) 4.5%, transparent);
+  }
+  .jb-layer-tab:active {
+    transform: scale(0.98);
+  }
+  .jb-layer-tab[aria-selected="true"] {
+    background: var(--jb-bg-surface);
+    color: var(--jb-fg-default);
+    font-weight: 600;
+    box-shadow:
+      0 1px 3px rgba(24, 22, 18, 0.1),
+      0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 7.5%, transparent);
+  }
+  .jb-dark .jb-layer-tab[aria-selected="true"] {
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.36),
+      0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 14%, transparent);
+  }
+  /* 底部播放坞：18px 同心悬浮雕塑底座（p-1.5 -> 12px 内部主控） */
+  .jb-dock-slab {
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--jb-bg-surface) 94%, var(--jb-bg-app));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 7.5%, transparent),
+      0 12px 30px -12px rgba(24, 22, 18, 0.11),
+      0 2px 6px -1px rgba(24, 22, 18, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  }
+  .jb-dark .jb-dock-slab,
+  .jb-dock-slab.jb-dark {
+    background: color-mix(in srgb, var(--jb-bg-surface) 86%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 12%, transparent),
+      0 16px 40px -10px rgba(0, 0, 0, 0.56),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  /* 主操作「播放 / 暂停」：无黑描边的暖阳黄雕塑胶囊 + 顶部高光与暖色微辉光 */
+  .j-btn.jb-play-pill {
+    border-radius: 12px;
+    background: var(--jb-accent);
+    color: var(--jb-fg-on-accent);
+    font-weight: 700;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.52),
+      inset 0 0 0 1px color-mix(in srgb, var(--jb-fg-on-accent) 10%, transparent),
+      0 3px 10px -2px rgba(210, 160, 10, 0.38),
+      0 1px 2px rgba(24, 22, 18, 0.08);
+    transition:
+      transform 140ms var(--juice-out),
+      background-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+  .j-btn.jb-play-pill:hover:enabled {
+    background: var(--jb-accent-hover);
+    color: var(--jb-fg-on-accent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.66),
+      inset 0 0 0 1px color-mix(in srgb, var(--jb-fg-on-accent) 12%, transparent),
+      0 5px 14px -2px rgba(210, 160, 10, 0.46),
+      0 2px 4px rgba(24, 22, 18, 0.1);
+  }
+  .j-btn.jb-play-pill:active:enabled {
+    background: var(--jb-accent-press);
+    transform: scale(0.97);
+  }
+  /* 左栏方案卡片（14px 同心色阶板，选中态暖黄柔和浸润，无黑框） */
+  .jb-work-card {
+    border-radius: 14px;
+    background: transparent;
+    transition:
+      background-color 150ms ease,
+      box-shadow 160ms ease,
+      transform 140ms var(--juice-out);
+  }
+  .jb-work-card:hover {
+    background: color-mix(in srgb, var(--jb-fg-default) 5%, transparent);
+  }
+  .jb-work-card:active {
+    transform: scale(0.985);
+  }
+  .jb-work-card[data-active="true"] {
+    background: color-mix(in srgb, var(--jb-accent) 28%, var(--jb-bg-surface));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.65),
+      inset 0 0 0 1px color-mix(in srgb, var(--jb-accent-press) 28%, transparent),
+      0 2px 8px -2px rgba(180, 135, 0, 0.12);
+  }
+  .jb-dark .jb-work-card[data-active="true"] {
+    background: color-mix(in srgb, var(--jb-accent) 20%, var(--jb-bg-surface));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 0 0 1px color-mix(in srgb, var(--jb-accent) 32%, transparent),
+      0 4px 12px -4px rgba(0, 0, 0, 0.4);
+  }
+  /* 首页与发布站作品卡片：20px -> 14px -> 8px 同心浮升雕塑板 */
+  .jb-home-slab {
+    border-radius: 20px;
+    padding: 8px;
+    background: var(--jb-bg-surface);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 7%, transparent),
+      0 4px 16px -6px rgba(24, 22, 18, 0.06);
+    transition:
+      transform 200ms var(--juice-out),
+      box-shadow 200ms var(--juice-out);
+  }
+  .jb-home-slab[data-interactive="true"]:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--jb-fg-default) 12%, transparent),
+      0 16px 36px -12px rgba(24, 22, 18, 0.14),
+      0 4px 10px -2px rgba(24, 22, 18, 0.05);
+  }
+  /* 暖黄拨动开关（36x20 轨道，16x16 圆钮，行程 16px 严丝合缝，零溢出） */
+  .jb-switch-warm.j-switch {
+    width: 36px;
+    height: 20px;
+    padding: 2px;
+    flex-shrink: 0;
+  }
+  .jb-switch-warm.j-switch .j-switch-thumb {
+    width: 16px;
+    height: 16px;
+  }
+  .jb-switch-warm.j-switch[data-checked="true"] {
+    background: var(--jb-accent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--jb-fg-on-accent) 12%, transparent),
+      0 1px 4px -1px rgba(210, 160, 10, 0.28);
+  }
+  .jb-switch-warm.j-switch[data-checked="true"] .j-switch-thumb {
+    background: var(--jb-fg-on-accent);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
+  }
+}
+
 /* 键盘焦点：2px 深黄（accent-press）描边，外移 2px；鼠标点击不显示 */
 .jb-focus:focus-visible,
 .j-btn:focus-visible,
 .j-seg-btn:focus-visible,
 .j-switch:focus-visible,
 .j-checkbox:focus-visible,
+.j-drag-orb:focus-visible,
 .j-radio-card:has(> input:focus-visible) {
   outline: 2px solid var(--jb-accent-press);
   outline-offset: 2px;
@@ -392,11 +589,11 @@
 .jb-pop {
   background: var(--fill-slab);
   color: var(--fill-on);
-  border-radius: var(--juice-r-inner);
+  border-radius: 18px;
   box-shadow:
     0 0 0 1px var(--juice-edge),
-    0 14px 36px -8px rgba(0, 0, 0, 0.2),
-    0 4px 12px -2px rgba(0, 0, 0, 0.08);
+    0 18px 44px -10px rgba(24, 22, 18, 0.22),
+    0 4px 12px -2px rgba(24, 22, 18, 0.08);
   font-family: var(--jb-font);
   animation: j-pop-enter 140ms var(--juice-out) both;
 }
@@ -408,19 +605,23 @@
   overflow-wrap: break-word;
   background: var(--fill-on);
   color: var(--fill-slab);
-  border-radius: 9px;
-  box-shadow: 0 6px 18px -4px rgba(0, 0, 0, 0.24);
+  border-radius: 10px;
+  box-shadow: 0 8px 22px -4px rgba(24, 22, 18, 0.26);
   font-family: var(--jb-font);
   animation: j-pop-enter 110ms var(--juice-out) both;
 }
 @media (prefers-reduced-motion: reduce) {
   .jb-pop,
-  .jb-tip {
+  .jb-tip,
+  .jb-home-slab {
     animation: none;
+    transition: none;
   }
 }
 [data-render="1"] .jb-pop,
-[data-render="1"] .jb-tip {
+[data-render="1"] .jb-tip,
+[data-render="1"] .j-floating-pop,
+[data-render="1"] .jb-home-slab {
   animation: none !important;
   transition-duration: 0ms !important;
 }

@@ -10,8 +10,8 @@ import { m } from '../i18n/board/messages';
  * 字段流向：CloudJob（server CloudHub 写入 → 推送 / GET 读取）→ useCloudPublish.job → 进度、结果、失败（需要登录时显示登录命令）。
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Cloud, Copy, ExternalLink, Loader2, RotateCw, X } from 'lucide-react';
-import { Alert, Button, RadioCard, TextField } from '@tokenroll/juice/primitives';
+import { Check, Cloud, Copy, ExternalLink, RotateCw, X } from 'lucide-react';
+import { Alert, Badge, Button, CopySnippet, MaskedSecretField, Meter, RadioCard, Spinner, playJuiceSound } from '@tokenroll/juice/primitives';
 import { cn } from '@/lib/utils';
 import { Btn } from '../player/controls';
 import { Popover } from '../player/popover';
@@ -37,7 +37,12 @@ export function useCloudPublish(projectId: string) {
   useEffect(() => {
     let alive = true;
     void fetchCloudJob(projectId).then((j) => alive && setJob(j));
-    const off = subscribeCloud(projectId, (j) => setJob(j));
+    const off = subscribeCloud(projectId, (j) => {
+      setJob((prev) => {
+        if (prev?.state === 'running' && j?.state === 'done') playJuiceSound('paid');
+        return j;
+      });
+    });
     return () => {
       alive = false;
       off();
@@ -81,25 +86,26 @@ export type CloudPublishModel = ReturnType<typeof useCloudPublish>;
 /** 登录命令 + 复制按钮 + 重新检查。 */
 function LoginBlock({ command, message, onCheck, checking, stillOut }: { command: string; message?: string; onCheck: () => void; checking: boolean; stillOut: boolean }) {
   const { t: i18n } = useBoardI18n();
-  const [copied, setCopied] = useState(false);
   return (
     <div className="flex flex-col gap-2.5" data-testid="cloud-login">
       <div className="text-[14px] font-semibold">{i18n.board.cloudLoginTitle}</div>
       <p className="text-[13px] leading-[1.5] text-jb-muted">{i18n.board.cloudLoginBody}</p>
-      <div className="j-copy-snippet items-start gap-2 rounded-[10px] py-1.5 pl-3 pr-1.5">
-        {/* 要复制的命令完整显示（可能带 JOPLO_HOME 与 --server），长了就换行，不截断 */}
-        <code className="min-w-0 flex-1 select-all whitespace-pre-wrap break-all py-1 font-jb-mono text-[13px] leading-[1.45]" data-testid="cloud-login-command">{command}</code>
-        <Btn
-          size={28}
-          icon={copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-          label={copied ? i18n.board.cloudCommandCopied : i18n.board.cloudCopyCommand}
-          onClick={() => void copyText(command).then((ok) => setCopied(ok))}
-          data-testid="cloud-copy-command"
-        />
-      </div>
+      <CopySnippet
+        copyText={command}
+        copyLabel={i18n.board.cloudCopyCommand}
+        copiedLabel={i18n.board.cloudCommandCopied}
+        errorLabel={i18n.board.clipboardUnavailableCopyFromTheAddressBar}
+        onCopied={() => playJuiceSound('pop')}
+        copyButtonRef={(el) => {
+          if (el) el.dataset.testid = 'cloud-copy-command';
+        }}
+        className="rounded-[12px] font-jb-mono text-[12.5px]"
+      >
+        <span className="whitespace-pre-wrap break-all" data-testid="cloud-login-command">{command}</span>
+      </CopySnippet>
       {message ? <p className="text-[12px] text-jb-faint">{message}</p> : null}
       {stillOut ? <p className="text-[12px] text-jb-danger" data-testid="cloud-still-out">{i18n.board.cloudStillSignedOut}</p> : null}
-      <Btn icon={checking ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />} label={i18n.board.cloudCheckAgain} onClick={onCheck} disabled={checking} data-testid="cloud-check-again" className="self-start" />
+      <Btn icon={checking ? <Spinner size="sm" /> : <RotateCw className="size-4" />} label={i18n.board.cloudCheckAgain} sound="tap" onClick={onCheck} disabled={checking} data-testid="cloud-check-again" className="self-start" />
     </div>
   );
 }
@@ -112,16 +118,8 @@ export function StorageUsage({ storage, server, plan, full }: { storage: CloudSt
   if (view.level === 'ok' && !full) return <p className="text-[12px] text-jb-faint" data-testid="cloud-storage-mini">{i18n.board.cloudStorageMini(view.used, view.quota)}</p>;
   const level = full ? 'over' : view.level;
   return (
-    <div className="flex flex-col gap-2" data-testid="cloud-storage-meter" data-level={level}>
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between text-[12px]">
-          <span className="font-semibold tracking-[0.5px] text-jb-muted">{i18n.board.cloudStorage}</span>
-          <span className="text-jb-muted">{i18n.board.cloudStorageOf(view.used, view.quota)}</span>
-        </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-[var(--juice-w12)]" role="meter" aria-label={i18n.board.cloudStorage} aria-valuemin={0} aria-valuemax={100} aria-valuenow={view.pct}>
-          <div className={cn('h-full rounded-full', level === 'over' ? 'bg-jb-danger' : 'bg-jb-accent-press')} style={{ width: `${view.pct}%` }} />
-        </div>
-      </div>
+    <div className={cn('flex flex-col gap-2', level === 'over' && '[&_.j-slider-fill]:!bg-jb-danger')} data-testid="cloud-storage-meter" data-level={level}>
+      <Meter value={view.pct} label={i18n.board.cloudStorage} valueLabel={i18n.board.cloudStorageOf(view.used, view.quota)} />
       {level === 'near' ? (
         <div data-testid="cloud-storage-near">
           <Alert tone="warn">
@@ -192,16 +190,16 @@ function ScopeRadio({ value, onChange, ctx, names, disabled }: { value: CloudSco
   );
 }
 
-function Progress({ job }: { job: CloudJob }) {
+function PublishStages({ job }: { job: CloudJob }) {
   const { t: i18n } = useBoardI18n();
   const stage = cloudStage(job.lines);
   const at = CLOUD_STAGES.indexOf(stage);
   const label = { checking: i18n.board.cloudStageChecking, building: i18n.board.cloudStageBuilding, uploading: i18n.board.cloudStageUploading, finalizing: i18n.board.cloudStageFinalizing };
   return (
-    <ol className="flex flex-col gap-1.5" data-testid="cloud-progress" aria-live="polite">
+    <ol className="flex flex-col gap-1.5 rounded-[12px] bg-[var(--juice-w6)] p-3" data-testid="cloud-progress" aria-live="polite">
       {CLOUD_STAGES.map((s, i) => (
         <li key={s} className={cn('flex items-center gap-2 text-[13px]', i > at && 'text-jb-faint')}>
-          {i < at ? <Check className="size-4 text-jb-ok" /> : i === at ? <Loader2 className="size-4 animate-spin text-jb-cloud" /> : <span className="size-4" />}
+          {i < at ? <Check className="size-4 text-jb-ok" /> : i === at ? <Spinner size="sm" className="text-jb-cloud" /> : <span className="size-4" />}
           {label[s]}
         </li>
       ))}
@@ -218,10 +216,18 @@ function Result({ job, onFlash, server }: { job: CloudJob & { result: NonNullabl
   return (
     <div className="flex flex-col gap-2.5" data-testid="cloud-result">
       <div className="flex items-center gap-2 text-[14px] font-semibold text-jb-ok"><Check className="size-4" />{i18n.board.cloudPublished}</div>
-      <div className="j-copy-snippet gap-1.5 py-1.5 pl-3 pr-1.5">
+      <div className="j-copy-snippet gap-1.5 rounded-[12px] py-1.5 pl-3 pr-1.5">
         <a href={r.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate font-jb-mono text-[13px] text-jb-cloud underline-offset-2 hover:underline" data-testid="cloud-url">{r.url}</a>
-        <Btn size={28} icon={<Copy className="size-4" />} label={i18n.board.cloudCopyLink} iconOnly onClick={() => void copyText(r.url).then((ok) => onFlash(<LocalText value={ok ? m.board.cloudLinkCopied : m.board.clipboardUnavailableCopyFromTheAddressBar} />))} data-testid="cloud-copy-link" />
-        <Btn size={28} icon={<ExternalLink className="size-4" />} label={i18n.board.cloudOpenLink} iconOnly onClick={() => window.open(r.url, '_blank', 'noopener')} data-testid="cloud-open-link" />
+        <Btn
+          size={28}
+          icon={<Copy className="size-4" />}
+          label={i18n.board.cloudCopyLink}
+          iconOnly
+          sound="pop"
+          onClick={() => void copyText(r.url).then((ok) => onFlash(<LocalText value={ok ? m.board.cloudLinkCopied : m.board.clipboardUnavailableCopyFromTheAddressBar} />))}
+          data-testid="cloud-copy-link"
+        />
+        <Btn size={28} icon={<ExternalLink className="size-4" />} label={i18n.board.cloudOpenLink} iconOnly sound="tap" onClick={() => window.open(r.url, '_blank', 'noopener')} data-testid="cloud-open-link" />
       </div>
       <p className="text-[12px] text-jb-muted" data-testid="cloud-result-life">
         {expires ? i18n.board.cloudExpiresAt(expires) : i18n.board.cloudPermanentLink}
@@ -229,7 +235,7 @@ function Result({ job, onFlash, server }: { job: CloudJob & { result: NonNullabl
       </p>
       <PublicationLinks result={r} server={server} />
       {borrowed.length ? (
-        <div className="flex flex-col gap-1 rounded-[8px] border border-[#E0AE00] bg-jb-selected px-3 py-2" data-testid="cloud-borrowed">
+        <div className="flex flex-col gap-1 rounded-[12px] bg-jb-selected px-3.5 py-2.5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--jb-accent-press)_30%,transparent)]" data-testid="cloud-borrowed">
           <div className="text-[13px] font-semibold">{i18n.board.cloudBorrowedTitle}</div>
           <ul className="flex flex-col gap-0.5 text-[12px]">
             {borrowed.map((b) => (
@@ -285,22 +291,24 @@ export function PasswordFields({ visibility, plan, server, protectedLink, value,
   useEffect(() => { setShow(false); }, [value === undefined, visibility]);
   if (visibility !== 'private') return null;
   const editing = typeof value === 'string' && plan === 'pro';
-  return <fieldset disabled={disabled} className="flex flex-col gap-2 rounded-[12px] bg-[var(--juice-w6)] p-3" data-testid="cloud-password">
+  return <fieldset disabled={disabled} className="flex flex-col gap-2 rounded-[14px] bg-[var(--juice-w6)] p-3" data-testid="cloud-password">
     <legend className="px-1 text-[12px] font-semibold text-jb-muted">{i18n.board.cloudPasswordTitle}</legend>
     {protectedLink ? <p className="text-[12px] font-semibold">{i18n.board.cloudPasswordProtected} · {value === undefined ? i18n.board.cloudPasswordKeep : value === null ? i18n.board.cloudPasswordRemoving : i18n.board.cloudPasswordChange}</p> : null}
     {plan !== 'pro' ? <p className="text-[12px] text-jb-muted">{i18n.board.cloudPasswordUpgrade} <a href={`${server}/settings/billing`} target="_blank" rel="noopener noreferrer" className="jb-focus text-jb-cloud hover:underline">{i18n.board.cloudStorageUpgrade}</a></p> : null}
-    {editing ? <TextField
+    {editing ? <MaskedSecretField
       label={i18n.board.cloudPasswordLabel}
       hint={i18n.board.cloudPasswordLength}
-      type={show ? 'text' : 'password'}
       value={value}
-      onChange={onChange}
+      onChange={(e) => onChange(e.currentTarget.value)}
+      revealed={show}
+      onRevealedChange={setShow}
+      revealLabel={i18n.board.cloudPasswordShow}
+      hideLabel={i18n.board.cloudPasswordHide}
       disabled={disabled}
       autoComplete="new-password"
       spellCheck={false}
       autoCapitalize="none"
       aria-invalid={Array.from(value).length < 8 || Array.from(value).length > 128}
-      suffix={<button type="button" aria-pressed={show} className="jb-focus shrink-0 text-[12px] font-medium text-jb-cloud" onClick={() => setShow(v => !v)}>{show ? i18n.board.cloudPasswordHide : i18n.board.cloudPasswordShow}</button>}
     /> : null}
     <div className="flex flex-wrap gap-3 text-[12px] text-jb-cloud">
       {plan === 'pro' && !editing ? <button type="button" className="jb-focus" onClick={() => onChange('')}>{protectedLink ? i18n.board.cloudPasswordChange : i18n.board.cloudPasswordSet}</button> : null}
@@ -367,7 +375,7 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
   } else if (acct.error) {
     body = <p className="text-[13px] text-jb-danger">{typeof acct.error === 'string' ? i18n.board.cloudAccountFailed(acct.error) : <LocalText value={acct.error} />}</p>;
   } else if (!account && acct.loading) {
-    body = <div className="flex items-center gap-2 text-[13px] text-jb-muted"><Loader2 className="size-4 animate-spin" />{i18n.board.cloudStageChecking}</div>;
+    body = <div className="flex items-center gap-2 text-[13px] text-jb-muted"><Spinner size="sm" />{i18n.board.cloudStageChecking}</div>;
   } else if (signedOut || loginFromJob) {
     const command = signedOut?.loginCommand ?? job?.error?.loginCommand ?? 'npx joplo login';
     body = <LoginBlock command={command} message={signedOut?.message ?? job?.error?.message} onCheck={() => void check()} checking={acct.loading} stillOut={stillOut} />;
@@ -378,10 +386,14 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
     body = (
       <div className="flex flex-col gap-3">
         {account?.signedIn ? (
-          <p className="truncate text-[12px] text-jb-muted" data-testid="cloud-account">
-            {i18n.board.cloudSignedInAs(account.email)}
-            {account.plan ? ` · ${account.plan === 'pro' ? i18n.board.cloudPlanPro : i18n.board.cloudPlanFree}` : ''}
-          </p>
+          <div className="flex items-center justify-between gap-2 text-[12px] text-jb-muted" data-testid="cloud-account">
+            <span className="min-w-0 truncate">{i18n.board.cloudSignedInAs(account.email)}</span>
+            {account.plan ? (
+              <Badge tone={account.plan === 'pro' ? 'signal' : 'neutral'} className="shrink-0 px-2 py-0.5 text-[11px] font-semibold">
+                {account.plan === 'pro' ? i18n.board.cloudPlanPro : i18n.board.cloudPlanFree}
+              </Badge>
+            ) : null}
+          </div>
         ) : null}
         {account?.signedIn ? (
           <StorageUsage
@@ -394,7 +406,7 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
         {model.linksError ? (
           <div role="alert" className="flex flex-col gap-2 text-[12px] text-jb-danger" data-testid="cloud-links-error">
             <LocalText value={model.linksError} />
-            <Btn icon={<RotateCw className="size-4" />} label={i18n.board.cloudTryAgain} onClick={model.retryLinks} className="self-start" data-testid="cloud-links-retry" />
+            <Btn icon={<RotateCw className="size-4" />} label={i18n.board.cloudTryAgain} sound="tap" onClick={model.retryLinks} className="self-start" data-testid="cloud-links-retry" />
           </div>
         ) : null}
         <div className="flex flex-col gap-1.5">
@@ -405,7 +417,7 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
         <VisibilityFields visibility={restricted ? 'private' : visibility} review={review} onVisibility={v => { setVisibility(v); setPassword(undefined); }} onReview={setReview} disabled={running || !model.linksReady} restricted={restricted} protectedLink={previous?.passwordProtected === true} />
         <PasswordFields visibility={restricted ? 'private' : visibility} plan={account?.signedIn ? account.plan : null} server={account?.server ?? 'https://cloud.joplo.app'} protectedLink={previous?.passwordProtected === true} value={password} onChange={setPassword} disabled={running || !model.linksReady} review={review} />
         {unpicked && !running ? (
-          <div className="flex flex-col gap-1 rounded-[8px] border border-jb-accent bg-jb-selected px-3 py-2" data-testid="cloud-unpicked" data-scope={unpicked}>
+          <div className="flex flex-col gap-1 rounded-[12px] bg-jb-selected px-3.5 py-2.5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--jb-accent-press)_28%,transparent)]" data-testid="cloud-unpicked" data-scope={unpicked}>
             <div className="text-[13px] font-semibold">{i18n.board.cloudNotPickedTitle}</div>
             <p className="text-[12px] leading-[1.5]">
               {unpicked === 'project' ? i18n.board.cloudNotPickedProject : unpicked === 'scenario' ? i18n.board.cloudNotPickedScenario(names.feature) : i18n.board.cloudNotPickedFeature(names.feature)}
@@ -413,7 +425,7 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
             <p className="text-[12px] leading-[1.5] text-jb-muted">{i18n.board.cloudNotPickedHow}</p>
           </div>
         ) : null}
-        {running && job ? <Progress job={job} /> : null}
+        {running && job ? <PublishStages job={job} /> : null}
         {job?.state === 'done' && job.result ? <Result job={job as CloudJob & { result: NonNullable<CloudJob['result']> }} onFlash={onFlash} server={account?.server ?? 'https://cloud.joplo.app'} /> : null}
         {job?.state === 'failed' && job.error?.storage && !unpicked ? <StorageFull full={job.error.storage} plan={account?.signedIn ? account.plan : null} /> : null}
         {job?.state === 'failed' && job.error && !job.error.storage && !unpicked ? (
@@ -431,10 +443,11 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
         <Button
           variant="primary"
           size="md"
+          sound="tap"
           disabled={running || !model.linksReady || !!unpicked || !!passwordInvalid}
           onClick={() => { const secret = password; setPassword(undefined); void model.publish(ctx, choice, restricted ? 'private' : visibility, review, secret); }}
-          leftIcon={running ? <Loader2 className="size-4 animate-spin" /> : <Cloud className="size-4" />}
-          className="h-9 w-full bg-jb-cloud font-jb text-[14px] font-semibold text-jb-on-cloud hover:bg-jb-cloud-hover"
+          leftIcon={running ? <Spinner size="sm" /> : <Cloud className="size-4" />}
+          className="h-9 w-full rounded-[11px] bg-jb-cloud font-jb text-[14px] font-semibold text-jb-on-cloud shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_2px_8px_-2px_rgba(28,95,184,0.35)] hover:bg-jb-cloud-hover"
           data-testid="cloud-publish"
         >
           {model.linksError ? i18n.board.cloudPublishButton : !model.linksReady ? i18n.board.cloudStageChecking : running ? i18n.board.cloudPublishing : job?.state === 'done' ? i18n.board.cloudPublishAgain : job?.state === 'failed' ? i18n.board.cloudTryAgain : i18n.board.cloudPublishButton}
@@ -444,11 +457,11 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
   }
 
   return (
-    <Popover open={model.open} anchor={model.anchor} onClose={() => model.setOpen(false)} placement="bottom-end" width={380} label={i18n.board.cloudTitle} testid="cloud-popover">
+    <Popover open={model.open} anchor={model.anchor} onClose={() => model.setOpen(false)} placement="bottom-end" width={388} label={i18n.board.cloudTitle} testid="cloud-popover">
       <div className="flex flex-col gap-3 p-4">
-        <div className="flex items-center gap-2">
-          <span className="flex size-7 items-center justify-center rounded-[6px] bg-jb-cloud text-jb-on-cloud"><Cloud className="size-4" /></span>
-          <span className="flex-1 text-[15px] font-semibold">{i18n.board.cloudTitle}</span>
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-7 items-center justify-center rounded-[9px] bg-jb-cloud text-jb-on-cloud shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"><Cloud className="size-4" /></span>
+          <span className="flex-1 text-[15px] font-semibold tracking-[-0.01em]">{i18n.board.cloudTitle}</span>
           <Btn size={28} variant="ghost" icon={<X className="size-4" />} label={i18n.board.cloudClose} iconOnly onClick={() => model.setOpen(false)} data-testid="cloud-close" />
         </div>
         {body}

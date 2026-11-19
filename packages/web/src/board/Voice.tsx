@@ -22,14 +22,13 @@ import { useI18n } from '../i18n/context';
  * - Key：GET/PUT/DELETE /__joplo/voice/profiles；Key 只提交、不回显（只显示末 4 位）。
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AudioLines, Check, Copy, KeyRound, Loader2, Play, Square, Volume2, VolumeX, X } from 'lucide-react';
-import { Alert, Badge, IconButton, ScrollArea, Select, TextField } from '@tokenroll/juice/primitives';
+import { AudioLines, Check, KeyRound, Play, Square, Volume2, VolumeX, X } from 'lucide-react';
+import { Alert, Badge, CopySnippet, MaskedSecretField, Progress, ScrollArea, Select, Spinner, playJuiceSound } from '@tokenroll/juice/primitives';
 import { speakerRoleAt, spokenLine, type Project } from '@joplo-app/core/runtime';
 import { stepCaption } from '../i18n/step-caption';
 import { cn } from '@/lib/utils';
 import { Btn, Switch } from '../player/controls';
 import { Popover } from '../player/popover';
-import { copyText } from '../player/util';
 import type { DemoController } from '../runtime/demo';
 import { Narrator, browserVoices } from '../runtime/voice';
 import {
@@ -223,7 +222,7 @@ export function useVoice(projectId: string, project: Project | null, workId: str
 const linkClass = 'jb-focus rounded-[4px] font-medium text-jb-cloud underline-offset-2 hover:underline';
 
 /** 播放坞里的「声音」按钮。 */
-export function VoiceButton({ api, open, onToggle, btnRef, variant = 'ghost', size = 34 }: { api: VoiceApi; open: boolean; onToggle: () => void; btnRef: (el: HTMLButtonElement | null) => void; variant?: 'ghost' | 'default'; size?: 32 | 34 }) {
+export function VoiceButton({ api, open, onToggle, btnRef, variant = 'ghost', size = 32 }: { api: VoiceApi; open: boolean; onToggle: () => void; btnRef: (el: HTMLButtonElement | null) => void; variant?: 'ghost' | 'default'; size?: 28 | 32 | 34 }) {
   const { t: i18n } = useBoardI18n();
   return (
     <Btn
@@ -235,26 +234,30 @@ export function VoiceButton({ api, open, onToggle, btnRef, variant = 'ghost', si
       variant={variant}
       size={size}
       selected={open}
+      sound="tap"
       aria-haspopup="dialog"
       aria-expanded={open}
-      className="rounded-[8px]"
+      className="h-[30px] w-[30px] rounded-[9px]"
       onClick={onToggle}
       data-testid="voice-button"
     />
   );
 }
 
-/** 可复制的一行命令（登录命令，使用 Juice .j-copy-snippet + IconButton）。 */
+/** 可复制的一行命令（登录命令，使用 Juice CopySnippet）。 */
 function CommandLine({ text }: { text: string }) {
   const { t: i18n } = useBoardI18n();
-  const [copied, setCopied] = useState(false);
   return (
-    <div className="j-copy-snippet h-8 py-0 pl-2.5 pr-1">
-      <code className="min-w-0 flex-1 truncate font-jb-mono text-[12px]" data-testid="voice-login-command">{text}</code>
-      <IconButton label={i18n.board.copy(text)} title={copied ? i18n.board.cloudCommandCopied : i18n.board.cloudCopyCommand} variant="ghost" size="xs" onClick={() => void copyText(text).then((ok) => setCopied(ok))}>
-        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-      </IconButton>
-    </div>
+    <CopySnippet
+      copyText={text}
+      copyLabel={i18n.board.cloudCopyCommand}
+      copiedLabel={i18n.board.cloudCommandCopied}
+      errorLabel={i18n.board.clipboardUnavailable}
+      onCopied={() => playJuiceSound('pop')}
+      className="rounded-[10px] font-jb-mono text-[12px]"
+    >
+      <span data-testid="voice-login-command">{text}</span>
+    </CopySnippet>
   );
 }
 
@@ -389,13 +392,19 @@ export function VoicePanel({ api, onManage }: { api: Pick<VoiceApi, 'state' | 'p
         role="radio"
         aria-checked={checked}
         disabled={fromConfig}
-        onClick={() => void api.select(id)}
+        onClick={() => {
+          playJuiceSound('tap');
+          void api.select(id);
+        }}
         data-testid={testid}
-        className={cn('jb-focus flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[13px] disabled:cursor-default', checked ? 'bg-jb-selected font-semibold' : 'hover:bg-jb-hover')}
+        className={cn(
+          'jb-focus flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[13px] transition-[background-color,box-shadow,transform] duration-150 active:scale-[0.99] disabled:cursor-default',
+          checked ? 'bg-jb-selected font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]' : 'hover:bg-jb-hover',
+        )}
       >
-        <span className={cn('flex size-3.5 shrink-0 items-center justify-center rounded-full border', checked ? 'border-jb-ink bg-jb-accent' : 'border-jb-line')}>{checked ? <Check className="size-2.5" strokeWidth={3} aria-hidden /> : null}</span>
+        <span className={cn('flex size-4 shrink-0 items-center justify-center rounded-full transition-colors', checked ? 'bg-jb-accent text-jb-on-accent shadow-[0_1px_3px_rgba(210,160,10,0.3)]' : 'bg-[var(--juice-w8)] shadow-[inset_0_0_0_1px_var(--juice-edge)]')}>{checked ? <Check className="size-2.5" strokeWidth={3} aria-hidden /> : null}</span>
         <span className={cn('min-w-0 flex-1 truncate', p?.unsupported && 'text-jb-muted')}>{nameOf(p)}</span>
-        {p?.kind === 'cloud' ? <Badge className="h-[18px] shrink-0 px-1.5 text-[10.5px]">{i18n.board.voiceRecommended}</Badge> : null}
+        {p?.kind === 'cloud' ? <Badge className="shrink-0 px-2 py-0.5 text-[10.5px]">{i18n.board.voiceRecommended}</Badge> : null}
         {noteOf(p)}
       </button>
     );
@@ -468,7 +477,7 @@ export function VoicePanel({ api, onManage }: { api: Pick<VoiceApi, 'state' | 'p
             </ul>
           </ScrollArea>
         ) : null}
-        {g ? <div className="h-1.5 overflow-hidden rounded-full bg-jb-sunken"><div className="h-full bg-jb-ink transition-[width]" style={{ width: `${g.total ? Math.round((g.done / g.total) * 100) : 0}%` }} /></div> : null}
+        {g ? <Progress compact value={g.total ? Math.round((g.done / g.total) * 100) : 0} label={i18n.board.voice} /> : null}
         {cov.failed ? <p className="text-[12px] text-jb-danger" data-testid="voice-failed">{i18n.board.voiceFailed(cov.failed, Object.values(state?.failures ?? {})[0]?.message ?? '')}</p> : null}
         {current.kind !== 'cloud' && !current.unsupported && !hasKey(current) ? <p className="text-[12px] text-jb-pending">{i18n.board.voiceNoKey}</p> : null}
         {current.kind === 'cloud' && cloud?.signedIn && !cloud.available ? <p className="text-[12px] text-jb-pending" data-testid="voice-cloud-offline">{i18n.board.voiceCloudOfflineBody}</p> : null}
@@ -477,9 +486,10 @@ export function VoicePanel({ api, onManage }: { api: Pick<VoiceApi, 'state' | 'p
         ) : current.unsupported ? null : (
           <>
             <Btn
-              icon={api.busy ? <Loader2 className="size-4 animate-spin" /> : <AudioLines className="size-4" />}
+              icon={api.busy ? <Spinner size="sm" /> : <AudioLines className="size-4" />}
               label={generateLabel}
               variant="primary"
+              sound="tap"
               disabled={api.busy || !cov.total || cov.have === cov.total || !canGenerate(current, cloud)}
               onClick={() => void api.generate()}
               className="w-full"
@@ -510,19 +520,19 @@ export function VoicePanel({ api, onManage }: { api: Pick<VoiceApi, 'state' | 'p
       </header>
       <p className="px-4 pb-3 text-[12px] leading-snug text-jb-muted">{i18n.board.voiceReadAloudHint}</p>
 
-      <section className="flex flex-col gap-1 border-t border-jb-line px-3 pb-3 pt-2.5">
+      <section className="flex flex-col gap-1 border-t border-[var(--juice-edge)] px-3 pb-3 pt-2.5">
         <div className="px-1 pb-1 text-[12px] font-semibold tracking-[1px] text-jb-muted">{i18n.board.voiceSource}</div>
         {fromConfig ? <p className="px-1 pb-1 text-[12px] text-jb-faint" data-testid="voice-from-config">{i18n.board.voiceSetByConfig}</p> : null}
         {state?.missing ? <p className="px-1 pb-1 text-[12px] text-jb-pending" data-testid="voice-config-missing">{i18n.board.voiceConfigMissing(state.missing)}</p> : null}
-        <div role="radiogroup" aria-label={i18n.board.voiceSource} className="flex flex-col">
+        <div role="radiogroup" aria-label={i18n.board.voiceSource} className="flex flex-col gap-0.5">
           {rows.map((r) => sourceRow(r.id, r.profile))}
         </div>
       </section>
 
       {body}
-      {api.error ? <p className="border-t border-jb-line px-4 py-2 text-[12px] text-jb-danger" data-testid="voice-error"><LocalText value={api.error} /></p> : null}
-      <footer className="border-t border-jb-line px-2 py-1.5">
-        <Btn icon={<KeyRound className="size-4" />} label={i18n.board.voiceManageKeys} variant="ghost" onClick={onManage} className="w-full justify-start" data-testid="voice-manage" />
+      {api.error ? <p className="border-t border-[var(--juice-edge)] px-4 py-2 text-[12px] text-jb-danger" data-testid="voice-error"><LocalText value={api.error} /></p> : null}
+      <footer className="border-t border-[var(--juice-edge)] px-2 py-1.5">
+        <Btn icon={<KeyRound className="size-4" />} label={i18n.board.voiceManageKeys} variant="ghost" sound="tap" onClick={onManage} className="w-full justify-start" data-testid="voice-manage" />
       </footer>
       <span className="sr-only" aria-live="polite">{api.on ? shared.player.turnNarrationOff : shared.player.turnNarrationOn}</span>
     </div>
@@ -545,10 +555,10 @@ export function VoiceKeysDialog({ api, open, onClose }: { api: VoiceApi; open: b
   const keyed = profiles.filter((p) => !p.unsupported && (p.kind === 'openai' || p.kind === 'elevenlabs'));
   const legacy = profiles.filter((p) => p.unsupported);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 p-4" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label={i18n.board.voiceKeysTitle} data-jb-pop="" className="j-floating-pop jb-pop flex max-h-[88vh] w-[520px] max-w-full flex-col overflow-hidden font-jb text-[13px] text-jb-fg" data-testid="voice-dialog">
-        <header className="flex items-center justify-between border-b border-jb-line px-5 py-3">
-          <h2 className="text-[17px] font-bold">{i18n.board.voiceKeysTitle}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/28 p-4 backdrop-blur-[2px]" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label={i18n.board.voiceKeysTitle} data-jb-pop="" className="j-floating-pop jb-pop flex max-h-[88vh] w-[520px] max-w-full flex-col overflow-hidden rounded-[20px] font-jb text-[13px] text-jb-fg" data-testid="voice-dialog">
+        <header className="flex items-center justify-between border-b border-[var(--juice-edge)] px-5 py-3.5">
+          <h2 className="text-[17px] font-bold tracking-[-0.01em]">{i18n.board.voiceKeysTitle}</h2>
           <Btn icon={<X className="size-4" />} label={i18n.board.voiceClose} iconOnly variant="ghost" onClick={onClose} data-testid="voice-dialog-close" />
         </header>
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
@@ -558,7 +568,7 @@ export function VoiceKeysDialog({ api, open, onClose }: { api: VoiceApi; open: b
           ))}
           <PluginKeyRows projectId={api.projectId} />
           {legacy.length ? (
-            <section className="flex flex-col gap-2 border-t border-jb-line pt-3" data-testid="voice-legacy">
+            <section className="flex flex-col gap-2 border-t border-[var(--juice-edge)] pt-3" data-testid="voice-legacy">
               <div className="text-[12px] font-semibold text-jb-muted">{i18n.board.voiceLegacyTitle}</div>
               <p className="text-[12px] leading-[1.5] text-jb-faint">{i18n.board.voiceUnsupportedNote}</p>
               {legacy.map((p) => (
@@ -600,22 +610,24 @@ function KeyRow({ p, api }: { p: VoiceProfileView; api: VoiceApi }) {
     api.setProfiles(r.profiles);
     setKey('');
     setTest(null);
+    if (next) playJuiceSound('paid');
     setMsg(i18n.board.voiceSaved);
   };
   return (
-    <section className="flex flex-col gap-2 rounded-[14px] bg-[var(--juice-w6)] p-3" data-testid={`voice-key-${p.id}`}>
+    <section className="flex flex-col gap-2.5 rounded-[14px] bg-[var(--juice-w6)] p-3.5" data-testid={`voice-key-${p.id}`}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[14px] font-semibold">{p.name}</span>
-        <Badge tone={p.key.saved || p.key.envSet ? 'ok' : 'neutral'}>{status}</Badge>
+        <Badge tone={p.key.saved || p.key.envSet ? 'ok' : 'neutral'} className="px-2 py-0.5">{status}</Badge>
       </div>
-      <TextField
+      <MaskedSecretField
         label={i18n.board.voiceApiKey}
         hint={p.key.saved ? i18n.board.voiceKeyKeep(p.key.hint ?? '') : p.key.env ? i18n.board.voiceKeyEnv(p.key.env) : i18n.board.voiceKeyLocal}
-        type="password"
+        revealLabel={i18n.board.cloudPasswordShow}
+        hideLabel={i18n.board.cloudPasswordHide}
         autoComplete="off"
         value={key}
         placeholder={p.key.saved ? (p.key.hint ?? '') : ''}
-        onChange={(v) => (setKey(v), setTest(null))}
+        onChange={(e) => (setKey(e.currentTarget.value), setTest(null))}
         data-testid={`voice-key-input-${p.id}`}
       />
       {test && !test.ok ? <p className="break-words text-[12px] text-jb-danger" data-testid="voice-test-error"><LocalText value={test.message} /></p> : null}
@@ -623,8 +635,8 @@ function KeyRow({ p, api }: { p: VoiceProfileView; api: VoiceApi }) {
       {msg ? <p className="text-[12px] text-jb-muted"><LocalText value={msg} /></p> : null}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {p.key.saved ? <Btn label={i18n.board.voiceRemoveKey} size={28} variant="ghost" disabled={!!working} onClick={() => void save(null)} data-testid={`voice-key-remove-${p.id}`} /> : null}
-        <Btn icon={working === 'test' ? <Loader2 className="size-4 animate-spin" /> : undefined} label={i18n.board.voiceTest} size={28} disabled={!!working || (!key && !hasKey(p))} onClick={() => void runTest()} data-testid={`voice-key-test-${p.id}`} />
-        <Btn label={i18n.board.voiceSave} size={28} variant="primary" disabled={!!working || !key.trim()} onClick={() => void save(key.trim())} data-testid={`voice-key-save-${p.id}`} />
+        <Btn icon={working === 'test' ? <Spinner size="sm" /> : undefined} label={i18n.board.voiceTest} size={28} sound="tap" disabled={!!working || (!key && !hasKey(p))} onClick={() => void runTest()} data-testid={`voice-key-test-${p.id}`} />
+        <Btn label={i18n.board.voiceSave} size={28} variant="primary" sound="tap" disabled={!!working || !key.trim()} onClick={() => void save(key.trim())} data-testid={`voice-key-save-${p.id}`} />
       </div>
     </section>
   );
@@ -641,16 +653,16 @@ function PluginKeyRow({projectId,initial}:{projectId:string;initial:PluginKeySta
   const [state,setState] = useState(initial), [key,setKey] = useState(''), [busy,setBusy] = useState(false), [message,setMessage] = useState<Text | null>(null);
   const save = async (value:string|null) => {
     setBusy(true); setMessage(null);
-    try {setState(await savePluginKey(projectId,state.plugin,state.id,value)); setKey(''); setMessage(i18n.board.voiceSaved);}
+    try {setState(await savePluginKey(projectId,state.plugin,state.id,value)); setKey(''); if (value) playJuiceSound('paid'); setMessage(i18n.board.voiceSaved);}
     catch {setMessage('Plugin key could not be saved');} finally {setBusy(false);}
   };
   const testId=`plugin-key-${state.plugin}-${state.id}`;
-  return <section className="flex flex-col gap-2 rounded-[14px] bg-[var(--juice-w6)] p-3" data-testid={testId}>
-    <div className="flex items-center justify-between gap-2"><span className="text-[14px] font-semibold">{state.title}</span><Badge tone={state.envSet || state.saved ? 'ok' : 'neutral'}>{state.envSet ? i18n.board.voiceKeyFromEnv(state.env) : state.saved ? i18n.board.voiceKeySaved : i18n.board.voiceNoKeyBadge}</Badge></div>
+  return <section className="flex flex-col gap-2.5 rounded-[14px] bg-[var(--juice-w6)] p-3.5" data-testid={testId}>
+    <div className="flex items-center justify-between gap-2"><span className="text-[14px] font-semibold">{state.title}</span><Badge tone={state.envSet || state.saved ? 'ok' : 'neutral'} className="px-2 py-0.5">{state.envSet ? i18n.board.voiceKeyFromEnv(state.env) : state.saved ? i18n.board.voiceKeySaved : i18n.board.voiceNoKeyBadge}</Badge></div>
     <p className="text-[12px] text-jb-muted">{state.description} <a href={state.url} target="_blank" rel="noreferrer" className={linkClass}>{i18n.board.voiceApiKey}</a></p>
-    <TextField label={i18n.board.voiceApiKey} hint={i18n.board.voiceKeyEnv(state.env)} type="password" autoComplete="off" value={key} onChange={setKey} data-testid={`${testId}-input`} />
+    <MaskedSecretField label={i18n.board.voiceApiKey} hint={i18n.board.voiceKeyEnv(state.env)} revealLabel={i18n.board.cloudPasswordShow} hideLabel={i18n.board.cloudPasswordHide} autoComplete="off" value={key} onChange={(e) => setKey(e.currentTarget.value)} data-testid={`${testId}-input`} />
     <p className="text-[12px] text-jb-muted">{i18n.board.voiceKeysHint(state.file)}</p>
     {message ? <p className="text-[12px] text-jb-muted"><LocalText value={message}/></p> : null}
-    <div className="flex flex-wrap items-center justify-end gap-2">{state.saved ? <Btn label={i18n.board.voiceRemoveKey} size={28} variant="ghost" disabled={busy} onClick={()=>void save(null)} data-testid={`${testId}-remove`} /> : null}<Btn label={i18n.board.voiceSave} size={28} variant="primary" disabled={busy || !key.trim()} onClick={()=>void save(key.trim())} data-testid={`${testId}-save`} /></div>
+    <div className="flex flex-wrap items-center justify-end gap-2">{state.saved ? <Btn label={i18n.board.voiceRemoveKey} size={28} variant="ghost" disabled={busy} onClick={()=>void save(null)} data-testid={`${testId}-remove`} /> : null}<Btn label={i18n.board.voiceSave} size={28} variant="primary" sound="tap" disabled={busy || !key.trim()} onClick={()=>void save(key.trim())} data-testid={`${testId}-save`} /></div>
   </section>;
 }

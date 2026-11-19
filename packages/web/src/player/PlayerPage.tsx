@@ -40,7 +40,7 @@ import { Overlay } from './Overlay';
 import { StageViewport, type StageWatermark } from './StageViewport';
 import { resolveLook, type AppearanceFont, type AppearanceStroke } from '../renderer/appearance';
 import { AudioLines, PanelLeftOpen } from 'lucide-react';
-import { Alert, Separator } from '@tokenroll/juice/primitives';
+import { Alert, Separator, playJuiceSound } from '@tokenroll/juice/primitives';
 import { Btn, DirectorTag, Kbd, MenuButton, Segmented, Switch, useWidth, type MenuEntry } from './controls';
 import { SHORTCUTS } from './states';
 import { fullscreenBarCollapse } from './controls-fit';
@@ -71,7 +71,7 @@ export const JOPLO_SITE_URL = 'https://joplo.app/';
 /** 顶栏标志：看板里是回首页的按钮；传 href（发布站）时是在新标签页打开的外链，观众不会丢掉正在看的演示。 */
 export function Brand({ onClick, href }: { onClick?: () => void; href?: string }) {
   const { t: i18n } = useI18n();
-  const className = 'jb-focus flex shrink-0 items-center rounded-[6px]';
+  const className = 'jb-focus flex shrink-0 items-center rounded-[8px] transition-transform duration-150 active:scale-[0.97]';
 
   if (href)
     return (
@@ -80,7 +80,18 @@ export function Brand({ onClick, href }: { onClick?: () => void; href?: string }
       </a>
     );
   return (
-    <button type="button" onClick={onClick} aria-label={i18n.player.joploGoToHome} className={className} data-testid="brand">
+    <button
+      type="button"
+      onClick={() => {
+        if (onClick) {
+          playJuiceSound('tap');
+          onClick();
+        }
+      }}
+      aria-label={i18n.player.joploGoToHome}
+      className={className}
+      data-testid="brand"
+    >
       <JoploLogo height={28} />
     </button>
   );
@@ -88,9 +99,9 @@ export function Brand({ onClick, href }: { onClick?: () => void; href?: string }
 
 export function TopBar({ children, right }: { children?: ReactNode; right?: ReactNode }) {
   return (
-    <header className="flex h-[52px] shrink-0 items-center gap-3 bg-jb-surface px-4 font-jb text-jb-fg shadow-[0_1px_0_var(--juice-edge)]" data-testid="topbar">
+    <header className="jb-topbar-surface flex h-[52px] shrink-0 items-center gap-3 px-4 font-jb text-jb-fg" data-testid="topbar">
       {children}
-      {right ? <div data-topbar-actions="" className="ml-auto flex shrink-0 items-center gap-3">{right}</div> : null}
+      {right ? <div data-topbar-actions="" className="ml-auto flex shrink-0 items-center gap-2">{right}</div> : null}
     </header>
   );
 }
@@ -102,7 +113,7 @@ function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
     <nav aria-label={i18n.player.breadcrumbs} className="flex min-w-0 items-center gap-1 text-[14px]" data-testid="crumbs">
       {crumbs.map((c, i) => (
         <span key={c.testid} className="flex min-w-0 items-center gap-1">
-          {i > 0 ? <span className="px-1.5 text-jb-faint">/</span> : null}
+          {i > 0 ? <span className="px-1 text-jb-faint/80">/</span> : null}
           {c.items ? (
             <MenuButton
               trigger={{ label: c.label, iconOnly: false }}
@@ -111,12 +122,20 @@ function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
               items={c.items}
               placement="bottom-start"
               variant="ghost"
-              width={300}
-              className="h-8 min-w-0 max-w-[260px] px-2 text-[14px] [&_[data-jb-label]]:truncate"
+              width={312}
+              className="h-8 min-w-0 max-w-[260px] rounded-[10px] px-2.5 text-[14px] [&_[data-jb-label]]:truncate"
               chevron={<ChevronsUpDown className="size-3.5 text-jb-faint" aria-hidden />}
             />
           ) : c.onClick ? (
-            <button type="button" onClick={c.onClick} data-testid={c.testid} className="jb-focus truncate rounded-[8px] px-2 py-1.5 font-medium transition-colors hover:bg-jb-hover">
+            <button
+              type="button"
+              onClick={() => {
+                playJuiceSound('tap');
+                c.onClick?.();
+              }}
+              data-testid={c.testid}
+              className="jb-focus truncate rounded-[10px] px-2.5 py-1.5 font-medium transition-[background-color,transform] duration-150 hover:bg-[var(--juice-w6)] active:scale-[0.97]"
+            >
               {c.label}
             </button>
           ) : (
@@ -133,7 +152,7 @@ function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
 const playLabelOf = (snap: Snapshot, i18n: Dictionary = en) => (!snap.playing ? (snap.state?.completed ? i18n.player.replay : i18n.player.play) : snap.paused ? i18n.player.resume : i18n.player.pause);
 const speedItems = (speed: number, onSpeed: (v: number) => void, i18n: Dictionary = en): MenuEntry[] => SPEEDS.map((v) => ({ id: `speed-${v}`, label: i18n.player.speedValue(v), checked: speed === v, onClick: () => onSpeed(v) }));
 
-/** 上一步 / 播放 / 下一步（悬停提示写快捷键）。 */
+/** 上一步 / 播放 / 下一步（悬停提示写快捷键；播放按钮采用无黑框暖阳黄雕塑胶囊）。 */
 function NavButtons({ snap, scenario, ctl, iconOnly, size, ids }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; iconOnly: boolean; size: 32 | 34; ids: { prev: string; play: string; next: string } }) {
   const { t: i18n } = useI18n();
 
@@ -142,19 +161,19 @@ function NavButtons({ snap, scenario, ctl, iconOnly, size, ids }: { snap: Snapsh
   const off = !scenario || snap.view !== 'stage';
   const playing = snap.playing && !snap.paused;
   const playLabel = playLabelOf(snap, i18n);
-  const side = size === 34 ? 'rounded-[8px]' : undefined;
+  const side = size === 34 ? 'rounded-[11px]' : 'rounded-[10px]';
   return (
     <>
-      <Btn icon={<ChevronLeft className="size-4" />} label={i18n.player.previousStep} kbd="←" iconOnly variant="ghost" size={size} className={side} onClick={() => ctl.prev()} disabled={off || (pos === 0 && !snap.busy)} data-testid={ids.prev} />
-      <Btn icon={playing ? <Pause className="size-4" /> : <Play className="size-4" />} label={playLabel} kbd={i18n.player.space} title={playLabel} aria-label={playLabel} iconOnly={iconOnly} size={size} variant="play" className={cn(side, !iconOnly && 'px-4 text-[14px]')} onClick={() => ctl.togglePlay()} disabled={off || total === 0} data-testid={ids.play} />
-      <Btn icon={<ChevronRight className="size-4" />} label={i18n.player.nextStep} kbd="→" iconOnly variant="ghost" size={size} className={side} onClick={() => void ctl.next()} disabled={off || total === 0} data-testid={ids.next} />
+      <Btn icon={<ChevronLeft className="size-4" />} label={i18n.player.previousStep} kbd="←" iconOnly variant="ghost" size={size} sound="tick" className={side} onClick={() => ctl.prev()} disabled={off || (pos === 0 && !snap.busy)} data-testid={ids.prev} />
+      <Btn icon={playing ? <Pause className="size-4 fill-current" /> : <Play className="size-4 fill-current" />} label={playLabel} kbd={i18n.player.space} title={playLabel} aria-label={playLabel} iconOnly={iconOnly} size={size} variant="play" sound="tap" className={cn(size === 34 ? 'h-9 rounded-[12px]' : 'rounded-[11px]', !iconOnly && 'px-4 text-[14px]')} onClick={() => ctl.togglePlay()} disabled={off || total === 0} data-testid={ids.play} />
+      <Btn icon={<ChevronRight className="size-4" />} label={i18n.player.nextStep} kbd="→" iconOnly variant="ghost" size={size} sound="tick" className={side} onClick={() => void ctl.next()} disabled={off || total === 0} data-testid={ids.next} />
     </>
   );
 }
 
-const Divider = () => <Separator orientation="vertical" style={{ height: 20, alignSelf: 'center' }} />;
+const Divider = () => <Separator orientation="vertical" style={{ height: 18, alignSelf: 'center', opacity: 0.7 }} />;
 
-/** 时间线的一格（对齐 Juice .j-timeline-chip 同心胶囊，保留停留进度 jb-dwell 与分叉标记）：当前步展开写说明，其余只有序号。 */
+/** 时间线的一格（同心无描边胶囊 + 平滑停留进度 jb-dwell + 轻触刻度声）：当前步展开写说明，其余只有序号。 */
 function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; width: number; onClick: () => void; testid: string; kind?: string }) {
   const { t: i18n } = useI18n();
   const [tip, tipNode] = useTip(chip.state === 'current' && !chip.fork ? null : chip.tip, { placement: 'top-center', delay: 200 });
@@ -163,7 +182,10 @@ function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; widt
     <li className="flex shrink-0">
       <button
         type="button"
-        onClick={onClick}
+        onClick={() => {
+          playJuiceSound('tick');
+          onClick();
+        }}
         data-testid={testid}
         data-state={chip.state}
         data-step-kind={kind}
@@ -173,28 +195,32 @@ function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; widt
         {...tip}
         style={cur ? { width } : undefined}
         className={cn(
-          'j-timeline-chip jb-focus relative flex h-7 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[8px] font-jb-mono text-[11px] font-bold',
-          cur ? 'justify-start bg-jb-accent px-2.5 text-jb-on-accent shadow-[inset_0_0_0_1.5px_var(--jb-border-strong)] hover:bg-jb-accent-hover hover:text-jb-on-accent' : 'min-w-[34px] justify-center px-1.5',
-          chip.state === 'done' && 'bg-jb-inverse text-jb-accent hover:bg-jb-inverse-hover hover:text-jb-accent',
-          chip.state === 'todo' && 'bg-[var(--juice-w6)] text-jb-muted hover:bg-[var(--juice-w12)] hover:text-jb-fg',
+          'j-timeline-chip jb-focus relative flex h-[30px] items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[9px] font-jb-mono text-[11px] font-bold transition-[background-color,color,box-shadow,transform] duration-150 active:scale-[0.97]',
+          cur
+            ? 'justify-start bg-[color-mix(in_srgb,var(--jb-accent)_30%,var(--jb-bg-surface))] px-2 text-jb-fg shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--jb-accent-press)_32%,transparent),0_1px_3px_rgba(24,22,18,0.06)] hover:bg-[color-mix(in_srgb,var(--jb-accent)_42%,var(--jb-bg-surface))] hover:text-jb-fg'
+            : 'min-w-[32px] justify-center px-1.5',
+          chip.state === 'done' && 'bg-[var(--juice-w12)] text-jb-fg hover:bg-[var(--juice-w20)] hover:text-jb-fg',
+          chip.state === 'todo' && 'bg-transparent text-jb-muted hover:bg-[var(--juice-w6)] hover:text-jb-fg',
         )}
       >
-        {/* 播放中的停留进度：从左往右填深黄，暂停时停住（D55） */}
+        {/* 播放中的停留进度：从左往右平滑浸润暖金底色，暂停时停住（D55） */}
         {chip.dwell ? (
           <span
             key={`${chip.index}|${chip.dwell.ms}|${chip.dwell.elapsed}`}
             aria-hidden
-            className="jb-dwell absolute inset-0 bg-jb-accent-press"
+            className="jb-dwell absolute inset-0 rounded-[9px] bg-[color-mix(in_srgb,var(--jb-accent)_66%,transparent)]"
             data-testid="dwell"
             style={{ animationDuration: `${chip.dwell.ms}ms`, animationDelay: `${-chip.dwell.elapsed}ms`, animationPlayState: chip.dwell.paused ? 'paused' : 'running' }}
           />
         ) : null}
-        <span className="relative">{i18n.player.number(chip.index)}</span>
+        <span className={cn('relative inline-flex items-center justify-center tabular-nums', cur && 'min-w-[18px] rounded-[5px] bg-[color-mix(in_srgb,var(--jb-fg-default)_10%,transparent)] px-1 py-0.5 text-[10.5px]')}>
+          {i18n.player.number(chip.index)}
+        </span>
         {chip.fork ? <GitFork className="relative size-3 shrink-0" aria-label={i18n.player.fork} /> : null}
-        {chip.system && !cur ? <Cog className="relative size-3" aria-label={i18n.player.system} /> : null}
-        {chip.card && !cur ? <Film className="relative size-3" aria-label={i18n.player.transition} /> : null}
+        {chip.system && !cur ? <Cog className="relative size-3 opacity-75" aria-label={i18n.player.system} /> : null}
+        {chip.card && !cur ? <Film className="relative size-3 opacity-75" aria-label={i18n.player.transition} /> : null}
         {cur ? (
-          <span className="relative min-w-0 truncate font-jb text-[12px] font-semibold">
+          <span className="relative min-w-0 truncate font-jb text-[12.5px] font-semibold">
             {chip.system ? i18n.player.systemPrefix : chip.card ? i18n.player.transitionPrefix : ''}
             {chip.label}
           </span>
@@ -221,7 +247,7 @@ function Timeline({ snap, scenario, ctl, currentW }: { snap: Snapshot; scenario:
     else if (l + li.offsetWidth > ol.scrollLeft + ol.clientWidth) ol.scrollLeft = l + li.offsetWidth - ol.clientWidth + 6;
   }, [cur]);
   return (
-    <ol ref={ref} className="j-timeline-track jb-noscrollbar flex h-[34px] min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1.5" aria-label={i18n.player.steps} data-testid="step-bar">
+    <ol ref={ref} className="j-timeline-track jb-noscrollbar flex h-9 min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-[12px] bg-[var(--juice-w4)] p-[3px] shadow-[inset_0_1px_2px_rgba(24,22,18,0.03)]" aria-label={i18n.player.steps} data-testid="step-bar">
       {chips.map((c) => (
         <Chip key={c.index} chip={c} width={currentW} onClick={() => ctl.clickStepChip(c.stepIndex)} testid={c.index === 0 ? 'chip-initial' : `chip-${scenario.steps[c.index - 1]!.id}`} kind={c.index === 0 ? undefined : scenario.steps[c.index - 1]!.kind} />
       ))}
@@ -236,7 +262,7 @@ function CompactTimeline({ snap, scenario, ctl }: { snap: Snapshot; scenario: Sc
   const chips = timelineChips(scenario.steps, snap.state?.position ?? 0, snap.activeStep, snap.dwell, snap.paused, i18n);
   const cur = chips.find((c) => c.state === 'current') ?? chips[0]!;
   return (
-    <div className="flex min-w-0 flex-1 items-center px-1.5" data-testid="step-bar" data-compact="">
+    <div className="flex min-w-0 flex-1 items-center px-1" data-testid="step-bar" data-compact="">
       <MenuButton
         trigger={{ label: `${i18n.player.number(cur.index)} / ${i18n.player.number(scenario.steps.length)}`, iconOnly: false }}
         label={i18n.player.stepMenuLabel(cur.index, cur.label)}
@@ -245,41 +271,67 @@ function CompactTimeline({ snap, scenario, ctl }: { snap: Snapshot; scenario: Sc
         variant="ghost"
         size={34}
         width={300}
-        className="rounded-[8px] font-jb-mono text-[13px] font-semibold"
-        items={chips.map((c) => ({ id: `step-${c.index}`, label: c.tip, checked: c.state === 'current', onClick: () => ctl.clickStepChip(c.stepIndex) }))}
+        className="rounded-[10px] font-jb-mono text-[13px] font-semibold"
+        items={chips.map((c) => ({
+          id: `step-${c.index}`,
+          label: c.tip,
+          checked: c.state === 'current',
+          onClick: () => {
+            playJuiceSound('tick');
+            ctl.clickStepChip(c.stepIndex);
+          },
+        }))}
       />
     </div>
   );
 }
 
-/** 播放坞：⟲ ‹ 播放 › │ 时间线 │ 速度 ▾ · 缩放 − 适应 +（Juice .j-transport-bar 同心底座）。 */
+/** 播放坞：⟲ ‹ 播放 › │ 时间线 │ 声音 · 速度 ▾ · 缩放 − 适应 +（18px 同心悬浮雕塑坞，零黑框）。 */
 function Dock({ snap, scenario, ctl, speed, onSpeed, L, zoom, voice }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; speed: number; onSpeed?: (v: number) => void; L: BoardLayout; zoom: ReactNode; voice?: ReactNode }) {
   const { t: i18n } = useI18n();
 
   const off = !scenario || snap.view !== 'stage';
+  const hasRightControls = Boolean(voice || onSpeed || zoom);
   return (
-    <div className="j-transport-bar flex h-[56px] shrink-0 items-center justify-start gap-1.5 rounded-[14px] bg-jb-surface px-3 font-jb shadow-[0_0_0_1px_var(--juice-edge)]" role="toolbar" aria-label={i18n.player.playbackControls} data-testid="controls">
-      <Btn icon={<RotateCcw className="size-4" />} label={i18n.player.goToStart} kbd="Home" iconOnly variant="ghost" size={34} className="rounded-[8px]" onClick={() => ctl.reset()} disabled={off} data-testid="ctl-reset" />
-      <NavButtons snap={snap} scenario={scenario} ctl={ctl} iconOnly={false} size={34} ids={{ prev: 'ctl-prev', play: 'ctl-play', next: 'ctl-next' }} />
+    <div className="jb-dock-slab j-transport-bar flex h-[56px] shrink-0 items-center justify-start gap-1.5 rounded-[18px] px-2 font-jb" role="toolbar" aria-label={i18n.player.playbackControls} data-testid="controls">
+      <div className="flex shrink-0 items-center gap-1">
+        <Btn icon={<RotateCcw className="size-4" />} label={i18n.player.goToStart} kbd="Home" iconOnly variant="ghost" size={34} sound="tap" className="rounded-[11px]" onClick={() => ctl.reset()} disabled={off} data-testid="ctl-reset" />
+        <NavButtons snap={snap} scenario={scenario} ctl={ctl} iconOnly={false} size={34} ids={{ prev: 'ctl-prev', play: 'ctl-play', next: 'ctl-next' }} />
+      </div>
       <Divider />
       {scenario ? L.compactTimeline ? <CompactTimeline snap={snap} scenario={scenario} ctl={ctl} /> : <Timeline snap={snap} scenario={scenario} ctl={ctl} currentW={L.currentStepW} /> : <div className="flex-1" />}
-      <Divider />
-      {voice}
-      {onSpeed ? <MenuButton trigger={{ label: i18n.player.speedValue(speed), iconOnly: false }} label={i18n.player.autoplaySpeed(speed)} testid="speed" items={speedItems(speed, onSpeed, i18n)} placement="top-end" variant="ghost" size={34} width={120} className="rounded-[8px] px-2.5 font-jb-mono text-[13px] font-semibold" /> : null}
-      {zoom}
+      {hasRightControls ? (
+        <div className="flex h-9 shrink-0 items-center gap-0.5 rounded-[12px] bg-[var(--juice-w6)] p-[3px]">
+          {voice}
+          {onSpeed ? (
+            <MenuButton
+              trigger={{ label: i18n.player.speedValue(speed), iconOnly: false }}
+              label={i18n.player.autoplaySpeed(speed)}
+              testid="speed"
+              items={speedItems(speed, onSpeed, i18n)}
+              placement="top-end"
+              variant="ghost"
+              size={28}
+              width={124}
+              className="h-[30px] rounded-[9px] px-2 font-jb-mono text-[12.5px] font-semibold"
+            />
+          ) : null}
+          {zoom}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-/** 全屏控制条：居中的深色胶囊，高 48，内边距 8；宽度不够时依次收起三件套、速度、层级切换。 */
+/** 全屏控制条：居中的深色毛玻璃同心胶囊，高 48，宽度不够时依次收起三件套、速度、层级切换。 */
 function FullscreenBar({ snap, scenario, ctl, speed, onSpeed, layers, viewLayer, director, onLayer, onDirector, onExit, avail, actions }: { snap: Snapshot; scenario: Scenario; ctl: DemoController; speed: number; onSpeed?: (v: number) => void; layers: { id: string; title: string }[]; viewLayer: string; director: boolean; onLayer: (id: string) => void; onDirector: () => void; onExit: () => void; avail: number; actions?: ReactNode }) {
   const { t: i18n } = useI18n();
 
   const current = layers.find((l) => l.id === viewLayer)?.title ?? viewLayer;
   const c = fullscreenBarCollapse(avail, playLabelOf(snap, i18n), onSpeed ? SPEEDS : [], layers.map((l) => l.title), director, current, i18n);
-  const sep = <Separator orientation="vertical" style={{ height: 20, marginInline: 4, alignSelf: 'center' }} />;
+  const sep = <Separator orientation="vertical" style={{ height: 18, marginInline: 4, alignSelf: 'center', opacity: 0.7 }} />;
   return (
-    <div className="jb-dark j-transport-bar flex h-12 max-w-full shrink-0 items-center justify-start gap-1.5 overflow-hidden rounded-[24px] bg-jb-surface px-2 shadow-[0_0_0_1px_var(--juice-edge),0_12px_32px_-8px_rgba(0,0,0,0.45)] [&_[data-testid=fs-play]]:rounded-full" role="toolbar" aria-label={i18n.player.fullscreenPlaybackControls} data-testid="fullscreen-controls" data-collapsed={[...c].join(' ') || undefined}>
+    <div className="jb-dark jb-dock-slab j-transport-bar flex h-12 max-w-full shrink-0 items-center justify-start gap-1.5 overflow-hidden rounded-full px-2.5 [&_[data-testid=fs-play]]:rounded-full" role="toolbar" aria-label={i18n.player.fullscreenPlaybackControls} data-testid="fullscreen-controls" data-collapsed={[...c].join(' ') || undefined}>
       <NavButtons snap={snap} scenario={scenario} ctl={ctl} iconOnly={c.has('nav')} size={32} ids={{ prev: 'fs-prev', play: 'fs-play', next: 'fs-next' }} />
       {onSpeed ? (
         <>
@@ -309,21 +361,20 @@ function FullscreenBar({ snap, scenario, ctl, speed, onSpeed, layers, viewLayer,
         </>
       ) : null}
       {sep}
-      <Btn icon={<Shrink className="size-4" />} label={i18n.player.exitFullscreen} kbd="Esc" iconOnly variant="ghost" size={32} onClick={onExit} data-testid="fs-exit" />
+      <Btn icon={<Shrink className="size-4" />} label={i18n.player.exitFullscreen} kbd="Esc" iconOnly variant="ghost" size={32} sound="tap" className="rounded-full" onClick={onExit} data-testid="fs-exit" />
     </div>
   );
 }
 
 /** 标签的样式与内容（真实标签和看不见的测量标签共用，保证量出来的宽度就是显示的宽度）。 */
-const TAB_BASE = 'flex items-center gap-1.5 whitespace-nowrap rounded-t-[8px] px-3 font-jb text-[13px]';
-const tabLook = (active: boolean) =>
-  active ? 'h-9 border-[1.5px] border-b-0 border-jb-ink bg-jb-surface font-semibold text-jb-fg' : 'h-8 border border-b-0 border-jb-line bg-jb-sunken text-jb-muted';
+const TAB_BASE = 'flex h-[30px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3 font-jb text-[13px]';
+const tabLook = (active: boolean) => (active ? 'font-semibold text-jb-fg' : 'font-medium text-jb-muted');
 /** 层级的预设图标（core 的 LAYER_ICONS）：标签压窄时靠它认出是哪一层。 */
 const LAYER_ICON: Record<LayerIcon, typeof AppWindow> = {
   window: AppWindow, browser: Globe, mobile: Smartphone, desktop: Monitor, terminal: SquareTerminal, chat: MessageSquare,
   agent: Bot, server: Server, data: Database, email: Mail, doc: FileText, flow: Workflow,
 };
-function TabFace({ t }: { t: LayerTab }) {
+function TabFace({ t, cameraLabel }: { t: LayerTab; cameraLabel: string }) {
   const Icon = LAYER_ICON[t.icon ?? 'window'] ?? AppWindow;
   return (
     <>
@@ -334,16 +385,19 @@ function TabFace({ t }: { t: LayerTab }) {
         </span>
       ) : null}
       <span className="min-w-0 truncate">{t.title}</span>
+      {t.camera ? (
+        <span data-testid="director-badge" aria-label={cameraLabel} className="inline-flex size-[18px] shrink-0 items-center justify-center rounded-[6px] bg-jb-accent text-jb-on-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--jb-fg-on-accent)_12%,transparent)]">
+          <Clapperboard className="size-2.5" aria-hidden />
+        </span>
+      ) : null}
     </>
   );
 }
-const TAB_GAP = 4;
+const TAB_GAP = 3;
 
 /**
- * 层级标签（D55）：贴在舞台框上沿，正在看的那层与舞台连成一片；每个标签带预设图标，导演停在哪层，哪层右上角有摄像机角标。
- * 右侧「只重放这一层」与「跟随导演」。
- * 放不下时像书签（bookmarkTabs）：正在看的那层保持完整，其余压窄或叠起来，只露出图标和开头几个字；
- * 鼠标划过或键盘聚焦的标签浮到最上面、展开成全名，盖住邻居，别的标签不动。悬停提示里始终有全名。
+ * 层级分段栏（Juice 同心凹槽胶囊栏）：独立悬浮于 20px 圆角舞台上方，彻底告别旧式文件夹黑线标签！
+ * 放不下时保持 bookmarkTabs 自适应压窄与悬停平滑展开能力。
  */
 function LayerTabs({ layers, viewLayer, director, onLayer, onDirector, onReplay }: { layers: { id: string; title: string; role?: RoleInfo | null; icon?: LayerIcon }[]; viewLayer: string; director: boolean; onLayer: (id: string) => void; onDirector: (on: boolean) => void; onReplay: () => void }) {
   const { t: i18n } = useI18n();
@@ -351,7 +405,7 @@ function LayerTabs({ layers, viewLayer, director, onLayer, onDirector, onReplay 
   const [barRef, barWidth] = useWidth(0);
   const measure = useRef<HTMLDivElement | null>(null);
   const [widths, setWidths] = useState<number[]>([]);
-  const key = tabs.map((t) => `${t.id}|${t.title}|${t.active}|${t.icon ?? ''}|${t.role?.name ?? ''}`).join('\n');
+  const key = tabs.map((t) => `${t.id}|${t.title}|${t.active}|${t.camera}|${t.icon ?? ''}|${t.role?.name ?? ''}`).join('\n');
   useLayoutEffect(() => {
     const el = measure.current;
     if (!el) return;
@@ -365,55 +419,64 @@ function LayerTabs({ layers, viewLayer, director, onLayer, onDirector, onReplay 
     ro.observe(el);
     return () => ro.disconnect();
   }, [key]);
-  const geometry = widths.length === tabs.length ? bookmarkTabs(widths, tabs.findIndex((t) => t.active), barWidth, TAB_GAP) : [];
+  const innerAvail = Math.max(0, barWidth - 6);
+  const geometry = widths.length === tabs.length ? bookmarkTabs(widths, tabs.findIndex((t) => t.active), innerAvail, TAB_GAP) : [];
+  const lastGeom = geometry.at(-1);
+  const trackWidth = lastGeom ? Math.min(barWidth, Math.ceil(lastGeom.left + lastGeom.width) + 6) : undefined;
   return (
-    <div className="relative z-[1] -mb-[1.5px] flex h-9 shrink-0 items-end gap-2 pl-3" data-testid="layer-bar">
-      <div ref={measure} aria-hidden inert className="pointer-events-none invisible absolute left-0 top-0 flex w-max items-end">
+    <div className="relative z-[1] mb-2 flex h-9 shrink-0 items-center gap-2.5 px-0.5" data-testid="layer-bar">
+      <div ref={measure} aria-hidden inert className="pointer-events-none invisible absolute left-0 top-0 flex w-max items-center">
         {tabs.map((t) => (
           <span key={t.id} className={cn(TAB_BASE, tabLook(t.active))}>
-            <TabFace t={t} />
+            <TabFace t={t} cameraLabel={i18n.player.directorShot} />
           </span>
         ))}
       </div>
-      <div ref={barRef} role="tablist" aria-label={i18n.player.layers} className="relative h-9 min-w-0 flex-1" data-testid="layer-switch">
-        {tabs.map((t, i) => {
-          const g = geometry[i];
-          if (!g) return null;
-          const opens = g.openWidth > g.width;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={t.active}
-              data-testid={`layer-${t.id}`}
-              data-camera={t.camera ? '' : undefined}
-              title={t.active ? (t.camera ? i18n.player.directorIsUsing(t.title) : i18n.player.stayingOn(t.title)) : i18n.player.switchToDirectorPaused(t.title)}
-              onClick={() => onLayer(t.id)}
-              style={{ '--l': `${g.left}px`, '--w': `${g.width}px`, '--ol': `${g.openLeft}px`, '--ow': `${g.openWidth}px`, '--z': g.z } as React.CSSProperties}
-              className={cn(
-                'jb-focus absolute bottom-0 left-(--l) z-(--z) w-(--w)',
-                TAB_BASE,
-                tabLook(t.active),
-                !t.active && 'hover:text-jb-fg',
-                opens && 'transition-[left,width,z-index] duration-200 ease-out hover:transition-[left,width] focus-visible:transition-[left,width] hover:left-(--ol) hover:z-[60] hover:w-(--ow) focus-visible:left-(--ol) focus-visible:z-[60] focus-visible:w-(--ow)',
-              )}
-            >
-              <span className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
-                <TabFace t={t} />
-              </span>
-              {/* 导演停在这一层：右上角的小摄像机角标 */}
-              {t.camera ? (
-                <span data-testid="director-badge" aria-label={i18n.player.directorShot} className="pointer-events-none absolute -right-1.5 -top-1.5 inline-flex size-[18px] items-center justify-center rounded-full border-[1.5px] border-jb-ink bg-jb-accent text-jb-ink">
-                  <Clapperboard className="size-2.5" aria-hidden />
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
+      <div ref={barRef} className="flex h-9 min-w-0 flex-1 items-center">
+        <div
+          role="tablist"
+          aria-label={i18n.player.layers}
+          data-testid="layer-switch"
+          style={trackWidth ? { width: trackWidth } : undefined}
+          className="jb-layer-track relative h-9 max-w-full p-[3px]"
+        >
+          <div className="relative h-[30px] w-full">
+            {tabs.map((t, i) => {
+              const g = geometry[i];
+              if (!g) return null;
+              const opens = g.openWidth > g.width;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={t.active}
+                  data-testid={`layer-${t.id}`}
+                  data-camera={t.camera ? '' : undefined}
+                  title={t.active ? (t.camera ? i18n.player.directorIsUsing(t.title) : i18n.player.stayingOn(t.title)) : i18n.player.switchToDirectorPaused(t.title)}
+                  onClick={() => {
+                    if (!t.active) playJuiceSound('tap');
+                    onLayer(t.id);
+                  }}
+                  style={{ '--l': `${g.left}px`, '--w': `${g.width}px`, '--ol': `${g.openLeft}px`, '--ow': `${g.openWidth}px`, '--z': g.z } as React.CSSProperties}
+                  className={cn(
+                    'jb-layer-tab jb-focus absolute left-(--l) top-0 z-(--z) w-(--w)',
+                    TAB_BASE,
+                    tabLook(t.active),
+                    opens && 'transition-[left,width,z-index] duration-200 ease-out hover:left-(--ol) hover:z-[60] hover:w-(--ow) hover:bg-jb-surface hover:shadow-[0_2px_8px_rgba(24,22,18,0.12),0_0_0_1px_var(--juice-edge)] focus-visible:left-(--ol) focus-visible:z-[60] focus-visible:w-(--ow)',
+                  )}
+                >
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+                    <TabFace t={t} cameraLabel={i18n.player.directorShot} />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
-      <div className="ml-auto flex shrink-0 items-center gap-1 pb-1">
-        <Btn icon={<RotateCw className="size-4" />} label={i18n.player.replayThisLayer} title={i18n.player.playFromStep0UsingThisLayerSShots} iconOnly variant="ghost" size={28} onClick={onReplay} data-testid="replay-layer" />
+      <div className="ml-auto flex shrink-0 items-center gap-1">
+        <Btn icon={<RotateCw className="size-3.5" />} label={i18n.player.replayThisLayer} title={i18n.player.playFromStep0UsingThisLayerSShots} iconOnly variant="ghost" size={32} sound="tap" className="rounded-[10px]" onClick={onReplay} data-testid="replay-layer" />
         <Switch on={director} onChange={onDirector} label={i18n.player.followDirector} testid="director" title={director ? i18n.player.directorSwitchesLayersAndShotsWithEachStepTurn : i18n.player.turnOnToReturnToThisStepSDirector} />
       </div>
     </div>
@@ -634,16 +697,16 @@ export function PlayerPage(p: PlayerPageProps) {
   const zoomIn = () => zoomApi.current?.zoomBy(1.25);
   const zoomOut = () => zoomApi.current?.zoomBy(1 / 1.25);
   const fit = () => zoomApi.current?.fit();
-  // 缩放（D55：从画面右上角移到播放坞，Juice .j-zoom-bar 同心胶囊）。< 1440 只剩 − +；手动缩放后才出现「适应」
+  // 缩放（D55：从画面右上角移到播放坞，嵌入播放坞右侧同心凹槽内）。< 1440 只剩 − +；手动缩放后才出现「适应」
   const dockZoom = hasStage ? (
-    <div className="j-zoom-bar flex h-[34px] shrink-0 items-center gap-0.5 rounded-[9px] px-1" role="group" aria-label={i18n.player.zoom} data-testid="zoom-bar" data-zoom={userZoom === null ? 'camera' : userZoom.toFixed(2)}>
-      <Btn icon={<Minus className="size-4" />} label={i18n.player.zoomOut} title={i18n.player.zoomOutYouCanAlsoScrollOrPinch} iconOnly variant="ghost" size={28} onClick={zoomOut} data-testid="zoom-out" />
+    <div className="j-zoom-bar flex h-[30px] shrink-0 items-center gap-0.5 rounded-[9px] bg-transparent px-0.5" role="group" aria-label={i18n.player.zoom} data-testid="zoom-bar" data-zoom={userZoom === null ? 'camera' : userZoom.toFixed(2)}>
+      <Btn icon={<Minus className="size-3.5" />} label={i18n.player.zoomOut} title={i18n.player.zoomOutYouCanAlsoScrollOrPinch} iconOnly variant="ghost" size={28} sound="tap" className="h-[30px] w-[30px] rounded-[9px]" onClick={zoomOut} data-testid="zoom-out" />
       {L.zoomLabel ? (
-        <Btn label={i18n.player.fit} title={i18n.player.returnToTheShotResetManualZoomAndPan} variant="ghost" size={28} className="px-1.5 text-[12px] font-normal text-jb-muted" onClick={fit} disabled={userZoom === null} data-testid="zoom-fit" />
+        <Btn label={i18n.player.fit} title={i18n.player.returnToTheShotResetManualZoomAndPan} variant="ghost" size={28} sound="tap" className="h-[30px] rounded-[9px] px-2 text-[12px] font-medium text-jb-muted" onClick={fit} disabled={userZoom === null} data-testid="zoom-fit" />
       ) : userZoom !== null ? (
-        <Btn icon={<Maximize className="size-3.5" />} label={i18n.player.fit} title={i18n.player.returnToTheShot} iconOnly variant="ghost" size={28} onClick={fit} data-testid="zoom-fit" />
+        <Btn icon={<Maximize className="size-3.5" />} label={i18n.player.fit} title={i18n.player.returnToTheShot} iconOnly variant="ghost" size={28} sound="tap" className="h-[30px] w-[30px] rounded-[9px]" onClick={fit} data-testid="zoom-fit" />
       ) : null}
-      <Btn icon={<Plus className="size-4" />} label={i18n.player.zoomIn} title={i18n.player.zoomInYouCanAlsoScrollOrPinch} iconOnly variant="ghost" size={28} onClick={zoomIn} data-testid="zoom-in" />
+      <Btn icon={<Plus className="size-3.5" />} label={i18n.player.zoomIn} title={i18n.player.zoomInYouCanAlsoScrollOrPinch} iconOnly variant="ghost" size={28} sound="tap" className="h-[30px] w-[30px] rounded-[9px]" onClick={zoomIn} data-testid="zoom-in" />
     </div>
   ) : null;
 
@@ -715,22 +778,22 @@ export function PlayerPage(p: PlayerPageProps) {
           {i18n.player.thisOptionHasNoStageToDisplayYet}</div>
       )}
       {hoverBox ? (
-        <div className="pointer-events-none absolute z-10 border-[1.5px] border-dashed border-jb-ink" style={{ left: hoverBox.x - 3, top: hoverBox.y - 3, width: hoverBox.w + 6, height: hoverBox.h + 6 }} data-testid="inspect-hover">
-          <span className="absolute -top-[22px] left-[-1.5px] whitespace-nowrap rounded-[4px] bg-jb-inverse px-1.5 py-0.5 font-jb text-[11px] font-medium text-jb-on-inverse">
+        <div className="pointer-events-none absolute z-10 rounded-[6px] border-[1.5px] border-dashed border-jb-ink" style={{ left: hoverBox.x - 3, top: hoverBox.y - 3, width: hoverBox.w + 6, height: hoverBox.h + 6 }} data-testid="inspect-hover">
+          <span className="absolute -top-[24px] left-[-1.5px] whitespace-nowrap rounded-[6px] bg-jb-inverse px-2 py-0.5 font-jb text-[11px] font-medium text-jb-on-inverse shadow-sm">
             {hoverBox.type ?? i18n.player.element}{hoverBox.name ? ` · ${hoverBox.name}` : ''}
             <span className="ml-1.5 opacity-60">{i18n.player.clickToSelect}</span>
           </span>
         </div>
       ) : null}
       {completed && !full && !video ? (
-        <div className="absolute bottom-3 right-3 z-30 flex items-center gap-2" data-testid="complete-actions">
-          <Btn icon={<RotateCcw className="size-4" />} label={i18n.player.replay} onClick={() => ctl.togglePlay()} data-testid="replay" />
+        <div className="absolute bottom-3.5 right-3.5 z-30 flex items-center gap-2" data-testid="complete-actions">
+          <Btn icon={<RotateCcw className="size-4" />} label={i18n.player.replay} sound="tap" onClick={() => ctl.togglePlay()} data-testid="replay" />
           {p.completeAction}
           <AuthorLink author={p.author} />
         </div>
       ) : null}
       {p.flash ? (
-        <div role="status" className="jb-tip absolute left-1/2 top-3 z-20 -translate-x-1/2 whitespace-nowrap px-3 py-2 text-[13px]" data-testid="flash">
+        <div role="status" className="jb-tip absolute left-1/2 top-3 z-20 -translate-x-1/2 whitespace-nowrap px-3.5 py-2 text-[13px]" data-testid="flash">
           {p.flash}
         </div>
       ) : null}
@@ -767,16 +830,18 @@ export function PlayerPage(p: PlayerPageProps) {
   if (full)
     return (
       // 全屏：画面（字幕浮在画面上，D97）/ 控制条两段，上下排列。控制条那一行（64px）始终保留：淡出时只是变透明，画面与镜头尺寸不变、不跳动
-      <div ref={rootRef} className="jb-dark flex h-screen w-screen flex-col bg-jb-app" data-view={snap.view} data-fullscreen="" onMouseMove={idle.poke} style={idle.visible ? undefined : { cursor: 'none' }}>
-        <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-[6%] pb-6 pt-8" data-inspecting={inspecting ? '' : undefined} data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
-          {stageArea}
-          {completed ? <div className="flex justify-end"><AuthorLink author={p.author} /></div> : null}
+      <div ref={rootRef} data-juice-scope="" className="jb-dark flex h-screen w-screen flex-col bg-jb-app" data-view={snap.view} data-fullscreen="" onMouseMove={idle.poke} style={idle.visible ? undefined : { cursor: 'none' }}>
+        <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-[6%] pb-5 pt-7" data-inspecting={inspecting ? '' : undefined} data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
+          <div className="jb-stage-slab relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px]">
+            {stageArea}
+          </div>
+          {completed ? <div className="flex justify-end pt-2"><AuthorLink author={p.author} /></div> : null}
           {hasStage ? (
-            <div className={cn('absolute right-3 top-3 z-10 transition-opacity duration-300', idle.visible ? 'opacity-100' : 'pointer-events-none opacity-0')}>
-              <div className="j-zoom-bar flex h-8 items-center gap-0.5 rounded-[10px] bg-jb-surface p-0.5 shadow-[0_0_0_1px_var(--juice-edge)]" role="group" aria-label={i18n.player.zoom} data-testid="zoom-bar">
-                <Btn icon={<Minus className="size-4" />} label={i18n.player.zoomOut} iconOnly variant="ghost" size={28} onClick={zoomOut} data-testid="zoom-out" />
-                <Btn icon={<Maximize className="size-3.5" />} label={i18n.player.fit} iconOnly variant="ghost" size={28} onClick={fit} disabled={userZoom === null} data-testid="zoom-fit" />
-                <Btn icon={<Plus className="size-4" />} label={i18n.player.zoomIn} iconOnly variant="ghost" size={28} onClick={zoomIn} data-testid="zoom-in" />
+            <div className={cn('absolute right-4 top-4 z-10 transition-opacity duration-300', idle.visible ? 'opacity-100' : 'pointer-events-none opacity-0')}>
+              <div className="jb-dock-slab j-zoom-bar flex h-9 items-center gap-0.5 rounded-[12px] p-1" role="group" aria-label={i18n.player.zoom} data-testid="zoom-bar">
+                <Btn icon={<Minus className="size-4" />} label={i18n.player.zoomOut} iconOnly variant="ghost" size={28} sound="tap" className="rounded-[9px]" onClick={zoomOut} data-testid="zoom-out" />
+                <Btn icon={<Maximize className="size-3.5" />} label={i18n.player.fit} iconOnly variant="ghost" size={28} sound="tap" className="rounded-[9px]" onClick={fit} disabled={userZoom === null} data-testid="zoom-fit" />
+                <Btn icon={<Plus className="size-4" />} label={i18n.player.zoomIn} iconOnly variant="ghost" size={28} sound="tap" className="rounded-[9px]" onClick={zoomIn} data-testid="zoom-in" />
               </div>
             </div>
           ) : null}
@@ -809,7 +874,7 @@ export function PlayerPage(p: PlayerPageProps) {
     );
 
   return (
-    <div ref={rootRef} className="relative flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-view={snap.view} data-layout={L.wide ? 'wide' : L.rail ? 'rail' : 'narrow'}>
+    <div ref={rootRef} data-juice-scope="" className="relative flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-view={snap.view} data-layout={L.wide ? 'wide' : L.rail ? 'rail' : 'narrow'}>
       <TopBar
         right={
           <>
@@ -817,12 +882,13 @@ export function PlayerPage(p: PlayerPageProps) {
             <AuthorLink author={p.author} />
             {p.actions}
             {p.onInspect ? <LanguageMenu iconOnly={L.languageIconOnly} /> : null}
-            {p.menu.length ? <MenuButton trigger={{ icon: p.exportBadge && !L.topLabels ? p.exportBadge : p.menuLabel ? <Ellipsis className="size-4" /> : <Share className="size-4" />, label: p.menuLabel ?? i18n.player.export, iconOnly: !L.topLabels, extra: L.topLabels ? p.exportBadge : null }} label={p.menuLabel ?? i18n.player.export} testid="more-menu" items={p.menu} placement="bottom-end" width={p.menu.some((m) => 'custom' in m) ? 296 : 240} /> : null}
+            {p.menu.length ? <MenuButton trigger={{ icon: p.exportBadge && !L.topLabels ? p.exportBadge : p.menuLabel ? <Ellipsis className="size-4" /> : <Share className="size-4" />, label: p.menuLabel ?? i18n.player.export, iconOnly: !L.topLabels, extra: L.topLabels ? p.exportBadge : null }} label={p.menuLabel ?? i18n.player.export} testid="more-menu" items={p.menu} placement="bottom-end" width={p.menu.some((m) => 'custom' in m) ? 304 : 248} /> : null}
             <Btn
               icon={<Expand className="size-4" />}
               label={i18n.player.fullscreen}
               kbd="F"
               iconOnly
+              sound="tap"
               onClick={(e) => {
                 e.currentTarget.blur();
                 toggleFull();
@@ -833,26 +899,26 @@ export function PlayerPage(p: PlayerPageProps) {
         }
       >
         <Brand onClick={p.onBrand} href={p.brandHref} />
-        <Separator orientation="vertical" style={{ height: 20, alignSelf: 'center' }} />
+        <Separator orientation="vertical" style={{ height: 18, alignSelf: 'center', opacity: 0.75 }} />
         <Breadcrumbs crumbs={p.crumbs} />
       </TopBar>
       <div className="flex min-h-0 flex-1">
         {L.rail ? (
           // 窄屏（< 1100）：左栏收成 56px 竖条；点竖条或按 [ 浮出完整左栏，选完自动收回
-          <aside className="flex w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto bg-jb-surface py-3 shadow-[1px_0_0_var(--juice-edge)]" data-testid="left-nav" data-rail="">
-            <Btn icon={<PanelLeftOpen className="size-4" />} label={i18n.player.expandSidebar} kbd="[" iconOnly variant="ghost" size={32} selected={railOpen} onClick={() => setRailOpen((v) => !v)} data-testid="rail-open" tipPlacement="bottom-start" />
+          <aside className="jb-sidebar-surface flex w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto py-3" data-testid="left-nav" data-rail="">
+            <Btn icon={<PanelLeftOpen className="size-4" />} label={i18n.player.expandSidebar} kbd="[" iconOnly variant="ghost" size={32} sound="tap" selected={railOpen} onClick={() => setRailOpen((v) => !v)} data-testid="rail-open" tipPlacement="bottom-start" />
             <button type="button" className="flex w-full flex-1 flex-col items-center gap-1 pt-1" onClick={() => setRailOpen(true)} aria-label={i18n.player.expandSidebar}>
               {p.navRail}
             </button>
           </aside>
         ) : (
-          <aside className="flex shrink-0 flex-col overflow-y-auto bg-jb-surface px-3 py-4 shadow-[1px_0_0_var(--juice-edge)]" style={{ width: L.navWidth }} data-testid="left-nav">
+          <aside className="jb-sidebar-surface flex shrink-0 flex-col overflow-y-auto px-3 py-4" style={{ width: L.navWidth }} data-testid="left-nav">
             {p.nav}
           </aside>
         )}
         {L.rail && railOpen ? (
           <aside
-            className="j-floating-pop jb-pop absolute bottom-3 left-[64px] top-[60px] z-30 flex w-[276px] flex-col overflow-y-auto px-3 py-4"
+            className="j-floating-pop jb-pop absolute bottom-3 left-[64px] top-[60px] z-30 flex w-[280px] flex-col overflow-y-auto rounded-[20px] px-3 py-4"
             data-testid="left-nav-float"
             onClickCapture={(e) => {
               // 选完自动收回（点到了按钮）
@@ -862,7 +928,7 @@ export function PlayerPage(p: PlayerPageProps) {
             {p.nav}
           </aside>
         ) : null}
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-hidden px-4 py-3" data-inspecting={inspecting ? '' : undefined}>
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden px-4 py-3" data-inspecting={inspecting ? '' : undefined}>
           {p.banner}
           {snap.playbackError ? (
             <div className="shrink-0" data-testid="playback-error">
@@ -874,10 +940,10 @@ export function PlayerPage(p: PlayerPageProps) {
           ) : null}
           <div className="flex min-h-0 flex-1 flex-col">
             {hasLayerBar ? <LayerTabs layers={layers.map((l) => ({ ...l, role: roleOfScene(project, l.sceneId) }))} viewLayer={viewLayer} director={director} onLayer={(id) => p.onLayer(id)} onDirector={(on) => p.onLayer(on ? null : viewLayer)} onReplay={replayLayer} /> : null}
-            {/* 舞台框（1.5px 墨线，圆角 10）；字幕与步骤标题条浮在画面上（D97） */}
-            <div className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface', hasLayerBar && 'rounded-tl-none')} data-testid="stage-frame" data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
+            {/* 舞台框：20px 无重线同心雕塑板（jb-stage-slab）；字幕与步骤标题条浮在画面上（D97） */}
+            <div className="jb-stage-slab relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px]" data-testid="stage-frame" data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
               {stageArea}
-          {completed ? <div className="flex justify-end"><AuthorLink author={p.author} /></div> : null}
+              {completed ? <div className="flex justify-end"><AuthorLink author={p.author} /></div> : null}
             </div>
           </div>
           <Dock snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} L={L} zoom={dockZoom} voice={p.voice} />
@@ -895,15 +961,15 @@ function ShortcutsPanel({ open, onClose, board }: { open: boolean; onClose: () =
 
   const groups = SHORTCUTS(i18n).map((g) => ({ ...g, items: g.items.filter((i) => board || ![i18n.player.holdOptionKey, 'T', '[', 'Enter'].includes(i.keys)) })).filter((g) => g.items.length);
   return (
-    <CenterPanel open={open} onClose={onClose} label={i18n.player.keyboardShortcuts} testid="shortcuts" width={340}>
-      <div className="flex items-center justify-between px-4 pb-1 pt-3.5 font-jb">
+    <CenterPanel open={open} onClose={onClose} label={i18n.player.keyboardShortcuts} testid="shortcuts" width={356}>
+      <div className="flex items-center justify-between px-4 pb-1.5 pt-3.5 font-jb">
         <h2 className="text-[15px] font-bold">{i18n.player.keyboardShortcuts}</h2>
         <Kbd>?</Kbd>
       </div>
       <div className="flex flex-col gap-3 px-4 pb-4 pt-1 font-jb">
         {groups.map((g) => (
-          <section key={g.group}>
-            <div className="pb-1 text-[12px] font-semibold tracking-[1px] text-jb-muted">{g.group}</div>
+          <section key={g.group} className="rounded-[12px] bg-[var(--juice-w4)] px-3 py-2">
+            <div className="pb-1 text-[11.5px] font-semibold tracking-[0.8px] text-jb-muted">{g.group}</div>
             <ul className="flex flex-col">
               {g.items.map((i) => (
                 <li key={i.label} className="flex h-7 items-center justify-between gap-3 text-[13px]">
