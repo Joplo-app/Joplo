@@ -1,3 +1,4 @@
+import '../juice-layer.css';
 import { I18nProvider } from '../i18n/context';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

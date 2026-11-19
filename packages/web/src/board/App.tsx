@@ -29,7 +29,8 @@ import { VIEWPORT_SIZE, type Diagnostic } from '@joplo-app/core/runtime';
 import { DemoController } from '../runtime/demo';
 import { exportImage, openInEditor, selectionWriter } from '../runtime/dev-client';
 import { boardHash, parseBoardHash, warnUnknownPlayParams, type BoardRoute, type PlayRoute } from '../runtime/route';
-import { ArrowRight, BookOpen, CircleCheck, Cloud, Loader2, Smartphone, CircleX, Code, Copy, Film, ImageDown, LayoutGrid, Link, ScanSearch, Volume2, VolumeX } from 'lucide-react';
+import { ArrowRight, BookOpen, CircleCheck, Cloud, Smartphone, CircleX, Code, Copy, Film, ImageDown, LayoutGrid, Link, ScanSearch, Volume2, VolumeX } from 'lucide-react';
+import { Badge, Button, Spinner } from '@tokenroll/juice/primitives';
 import { PlayerPage, useBoardLayout, type MenuEntry } from '../player/PlayerPage';
 import { Btn, Kbd } from '../player/controls';
 import type { ProjectSummary } from '../runtime/dev-client';
@@ -143,7 +144,7 @@ function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpen
           <>
             <AppearanceButton look={a.saved} catalog={a.catalog} wide={L.topLabels} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} scopeLabel={i18n.board.allProjects} />
             <LanguageMenu iconOnly={L.languageIconOnly} />
-            <a href="https://github.com/Joplo-app/Joplo/tree/main/docs" target="_blank" rel="noreferrer" className="jb-focus inline-flex h-8 items-center gap-1.5 rounded-[6px] px-2.5 text-[13px] font-medium text-jb-muted hover:bg-jb-hover hover:text-jb-fg" data-testid="home-docs">
+            <a href="https://github.com/Joplo-app/Joplo/tree/main/docs" target="_blank" rel="noreferrer" className="jb-focus inline-flex h-8 items-center gap-1.5 rounded-[10px] px-2.5 text-[13px] font-medium text-jb-muted transition-colors hover:bg-jb-hover hover:text-jb-fg" data-testid="home-docs">
               <BookOpen className="size-4" aria-hidden />
               {i18n.board.docs}</a>
           </>
@@ -158,7 +159,7 @@ function ResourceWarnings({ list }: { list: Diagnostic[] }) {
   const { t } = useBoardI18n();
   const warnings = list.filter(d => d.severity === 'warning' && d.code.startsWith('LOCAL_RESOURCE_'));
   if (!warnings.length) return null;
-  return <div role="status" className="max-h-[25%] shrink-0 overflow-y-auto rounded-[8px] border-l-4 border-jb-ink bg-jb-subtle px-3 py-2 font-jb text-[13px]" data-testid="resource-warnings">
+  return <div role="status" className="max-h-[25%] shrink-0 overflow-y-auto rounded-[12px] bg-[var(--juice-w6)] px-3.5 py-2.5 font-jb text-[13px] shadow-[inset_0_0_0_1px_var(--juice-edge)]" data-testid="resource-warnings">
     <div className="flex items-center gap-2 font-semibold"><VolumeX className="size-4" aria-hidden />{t.board.mediaUnavailable}</div>
     <ul className="mt-1 space-y-1">{warnings.map((d, i) => <li key={i} className="break-words"><code className="font-jb-mono">{d.at}</code> <span className="text-jb-muted">{d.message}</span></li>)}</ul>
   </div>;
@@ -173,15 +174,15 @@ function DiagnosticsBanner({ list }: { list: Diagnostic[] }) {
   if (!sum) return null;
   const errors = list.filter((d) => d.severity === 'error');
   return (
-    <div role="alert" className="max-h-[40%] w-full shrink-0 overflow-y-auto rounded-[8px] border-l-4 border-jb-danger bg-jb-danger-bg px-3 py-2 text-left font-jb text-[13px]" data-testid="diagnostics">
+    <div role="alert" className="max-h-[40%] w-full shrink-0 overflow-y-auto rounded-[12px] bg-jb-danger-bg px-3.5 py-2.5 text-left font-jb text-[13px] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--jb-status-danger)_24%,transparent)]" data-testid="diagnostics">
       <div className="flex items-center gap-2">
         <CircleX className="size-4 shrink-0 text-jb-danger" aria-hidden />
         <strong className="text-jb-danger">{i18n.board.compilationCount(sum.count)}</strong>
         <span className="text-jb-danger">{i18n.board.showingTheLastSuccessfulStage}</span>
         <span className="flex-1" />
-        <button type="button" className="jb-focus shrink-0 rounded-[4px] px-1.5 text-[12px] font-medium text-jb-fg hover:underline" onClick={() => setOpen((v) => !v)} aria-expanded={open} data-testid="diag-toggle">
+        <Button variant="ghost" size="xs" onClick={() => setOpen((v) => !v)} aria-expanded={open} data-testid="diag-toggle">
           {open ? i18n.board.collapse : i18n.board.expand}
-        </button>
+        </Button>
       </div>
       <ul className="mt-1 flex flex-col gap-0.5 pl-6">
         {(open ? errors.slice(0, 50) : errors.slice(0, 1)).map((d, i) => (
@@ -317,9 +318,13 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   if (!project) {
     const msg = ir.status === 404 ? translate(ir.error ?? '', i18n) : (ir.error ?? (ir.payload && !ir.payload.ok ? null : i18n.board.compilingProject));
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-[14px] text-[#3a3a3a]" data-testid="player-loading">
-        {ir.payload && !ir.payload.ok ? <DiagnosticsBanner list={ir.payload.diagnostics} /> : <span>{msg ? translate(msg, i18n) : null}</span>}
-        <button type="button" className="text-[#1c5fb8] underline" onClick={() => navigate({ kind: 'home', projectId })}>
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-[14px] text-jb-muted" data-testid="player-loading">
+        {ir.payload && !ir.payload.ok ? (
+          <DiagnosticsBanner list={ir.payload.diagnostics} />
+        ) : (
+          <span className="inline-flex items-center gap-2">{!ir.error && ir.status !== 404 ? <Spinner size="sm" /> : null}{msg ? translate(msg, i18n) : null}</span>
+        )}
+        <button type="button" className="jb-focus rounded-[8px] px-2.5 py-1 text-jb-cloud underline underline-offset-2 hover:bg-jb-hover" onClick={() => navigate({ kind: 'home', projectId })}>
           {i18n.board.goToHome}</button>
       </div>
     );
@@ -330,7 +335,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-[14px]" data-testid="feature-missing">
         <span>{i18n.board.featureNotFound(play.featureId)}</span>
-        <button type="button" className="text-[#1c5fb8] underline" onClick={() => navigate({ kind: 'home', projectId })}>
+        <button type="button" className="jb-focus rounded-[8px] px-2.5 py-1 text-jb-cloud underline underline-offset-2 hover:bg-jb-hover" onClick={() => navigate({ kind: 'home', projectId })}>
           {i18n.board.goToHome}</button>
       </div>
     );
@@ -354,7 +359,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
     {
       id: 'cloud',
       tone: 'cloud' as const,
-      icon: cloud.running ? <Loader2 className="animate-spin" /> : <Cloud />,
+      icon: cloud.running ? <Spinner size="sm" /> : <Cloud />,
       label: i18n.board.cloudPublish,
       description: cloud.running ? i18n.board.cloudPublishing : !cloud.acct.available ? i18n.board.cloudUnavailableHint : i18n.board.cloudPublishHint,
       onClick: () => {
@@ -414,15 +419,15 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
       {ir.payload && !ir.payload.ok ? <DiagnosticsBanner list={ir.payload.diagnostics} /> : null}
       {ir.payload?.ok ? <ResourceWarnings list={ir.payload.diagnostics} /> : null}
       {gap && work && gb ? (
-        <div role="status" className="flex shrink-0 flex-col gap-2 rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface px-4 py-3 font-jb" data-testid="gap-notice" data-status={gap.status}>
+        <div role="status" className="flex shrink-0 flex-col gap-2 rounded-[14px] bg-jb-surface px-4 py-3 font-jb shadow-[0_0_0_1px_var(--juice-edge)]" data-testid="gap-notice" data-status={gap.status}>
           <div className="flex items-center gap-2 text-[14px] font-semibold">
             <StatusIcon status={gap.status} size={16} />
             {i18n.board.gapTitle(gb.letter, caseTitle ?? '', gap.status !== 'none' && gap.status !== 'missing' ? COVERAGE_LABEL(i18n)[gap.status].text : '')}
           </div>
           <div className="text-[13px] text-jb-muted">{i18n.board.gapBody(gb.letter, gap.basis === 'derived' ? i18n.board.thisCaseIsNotCoveredYet : gap.reason ?? '')}</div>
           <div className="flex flex-wrap items-center gap-2">
-            <Btn icon={<Copy className="size-3.5" />} label={i18n.board.copyRequestForAgent} size={28} onClick={() => void copyText(gb.agentText).then((ok) => setFlash(<LocalText value={ok ? m.board.requestForAgentCopied : m.board.clipboardUnavailable} />))} data-testid="gap-copy" />
-            {gb.alt ? <Btn icon={<ArrowRight className="size-3.5" />} label={i18n.board.seeHowOptionHandlesThis(gb.alt.letter)} variant="primary" size={28} onClick={() => toPlay({ featureId: entry.id, workId: gb.alt!.workId, ...(resolved.caseId ? { caseId: resolved.caseId } : {}) })} data-testid="gap-alt" /> : null}
+            <Btn icon={<Copy className="size-3.5" />} label={i18n.board.copyRequestForAgent} size={28} sound="pop" onClick={() => void copyText(gb.agentText).then((ok) => setFlash(<LocalText value={ok ? m.board.requestForAgentCopied : m.board.clipboardUnavailable} />))} data-testid="gap-copy" />
+            {gb.alt ? <Btn icon={<ArrowRight className="size-3.5" />} label={i18n.board.seeHowOptionHandlesThis(gb.alt.letter)} variant="primary" size={28} sound="tap" onClick={() => toPlay({ featureId: entry.id, workId: gb.alt!.workId, ...(resolved.caseId ? { caseId: resolved.caseId } : {}) })} data-testid="gap-alt" /> : null}
           </div>
           <div className="truncate text-[12px] text-jb-faint" data-testid="gap-command" title={gb.agentText}>
             {i18n.board.copiedText}{gb.agentText}
@@ -481,6 +486,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
               label={i18n.board.inspect}
               iconOnly={!L.topLabels}
               selected={inspectMode}
+              sound="tap"
               title={inspectMode ? i18n.board.exitInspectMode : i18n.board.inspectModeClickAStageElementToSelectIt}
               kbd={L.topLabels ? undefined : i18n.board.hold}
               onClick={() => setInspectMode((v) => !v)}
@@ -492,16 +498,16 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
           </>
         }
         inspectMode={inspectMode}
-        completeAction={nc ? <Btn icon={<ArrowRight className="size-4" />} iconAfter label={i18n.board.nextCase(nc.title)} kbd="Enter" variant="primary" className="max-w-[360px] [&>span]:truncate" onClick={() => nextRef.current?.()} data-testid="next-case" /> : null}
+        completeAction={nc ? <Btn icon={<ArrowRight className="size-4" />} iconAfter label={i18n.board.nextCase(nc.title)} kbd="Enter" variant="primary" sound="tap" className="max-w-[360px] [&_[data-jb-label]]:truncate" onClick={() => nextRef.current?.()} data-testid="next-case" /> : null}
         navRail={independentWork ? <WorkRail entry={independentWork} scenarioId={snap.scenarioId} /> : <CaseRail project={project} featureId={entry.id} workId={resolved.workId} caseId={resolved.caseId} />}
         exportBadge={vid.running && vid.job ? <ProgressRing percent={vid.job.percent} /> : rt.installing && rt.job ? <ProgressRing percent={rt.job.percent} /> : null}
         deviceTag={
-          <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-[6px] border border-jb-line bg-jb-surface px-2.5 font-jb text-[12px] text-jb-muted" data-testid="device-tag">
+          <Badge className="h-7 rounded-[9px] bg-jb-surface px-2.5 font-jb text-[12px] text-jb-muted shadow-[0_0_0_1px_var(--juice-edge)]" data-testid="device-tag">
             <Smartphone className="size-3.5" aria-hidden />
-            {i18n.board.mobilePageDetails(VIEWPORT_SIZE.mobile.width)}</span>
+            {i18n.board.mobilePageDetails(VIEWPORT_SIZE.mobile.width)}</Badge>
         }
         voice={<VoiceButton api={voice} open={voiceOpen} onToggle={() => setVoiceOpen((v) => !v)} btnRef={setVoiceAnchor} />}
-        fullscreenVoice={<Btn icon={voice.on ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />} label={voice.on ? i18n.player.turnNarrationOff : i18n.player.turnNarrationOn} iconOnly variant="ghost" size={32} selected={voice.on} onClick={() => voice.setOn(!voice.on)} data-testid="fs-voice" />}
+        fullscreenVoice={<Btn icon={voice.on ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />} label={voice.on ? i18n.player.turnNarrationOff : i18n.player.turnNarrationOn} iconOnly variant="ghost" size={32} selected={voice.on} sound="latch" onClick={() => voice.setOn(!voice.on)} data-testid="fs-voice" />}
         fullscreenActions={<AppearanceButton look={a.saved} catalog={a.catalog} wide={false} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} variant="ghost" />}
         layer={play.layer ?? null}
         speed={play.speed ?? 1}

@@ -16,6 +16,7 @@ import { m } from '../i18n/board/messages';
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, RotateCw } from 'lucide-react';
+import { Alert, Button, TaskProgressCard } from '@tokenroll/juice/primitives';
 import { fetchExportRuntime, installExportRuntime, watchExportRuntime, type ExportRuntimeStatus, type InstallJob } from '../runtime/dev-client';
 
 /** 安装进度的文字与百分比（纯函数）。 */
@@ -120,7 +121,7 @@ export function useExportRuntime(projectId: string, handlers: { onReady: () => v
   };
 }
 
-/** 菜单顶部的卡片：未安装 → 说明 + 安装按钮；安装中 → 进度；失败 → 原因 + 重试。 */
+/** 菜单顶部的卡片（基于 Juice TaskProgressCard / Alert / Button）：未安装 → 说明 + 安装按钮；安装中 → 进度；失败 → 原因 + 重试。 */
 export function ExportSetupCard({ rt }: { rt: ExportRuntime }) {
   const { t: i18n } = useBoardI18n();
   const job = rt.job;
@@ -128,38 +129,33 @@ export function ExportSetupCard({ rt }: { rt: ExportRuntime }) {
   const failed = job?.status === 'error';
   const p = job ? setupProgress(job, i18n) : null;
   return (
-    <div className="m-1 mb-0 flex w-[300px] flex-col gap-2 rounded-[8px] border-[1.5px] border-jb-ink bg-jb-surface p-2.5 font-jb" data-testid="export-setup" data-status={job?.status ?? 'missing'}>
-      <div className="flex flex-col gap-0.5 text-[12px]">
+    <div className="m-1 mb-0 box-border flex w-[calc(100%-8px)] min-w-0 flex-col gap-2.5 rounded-[14px] bg-[var(--juice-w6)] p-3 font-jb" data-testid="export-setup" data-status={job?.status ?? 'missing'}>
+      <div className="flex min-w-0 flex-col gap-0.5 text-[12px]">
         <span className="font-semibold">{i18n.board.exportSetupTitle}</span>
-        <span className="text-jb-muted">{i18n.board.exportSetupBody(rt.downloadMB)}</span>
+        <span className="break-words text-jb-muted">{i18n.board.exportSetupBody(rt.downloadMB)}</span>
       </div>
       {running && p ? (
-        <>
-          <div className="flex items-center justify-between gap-2 text-[12px] text-jb-muted">
-            <span className="min-w-0 truncate" title={p.text}>{p.text}</span>
-            <span className="shrink-0 tabular-nums">{i18n.player.number(p.percent)}%</span>
-          </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-jb-sunken" role="progressbar" aria-valuenow={p.percent} aria-valuemin={0} aria-valuemax={100} aria-label={p.text}>
-            <div className="h-full rounded-full bg-jb-accent-press transition-[width]" style={{ width: `${p.percent}%` }} />
-          </div>
+        <TaskProgressCard step={p.text} value={p.percent}>
           <span className="text-[11px] text-jb-faint">{i18n.board.closingThisMenuWillNotStopTheInstall}</span>
-        </>
+        </TaskProgressCard>
       ) : (
         <>
           {failed && p ? (
-            <span className="whitespace-normal break-words text-[12px] text-jb-danger" role="alert" data-testid="export-setup-error">
-              {p.text}
-            </span>
+            <div data-testid="export-setup-error">
+              <Alert tone="danger">{p.text}</Alert>
+            </div>
           ) : null}
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="sm"
+            sound="tap"
+            leftIcon={failed ? <RotateCw className="size-3.5" aria-hidden /> : <Download className="size-3.5" aria-hidden />}
             onClick={() => void rt.install()}
-            className="jb-focus inline-flex h-8 items-center justify-center gap-1.5 rounded-[6px] border-[1.5px] border-jb-ink bg-jb-ink px-2.5 text-[12px] font-semibold text-jb-surface hover:opacity-90"
+            className="w-full rounded-[10px]"
             data-testid="export-setup-install"
           >
-            {failed ? <RotateCw className="size-3.5" aria-hidden /> : <Download className="size-3.5" aria-hidden />}
             {failed ? i18n.board.retry : i18n.board.installExportComponent(rt.downloadMB)}
-          </button>
+          </Button>
           <span className="select-text text-[11px] text-jb-faint">{i18n.board.exportSetupInTerminal(rt.command)}</span>
         </>
       )}

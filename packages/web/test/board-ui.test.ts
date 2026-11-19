@@ -50,10 +50,17 @@ describe('placePopover：浮层贴着锚点、放不下时翻转、不超出视�
     expect(placePopover({ left: 1100, top: 300, right: 1200, bottom: 334 }, { width: 260, height: 120 }, vp, 'right-start')).toEqual({ x: 1100 - 6 - 260, y: 300, side: 'left' });
     expect(placePopover({ left: 12, top: 760, right: 264, bottom: 794 }, { width: 260, height: 120 }, vp, 'right-start').y).toBe(800 - 8 - 120);
   });
-  it('边界输入：锚点或尺寸是 0、视口很小也不产生负坐标', () => {
+  it('边界输入：锚点或尺寸是 0、视口很小也不产生负坐标；原生 DOMRect 原型 getter 同样生效', () => {
     const r = placePopover({ left: 0, top: 0, right: 0, bottom: 0 }, { width: 0, height: 0 }, { width: 0, height: 0 }, 'bottom-end');
     expect(r.x).toBeGreaterThanOrEqual(0);
     expect(r.y).toBeGreaterThanOrEqual(0);
+    const protoRect = Object.create({
+      get left() { return 1100; },
+      get top() { return 10; },
+      get right() { return 1200; },
+      get bottom() { return 42; },
+    }) as { left: number; top: number; right: number; bottom: number };
+    expect(placePopover(protoRect, { width: 300, height: 200 }, vp, 'bottom-end')).toEqual({ x: 900, y: 48, side: 'bottom' });
   });
 });
 

@@ -1,16 +1,17 @@
 import { Languages } from 'lucide-react';
+import { Badge } from '@tokenroll/juice/primitives';
 import { useI18n } from '../i18n/context';
 import { useContent } from '../i18n/content-context';
 import type { ContentInfo } from '../i18n/content';
 import { locales, localeNames } from '../i18n/locale';
 import { MenuButton, type MenuEntry, type MenuItem } from './controls';
 
-/** 有作者内容的语言的标签（D84）：默认语言标“原文”，其他标“译文”；看板里过期条数用橙色写在标签前。 */
+/** 有作者内容的语言的标签（D84）：使用 Juice Badge（signal / warn），默认语言标“原文”，其他标“译文”。 */
 function ContentTag({ text, stale }: { text: string; stale?: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 font-jb">
-      {stale ? <span className="text-[11px] text-[#B45309]" data-testid="content-stale">{stale}</span> : null}
-      <span className="rounded-[4px] border border-jb-cloud/30 bg-[var(--jb-cloud-bg)] px-1.5 py-px text-[11px] font-medium leading-4 text-jb-cloud">{text}</span>
+      {stale ? <Badge tone="warn" className="px-2 py-0.5 text-[10.5px]" data-testid="content-stale">{stale}</Badge> : null}
+      <Badge tone="signal" className="px-2 py-0.5 text-[10.5px]">{text}</Badge>
     </span>
   );
 }

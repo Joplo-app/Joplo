@@ -1,0 +1,5 @@
+/* Declare Tailwind's standard cascade layer order BEFORE importing Juice UI into `components`
+ * so Tailwind's `@layer base` preflight (`* { padding: 0 }`) never overrides Juice's component padding,
+ * while `@layer utilities` still overrides Juice cleanly without !important. */
+@layer theme, base, components, utilities;
+@import "@tokenroll/juice/scoped.css" layer(components);

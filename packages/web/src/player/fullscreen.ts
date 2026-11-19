@@ -1,8 +1,9 @@
 /**
  * 全屏模式（T-stage）：浏览器 Fullscreen API；状态只在本页（不写进 URL）。Esc 由浏览器退出全屏。
- * 全屏时播放控制浮在画面下方，鼠标静止约 FULLSCREEN_IDLE_MS 后淡出，移动鼠标重新出现。
+ * 全屏时播放控制浮在画面下方，鼠标静止约 FULLSCREEN_IDLE_MS 后淡出，移动鼠标重新出现（基于 Juice v0.2.0 useIdleVisibility）。
  */
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useState, type RefObject } from 'react';
+import { useIdleVisibility } from '@tokenroll/juice/primitives';
 
 export const FULLSCREEN_IDLE_MS = 2500;
 
@@ -29,18 +30,5 @@ export function useFullscreen(ref: RefObject<HTMLElement | null>) {
 
 /** 鼠标静止 ms 毫秒后返回 false；poke() 表示鼠标动了。active = false 时总是 true。 */
 export function useIdleVisible(active: boolean, ms = FULLSCREEN_IDLE_MS) {
-  const [visible, setVisible] = useState(true);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const poke = useCallback(() => {
-    setVisible(true);
-    if (timer.current) clearTimeout(timer.current);
-    if (active) timer.current = setTimeout(() => setVisible(false), ms);
-  }, [active, ms]);
-  useEffect(() => {
-    poke();
-    return () => {
-      if (timer.current) clearTimeout(timer.current);
-    };
-  }, [poke]);
-  return { visible: !active || visible, poke };
+  return useIdleVisibility(active, ms);
 }

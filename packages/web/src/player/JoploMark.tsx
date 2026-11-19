@@ -25,8 +25,8 @@ export function JoploMark({ size = 24 }: { size?: number }) {
   );
 }
 
-/** 横版：高度 = 标志高度；字标默认墨色，深底上传 ink="#FFFFFF"。 */
-export function JoploLogo({ height = 28, ink = '#1E1E1E' }: { height?: number; ink?: string }) {
+/** 横版：高度 = 标志高度；字标默认跟随看板墨色（浅色 #1E1E1E / .jb-dark #F4F1EA），也可显式传入 ink。 */
+export function JoploLogo({ height = 28, ink = 'var(--jb-fg-default, #1E1E1E)' }: { height?: number; ink?: string }) {
   return (
     <svg height={height} width={(height * 340) / 128} viewBox="0 0 340 128" role="img" aria-label="Joplo" focusable="false">
       {MARK}

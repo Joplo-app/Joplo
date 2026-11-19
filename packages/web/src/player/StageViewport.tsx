@@ -17,6 +17,7 @@ import { CAMERA_EASE, CAMERA_MS } from '../runtime/pace';
 import { ThemeContext, type StageTheme, type StrokeMode } from '../renderer/rough';
 import { fillStage, fitStage, videoStage } from './fit';
 import { Ban, CircleArrowRight, CircleCheck, CircleDashed, CircleX, Info, X } from 'lucide-react';
+import { JBtn, JIconBtn } from '@/lib/juice';
 import { cn } from '@/lib/utils';
 import { noticeView, type NoticeView } from './states';
 
@@ -104,19 +105,19 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
           role="status"
           data-testid="notice"
           data-notice-kind={notice!.kind}
-          className={cn('jb-pop absolute left-1/2 top-3 z-20 flex max-w-[min(640px,86%)] -translate-x-1/2 items-center gap-2 rounded-[8px] py-1.5 pl-3 pr-1.5 text-[13px]', view.icon === 'error' && 'border-jb-danger')}
+          className={cn('j-floating-pop jb-pop absolute left-1/2 top-3 z-20 flex max-w-[min(640px,86%)] -translate-x-1/2 items-center gap-2 rounded-[12px] py-1.5 pl-3 pr-1.5 text-[13px]', view.icon === 'error' && 'shadow-[0_0_0_1.5px_var(--jb-status-danger),0_14px_36px_-8px_rgba(0,0,0,0.2)]')}
         >
           <NoticeIcon icon={view.icon} />
           <span className="min-w-0 truncate" title={view.text}>
             {view.text}
           </span>
           {view.back ? (
-            <button type="button" className="jb-focus shrink-0 whitespace-nowrap rounded-[6px] bg-jb-inverse px-2 py-1 text-[12px] font-medium text-jb-on-inverse hover:bg-jb-inverse-hover" onClick={onBack ?? onDismiss} data-testid="notice-back">
-              {i18n.player.backToDemo}</button>
+            <JBtn variant="primary" size="xs" className="shrink-0" onClick={onBack ?? onDismiss} data-testid="notice-back">
+              {i18n.player.backToDemo}</JBtn>
           ) : null}
-          <button type="button" className="jb-focus flex size-6 shrink-0 items-center justify-center rounded-[6px] text-jb-muted hover:bg-jb-hover hover:text-jb-fg" aria-label={i18n.player.dismissNotice} onClick={onDismiss}>
+          <JIconBtn variant="ghost" size="xs" label={i18n.player.dismissNotice} onClick={onDismiss}>
             <X className="size-3.5" />
-          </button>
+          </JIconBtn>
         </div>
       ) : null}
       <div className="absolute inset-0 flex items-center justify-center" inert={curtainUp || undefined}>

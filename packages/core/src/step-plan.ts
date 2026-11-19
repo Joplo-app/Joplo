@@ -117,9 +117,23 @@ export function stepPlan(project: Pick<Project, 'plugins'>, step: Step, o: StepP
   return { cursorMs, rippleMs, gestureMs, leadMs, settleMs, dwellMs, voiceMs: voice, totalMs: leadMs + Math.max(dwellMs, voice), ...(timingSource ? { timingSource, audioMs } : {}) };
 }
 
+const defaultPlanMsCache = new WeakMap<Pick<Project, 'plugins'>, WeakMap<readonly Step[], number>>();
+
 /** 一个场景按 1× 自动播放大约多久（毫秒）：每一步 stepPlan 的合计之和。 */
 export function scenarioPlanMs(project: Pick<Project, 'plugins'>, steps: readonly Step[], texts?: (step: Step) => (string | null | undefined)[]): number {
-  return steps.reduce((sum, step) => sum + stepPlan(project, step, texts ? { texts: texts(step) } : {}).totalMs, 0);
+  if (!texts) {
+    let bySteps = defaultPlanMsCache.get(project);
+    if (!bySteps) {
+      bySteps = new WeakMap();
+      defaultPlanMsCache.set(project, bySteps);
+    }
+    const hit = bySteps.get(steps);
+    if (hit !== undefined) return hit;
+    const total = steps.reduce((sum, step) => sum + stepPlan(project, step, {}).totalMs, 0);
+    bySteps.set(steps, total);
+    return total;
+  }
+  return steps.reduce((sum, step) => sum + stepPlan(project, step, { texts: texts(step) }).totalMs, 0);
 }
 
 /**

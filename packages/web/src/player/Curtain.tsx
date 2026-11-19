@@ -14,6 +14,7 @@ import { useI18n } from '../i18n/context';
 import { AnimatePresence, motion } from 'motion/react';
 const noop = () => {};
 import { Clapperboard, ListOrdered, Play, Timer, Users } from 'lucide-react';
+import { playJuiceSound } from '@tokenroll/juice/primitives';
 import { cardAt, roleOf, type CardAction, type Project, type RoleInfo } from '@joplo-app/core/runtime';
 import type { CoverContent, EntryCover } from './cover-content';
 import { fontStyle, type AppearanceFont } from '../renderer/appearance';
@@ -125,11 +126,11 @@ function SceneCover({ cover, k, onStart }: { cover: CoverContent; k: number; onS
     { key: 'time', icon: Timer, text: i18n.player.coverDuration(cover.duration) },
     ...(cover.roles.length ? [{ key: 'roles', icon: Users, text: i18n.player.list(cover.roles.map((r) => r.name)) }] : []),
   ];
-  const btnCls = 'flex items-center rounded-[8px] border-[1.5px] border-jb-ink bg-jb-accent font-jb font-semibold leading-none text-jb-on-accent shadow-jb-e1';
+  const btnCls = 'flex items-center rounded-full bg-jb-accent font-jb font-semibold leading-none text-jb-on-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_8px_24px_-4px_rgba(210,160,10,0.42),0_2px_6px_rgba(24,22,18,0.1)]';
   const btnStyle = { gap: px(8), padding: `${px(12)}px ${px(26)}px`, fontSize: px(17) };
   const btnFace = (
     <>
-      <Play aria-hidden style={{ width: px(18), height: px(18) }} />
+      <Play aria-hidden className="fill-current" style={{ width: px(17), height: px(17) }} />
       {i18n.player.coverStart}
     </>
   );
@@ -169,7 +170,17 @@ function SceneCover({ cover, k, onStart }: { cover: CoverContent; k: number; onS
           ))}
         </ul>
         {onStart ? (
-          <button type="button" onClick={onStart} title={`${i18n.player.coverStartTitle} · ${i18n.player.space}`} className={`${btnCls} jb-focus mt-1 cursor-pointer transition-colors hover:bg-jb-accent-hover active:translate-x-[1px] active:translate-y-[1px] active:bg-jb-accent-press`} style={btnStyle} data-testid="cover-start">
+          <button
+            type="button"
+            onClick={() => {
+              playJuiceSound('tap');
+              onStart();
+            }}
+            title={`${i18n.player.coverStartTitle} · ${i18n.player.space}`}
+            className={`${btnCls} jb-focus mt-1 cursor-pointer transition-[transform,background-color,box-shadow] duration-150 hover:-translate-y-0.5 hover:bg-jb-accent-hover active:translate-y-0 active:scale-[0.97] active:bg-jb-accent-press`}
+            style={btnStyle}
+            data-testid="cover-start"
+          >
             {btnFace}
           </button>
         ) : (
@@ -199,11 +210,11 @@ function EntryCoverView({ cover, entry, k, onStart }: { cover: CoverContent; ent
   const meta: { key: string; icon: typeof Timer; text: string }[] = atEntry
     ? [{ key: 'slices', icon: entry.linear ? Clapperboard : ListOrdered, text: entry.meta }]
     : [{ key: 'time', icon: Timer, text: i18n.player.coverDuration(cover.duration) }];
-  const btnCls = 'flex items-center rounded-[8px] border-[1.5px] border-jb-ink bg-jb-accent font-jb font-semibold leading-none text-jb-on-accent shadow-jb-e1';
+  const btnCls = 'flex items-center rounded-full bg-jb-accent font-jb font-semibold leading-none text-jb-on-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_8px_24px_-4px_rgba(210,160,10,0.42),0_2px_6px_rgba(24,22,18,0.1)]';
   const btnStyle = { gap: px(8), padding: `${px(12)}px ${px(26)}px`, fontSize: px(17) };
   const btnFace = (
     <>
-      <Play aria-hidden style={{ width: px(18), height: px(18) }} />
+      <Play aria-hidden className="fill-current" style={{ width: px(17), height: px(17) }} />
       {i18n.player.coverStart}
     </>
   );
@@ -248,7 +259,17 @@ function EntryCoverView({ cover, entry, k, onStart }: { cover: CoverContent; ent
           ))}
         </ul>
         {onStart ? (
-          <button type="button" onClick={onStart} title={`${i18n.player.coverStartTitle} · ${i18n.player.space}`} className={`${btnCls} jb-focus mt-1 cursor-pointer transition-colors hover:bg-jb-accent-hover active:translate-x-[1px] active:translate-y-[1px] active:bg-jb-accent-press`} style={btnStyle} data-testid="cover-start">
+          <button
+            type="button"
+            onClick={() => {
+              playJuiceSound('tap');
+              onStart();
+            }}
+            title={`${i18n.player.coverStartTitle} · ${i18n.player.space}`}
+            className={`${btnCls} jb-focus mt-1 cursor-pointer transition-[transform,background-color,box-shadow] duration-150 hover:-translate-y-0.5 hover:bg-jb-accent-hover active:translate-y-0 active:scale-[0.97] active:bg-jb-accent-press`}
+            style={btnStyle}
+            data-testid="cover-start"
+          >
             {btnFace}
           </button>
         ) : (

@@ -30,6 +30,7 @@ import { scenariosOf } from '../runtime/views';
 import type { StageTheme } from '../renderer/rough';
 import { Brand, JOPLO_SITE_URL, PlayerPage, TopBar } from '../player/PlayerPage';
 import { ArrowRight, CirclePlay, Link } from 'lucide-react';
+import { Separator, playJuiceSound } from '@tokenroll/juice/primitives';
 import { Btn } from '../player/controls';
 import { JoploMark } from '../player/JoploMark';
 import { StageThumb } from '../player/StageThumb';
@@ -69,7 +70,7 @@ export function SiteApp({ data, search = typeof location === 'undefined' ? '' : 
   const content = useMemo(() => (data ? siteContent(data.project, locale) : null), [data, locale]);
   const project = useMemo(() => (data ? viewProject(data.project, content?.locale, locale) : null), [data, content?.locale, locale]);
 
-  if (!data || !project) return <div className="p-8 text-[#c92a2a]">{i18n.site.prototypeDataIsMissingRunJoploBuildAgain}</div>;
+  if (!data || !project) return <div className="p-8 text-jb-danger">{i18n.site.prototypeDataIsMissingRunJoploBuildAgain}</div>;
   return (
     <ContentContext.Provider value={content}>
       {embed ? <EmbedApp project={project} params={embed} branding={branding} /> : <Site project={project} branding={branding} author={author} />}
@@ -110,17 +111,17 @@ export function SiteHome({ project, onView, author }: { author?: Author | null; 
   const listTitle = works.some((w) => w.featureId === null) ? i18n.site.works : i18n.site.features;
   const look = { theme: project.theme, font: null, stroke: null };
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-testid="site-home">
+    <div data-juice-scope="" className="flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-testid="site-home">
       <ThemeStyles themes={projectThemes(project)} />
       <TopBar right={<><AuthorLink author={author} /><LanguageMenu iconOnly={L.languageIconOnly} /></>}>
         <Brand href={JOPLO_SITE_URL} />
-        <span aria-hidden className="h-5 w-px shrink-0 bg-jb-line" />
+        <Separator orientation="vertical" style={{ height: 18, flexShrink: 0, opacity: 0.75 }} />
         <span className="truncate px-2 text-[14px] font-medium" data-testid="site-name">
           {project.name}
         </span>
       </TopBar>
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-[276px] shrink-0 flex-col overflow-y-auto border-r border-jb-line bg-jb-surface px-3 py-4">
+        <aside className="jb-sidebar-surface flex w-[280px] shrink-0 flex-col overflow-y-auto px-3 py-4">
           <div className="flex items-baseline justify-between px-2 pb-1.5 pt-2 text-[12px]">
             <span className="font-semibold tracking-[1px] text-jb-muted">{listTitle}</span>
             <span className="text-jb-faint">{i18n.site.itemCount(works.length)}</span>
@@ -128,7 +129,15 @@ export function SiteHome({ project, onView, author }: { author?: Author | null; 
           <ul className="flex flex-col gap-1">
             {works.map((w) => (
               <li key={w.id}>
-                <button type="button" onClick={() => onView(w.id)} className="jb-focus w-full truncate rounded-[8px] px-2.5 py-2 text-left text-[14px] hover:bg-jb-hover" data-testid={`site-feature-${w.id}`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    playJuiceSound('tap');
+                    onView(w.id);
+                  }}
+                  className="jb-focus w-full truncate rounded-[10px] px-2.5 py-2 text-left text-[14px] transition-colors hover:bg-[var(--juice-w6)]"
+                  data-testid={`site-feature-${w.id}`}
+                >
                   {w.title}
                 </button>
               </li>
@@ -138,9 +147,9 @@ export function SiteHome({ project, onView, author }: { author?: Author | null; 
           <SiteFooter />
         </aside>
         <main className="min-w-0 flex-1 overflow-y-auto px-10 py-8">
-          <div className="flex max-w-[1120px] flex-col gap-5">
+          <div className="flex max-w-[1140px] flex-col gap-6">
             <div>
-              <h1 className="text-[24px] font-bold leading-8">{project.name}</h1>
+              <h1 className="text-[26px] font-bold leading-8 tracking-[-0.02em]">{project.name}</h1>
               {project.description ? <p className="mt-1.5 max-w-[860px] text-[14px] leading-[22px] text-jb-muted">{project.description}</p> : null}
             </div>
             <ContentFallbackNotice />
@@ -152,15 +161,31 @@ export function SiteHome({ project, onView, author }: { author?: Author | null; 
                 const sc = firstSlice(w);
                 const forWho = w.audience ? [w.audience] : w.roles;
                 return (
-                  <div key={w.id} className="group relative flex flex-col overflow-hidden rounded-[10px] border border-jb-line bg-jb-surface hover:border-jb-ink hover:shadow-[var(--jb-e1)]" data-testid={`site-feature-row-${w.id}`} data-independent-work={independentWork ? '' : undefined}>
-                    <button type="button" onClick={() => onView(w.id)} aria-label={independentWork ? i18n.site.watchFor(w.title) : i18n.site.openDemoFor(w.title)} className="jb-focus absolute inset-0 z-[2] rounded-[10px]" data-testid={`site-view-${w.id}`} />
-                    <StageThumb project={project} scenarioId={sc?.id ?? null} sceneId={sc ? displaySceneId(project, sc.id, 0) : null} look={look} />
-                    <div className="flex flex-col gap-1.5 border-t border-jb-line px-4 pb-4 pt-3">
+                  <div
+                    key={w.id}
+                    className="jb-home-slab group relative flex flex-col overflow-hidden hover:-translate-y-0.5 hover:shadow-[0_0_0_1px_color-mix(in_srgb,var(--jb-fg-default)_12%,transparent),0_16px_36px_-12px_rgba(24,22,18,0.14),0_4px_10px_-2px_rgba(24,22,18,0.05)]"
+                    data-testid={`site-feature-row-${w.id}`}
+                    data-independent-work={independentWork ? '' : undefined}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playJuiceSound('tap');
+                        onView(w.id);
+                      }}
+                      aria-label={independentWork ? i18n.site.watchFor(w.title) : i18n.site.openDemoFor(w.title)}
+                      className="jb-focus absolute inset-0 z-[2] rounded-[20px]"
+                      data-testid={`site-view-${w.id}`}
+                    />
+                    <div className="overflow-hidden rounded-[14px] bg-jb-subtle shadow-[inset_0_0_0_1px_var(--juice-edge)]">
+                      <StageThumb project={project} scenarioId={sc?.id ?? null} sceneId={sc ? displaySceneId(project, sc.id, 0) : null} look={look} />
+                    </div>
+                    <div className="flex flex-col gap-1.5 px-3 pb-2.5 pt-3">
                       {independentWork ? <span className="truncate text-[12px] text-jb-muted" data-testid={`site-work-meta-${w.id}`}>{entryMetaText(w, i18n)}</span> : null}
                       <div className="flex items-center gap-3">
-                        <span className="min-w-0 flex-1 truncate text-[17px] font-bold">{w.title}</span>
-                        <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold opacity-0 transition-opacity group-hover:opacity-100">
-                          {independentWork ? i18n.site.watch : i18n.site.openDemo}<ArrowRight className="size-4" aria-hidden />
+                        <span className="min-w-0 flex-1 truncate text-[16.5px] font-bold tracking-[-0.01em]">{w.title}</span>
+                        <span className="flex shrink-0 items-center gap-1 rounded-[8px] bg-[var(--juice-w6)] px-2 py-0.5 text-[12.5px] font-semibold opacity-0 transition-opacity group-hover:opacity-100">
+                          {independentWork ? i18n.site.watch : i18n.site.openDemo}<ArrowRight className="size-3.5" aria-hidden />
                         </span>
                       </div>
                       <p className="line-clamp-2 text-[13px] leading-5 text-jb-muted">{w.summary}</p>
@@ -189,18 +214,22 @@ function SiteSliceRow({ row, onPick }: { row: ChapterRow; onPick: () => void }) 
     <li>
       <button
         type="button"
-        onClick={onPick}
+        onClick={() => {
+          if (!row.current) playJuiceSound('tap');
+          onPick();
+        }}
         data-testid={`site-scenario-${row.id}`}
         aria-current={row.current ? 'true' : undefined}
+        data-active={row.current ? 'true' : undefined}
         title={row.title}
-        className={cn('jb-focus flex w-full items-start gap-2.5 rounded-[8px] px-2.5 py-2 text-left text-[14px]', row.current ? 'bg-jb-selected font-semibold' : 'hover:bg-jb-hover')}
+        className="jb-work-card jb-focus flex w-full items-start gap-2.5 rounded-[11px] px-2.5 py-2 text-left text-[14px]"
       >
         {row.no ? (
           <span className="w-5 shrink-0 font-jb-mono text-[12px] font-bold leading-5 text-jb-muted" data-testid="slice-no">{row.no}</span>
         ) : (
           <CirclePlay className={cn('mt-0.5 size-4 shrink-0', row.current ? 'text-jb-fg' : 'text-jb-muted')} aria-hidden />
         )}
-        <span className="line-clamp-2 min-w-0 flex-1 leading-5 [overflow-wrap:anywhere]">{row.title}</span>
+        <span className={cn('line-clamp-2 min-w-0 flex-1 leading-5 [overflow-wrap:anywhere]', row.current && 'font-semibold')}>{row.title}</span>
         <span className="shrink-0 font-jb-mono text-[11px] font-normal leading-5 text-jb-faint">{i18n.player.clock(row.ms)}</span>
       </button>
     </li>
@@ -248,7 +277,7 @@ function SitePlayer({ project, play, navigate, branding, author }: { project: Pr
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-[14px]">
         <span>{i18n.site.featureNotFound}</span>
-        <button type="button" className="text-[#1c5fb8] underline" onClick={() => navigate({ kind: 'home' })}>
+        <button type="button" className="jb-focus rounded-[6px] text-jb-cloud underline" onClick={() => navigate({ kind: 'home' })}>
           {i18n.site.goToHome}</button>
       </div>
     );
@@ -285,7 +314,7 @@ function SitePlayer({ project, play, navigate, branding, author }: { project: Pr
           items: entriesOf(project).length <= 1 ? undefined : entriesOf(project).map((f) => ({ id: `feature-${f.id}`, label: f.title, checked: f.id === entry.id, onClick: () => navigate({ kind: 'play', play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) })),
         },
       ]}
-      actions={<Btn iconOnly={!L.topLabels} icon={<Link className="size-4" />} label={i18n.site.copyLink} title={i18n.site.copyLinkToCurrentStep} onClick={() => void copyText(location.href).then((ok) => setFlash(<LocalText value={ok ? m.site.linkCopied : m.site.clipboardUnavailableCopyFromTheAddressBar} />))} data-testid="copy-link" />}
+      actions={<Btn iconOnly={!L.topLabels} icon={<Link className="size-4" />} label={i18n.site.copyLink} title={i18n.site.copyLinkToCurrentStep} sound="pop" onClick={() => void copyText(location.href).then((ok) => setFlash(<LocalText value={ok ? m.site.linkCopied : m.site.clipboardUnavailableCopyFromTheAddressBar} />))} data-testid="copy-link" />}
       voice={<SiteVoiceButton voice={voice} />}
       fullscreenVoice={<SiteVoiceButton voice={voice} size={32} testid="fs-voice" />}
       layer={play.layer ?? null}
@@ -356,10 +385,14 @@ function SitePlayer({ project, play, navigate, branding, author }: { project: Pr
               <li key={r.id}>
                 <button
                   type="button"
-                  onClick={() => toPlay({ featureId: entry.id, scenarioId: r.id })}
+                  onClick={() => {
+                    if (!r.current) playJuiceSound('tap');
+                    toPlay({ featureId: entry.id, scenarioId: r.id });
+                  }}
                   data-testid={`site-scenario-${r.id}`}
                   aria-current={r.current ? 'true' : undefined}
-                  className={cn('jb-focus flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-left text-[14px]', r.current ? 'bg-jb-selected font-semibold' : 'hover:bg-jb-hover')}
+                  data-active={r.current ? 'true' : undefined}
+                  className={cn('jb-work-card jb-focus flex w-full items-center gap-2.5 rounded-[11px] px-2.5 py-2 text-left text-[14px]', r.current && 'font-semibold')}
                 >
                   <CirclePlay className={cn('size-4 shrink-0', r.current ? 'text-jb-fg' : 'text-jb-muted')} aria-hidden />
                   <span className="min-w-0 flex-1 truncate">{r.name}</span>

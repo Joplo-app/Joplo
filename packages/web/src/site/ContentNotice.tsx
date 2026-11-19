@@ -13,7 +13,7 @@ export function ContentFallbackNotice({ variant = 'bar' }: { variant?: 'bar' | '
   const text = t.site.contentFallback(localeNames[locale], source);
   if (variant === 'cover') return <span className="max-w-full truncate text-[12px] opacity-85" data-testid="content-fallback">{text}</span>;
   return (
-    <div role="note" className={cn('flex shrink-0 items-center gap-2 rounded-[8px] border border-jb-line bg-jb-surface px-3 py-1.5 font-jb text-[13px] text-jb-muted')} data-testid="content-fallback">
+    <div role="note" className={cn('flex shrink-0 items-center gap-2 rounded-[10px] bg-[var(--juice-w6)] px-3 py-1.5 font-jb text-[13px] text-jb-muted')} data-testid="content-fallback">
       <Languages className="size-4 shrink-0" aria-hidden />
       <span className="min-w-0 truncate">{text}</span>
     </div>

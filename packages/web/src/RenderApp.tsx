@@ -389,7 +389,7 @@ function RecordStage({ sampling,frameReadiness, viewportOverride, project, proje
   const voiceLines = useMemo(() => recordVoice ? chapters.flatMap(chapter => chapter.steps.map((step, i) => spokenLine(step, stepCaption(step, i18n), speakerRoleAt(project, chapter.id, i + 1)))).filter(l => l.text.trim()).map(l => ({ text: l.text, role: l.role, ...(l.audio !== undefined ? { audio: project.mediaAssets?.[l.audio.slice(15)] ?? '', audioInfo: project.mediaInfo?.[l.audio.slice(15)] } : {}) })) : [], [recordVoice, chapters, project, i18n]);
   useEffect(() => {
     let last = '';
-    return ctl.subscribe(() => {
+    const off = ctl.subscribe(() => {
       if (timeline.current.startedAt === null) return;
       const s = ctl.getSnapshot();
       const key = `${s.scenarioId}:${s.state?.position}:${s.activeStep}:${s.narration?.position}:${s.playing}:${s.upNext}:${s.dwell?.position}:${s.busy}`;
@@ -400,6 +400,7 @@ function RecordStage({ sampling,frameReadiness, viewportOverride, project, proje
       const step = position > 0 ? chapter?.steps[position - 1] : undefined;
       timeline.current.events.push({ at: performance.now(), engineMs: ctl.clock.time, scenarioId: s.scenarioId, position, stepId: step?.id ?? null, activeStep: s.activeStep, playing: s.playing, upNext: s.upNext, completed: !!s.state?.completed, dwell: s.dwell, camera: { shots: step?.shots ?? [], plan: cameraFor(project, s.scenarioId, cameraPosition(chapter, position, s.activeStep), s.leadLayer) }, ext: step?.ext ?? chapter?.ext ?? {}, media: step?.media ?? chapter?.media ?? {}, narration: s.narration ?? null, text: step ? spokenLine(step, stepCaption(step, i18n), speakerRoleAt(project, chapter!.id, position)).text : null });
     });
+    return () => { off(); };
   }, [ctl, project, i18n]);
   const cues = useRef<RecordCue[]>([]);
   const prepared = useRef<Promise<void> | null>(null);

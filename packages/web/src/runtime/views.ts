@@ -4,7 +4,7 @@
  */
 import { featuresOf, entriesOf, visibleRoutes, type Entry, nodeLabel, walkNodes, type Coverage, type Work, type PlayState, type Project, type Scenario, type Scene, type SceneNode } from '@joplo-app/core/runtime';
 
-/** 作品所属条目从核心投影定位；未选定方案通过功能显式声明的 workIds 定位。 */
+/** 作品所属条目从核心投影定位；未选定方案通过功能显式声明的 workIds 定位（entriesOf 已按项目缓存）。 */
 export const entryForWork = (project: Project, workId: string | null | undefined): Entry | null =>
   workId ? entriesOf(project).find(e => e.workId === workId || (e.featureId !== null && project.features[e.featureId]?.workIds.includes(workId))) ?? null : null;
 export const featureForWork = (project: Project, workId: string | null | undefined) => {
