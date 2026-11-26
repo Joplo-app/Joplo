@@ -13,7 +13,6 @@ import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-a
 import { $, callout, feature, flow, highlight, layer, numbered, work, page, set, shot, spotlight } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, focusAt, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
-import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
 import { cameraFor } from '../src/player/cameraFor';
 import { Stage } from '../src/renderer/Stage';
 import { I18nProvider } from '../src/i18n/context';
@@ -60,7 +59,7 @@ function project(autoFocus?: boolean): Project {
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
-  const r = compile(src, 'dev', { pluginOptions: { diagram: { layout: elkLayout } } });
+  const r = compile(src, 'dev');
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
   return r.project!;
 }

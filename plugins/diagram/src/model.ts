@@ -11,11 +11,11 @@ import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
 export type Point = { x: number; y: number };
 export type Box = { x: number; y: number; w: number; h: number };
 
-/** 架构图与状态机共用的“图”布局（ELK layered + 层级处理，见 graph-layout.ts）。 */
+/** 架构图与状态机共用的“图”布局（默认 D2 TALA，可选 ELK layered）。 */
 export type GraphLayout = {
   kind: 'graph';
-  /** elk = 编译期 ELK 布局；grid = 没有布局引擎时的退化排列（只在测试或旧调用方出现）。 */
-  engine: 'elk' | 'grid';
+  /** tala = 编译期 D2 TALA 布局（默认）；elk = 编译期 ELK 布局；grid = 没有布局引擎时的退化排列。 */
+  engine: 'tala' | 'elk' | 'grid';
   /** 实际采用的方向（作者没写 direction 时由比例决定，D69 补充）。 */
   direction?: 'right' | 'down';
   width: number;
@@ -72,6 +72,7 @@ export const DIAGRAM_GROUP_ICONS = [...DIAGRAM_NODE_KINDS, 'cloud', 'gateway', '
 /** 分组色调：映射到主题变量（blue = --jp-info，green = --jp-ok，orange = --jp-warn，red = --jp-danger），其余为固定低饱和色。 */
 export const DIAGRAM_TONES = ['gray', 'blue', 'green', 'orange', 'red', 'purple', 'teal'] as const;
 export const DIAGRAM_PINS = ['start', 'end'] as const;
+export const DIAGRAM_LAYOUT_ENGINES = ['tala', 'elk'] as const;
 export const SEQUENCE_BLOCK_KINDS = ['alt', 'opt', 'loop', 'par', 'break', 'critical'] as const;
 
 // ---------- 尺寸估算（编译期与浏览器共用，结果确定） ----------
@@ -140,8 +141,8 @@ export type GNode = {
 };
 export type GGroup = { id: string; seq: number; label: string; parent: string | null; icon?: string; pin?: 'start' | 'end' };
 export type GEdge = { id: string; from: string; to: string; label: string; lw: number; lh: number; async?: boolean };
-/** direction：作者写的方向；auto = 没写，按舞台比例在 right / down 里选（D69 补充）。 */
-export type GraphStructure = { root: GraphRootType; direction: 'right' | 'down' | 'auto'; groups: GGroup[]; nodes: GNode[]; edges: GEdge[] };
+/** direction：作者写的方向；auto = 没写，按舞台比例在 right / down 里选（D69 补充）。layoutEngine：显式写的 layout="tala"|"elk"，缺省为 tala。 */
+export type GraphStructure = { root: GraphRootType; direction: 'right' | 'down' | 'auto'; layoutEngine?: 'tala' | 'elk'; groups: GGroup[]; nodes: GNode[]; edges: GEdge[] };
 
 const pinOf = (v: unknown) => (v === 'start' || v === 'end' ? v : undefined);
 
@@ -154,6 +155,7 @@ export function graphStructure(node: SceneNode): GraphStructure {
   const fam = GRAPH_FAMILY[root];
   const p = node.props ?? {};
   const direction = p.direction === 'down' ? 'down' : p.direction === 'right' ? 'right' : 'auto';
+  const layoutEngine = p.layout === 'elk' ? 'elk' : p.layout === 'tala' ? 'tala' : undefined;
   const groups: GGroup[] = [];
   const nodes: GNode[] = [];
   const edges: GEdge[] = [];
@@ -200,7 +202,7 @@ export function graphStructure(node: SceneNode): GraphStructure {
       seen.add(q);
     }
   }
-  return { root, direction, groups, nodes, edges };
+  return { root, direction, ...(layoutEngine ? { layoutEngine } : {}), groups, nodes, edges };
 }
 
 export type SActor = { id: string; label: string; description: string; kind: string; group: string | null; w: number; h: number };

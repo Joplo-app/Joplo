@@ -45,13 +45,13 @@ Diagram, StateMachine and Sequence accept scale={2} to request twice the native 
 - Node kind: ${DIAGRAM_NODE_KINDS.join(', ')}. description says the responsibility in a few words; edge label says what flows.
 - Bigger systems: split into layers (overview → one layer per domain) instead of one huge diagram.
 
-## Layout is automatic (compile time)
-- Joplo lays the diagram out when compiling (ELK layered: layers, few crossings, orthogonal edges, groups laid out together). Never write coordinates.
-- Leave out direction: Joplo tries top → bottom and left → right and keeps the one that fills the stage with the largest text (domain groups end up side by side). direction="right" / "down" forces one; aspect={1.6} sets the wanted width / height; h="100%" fills a layer.
-- Source order is the order within a layer: write nodes, groups, and edges in reading order. Write the request edge before its reply (api → kernel before kernel → api): the later one is drawn as a return edge.
-- Mark secondary flows async (usage events, audit logs): they may stop pushing their target a layer down, so domains sit side by side instead of in a tall column.
-- When two chains feed one node (author → storage → player, and viewer → player), write the upstream chain's groups and edges first, in the direction data flows. An edge written before its upstream chain is drawn as a loop back across the stage.
-- pin="start" / pin="end" puts a node or group in the first / last layer of its group. The layout covers every element, including ones hidden with when: nodes never move between steps.
+## Layout is automatic (compile time, D2 TALA default)
+- Joplo lays the diagram out when compiling using D2's open-source TALA engine (layout="tala" by default: 2D domain-cluster placement, balanced symmetry around hubs, and clean orthogonal edge routing; pass layout="elk" only when strict 1D Sugiyama layered ranks are wanted). Never write coordinates; browser and published sites read compiled coordinates with zero layout runtime.
+- Leave out direction: Joplo tries top → bottom and left → right and keeps the orientation that fills the stage with the largest text (domain groups arrange into balanced 2D neighborhoods around shared hubs instead of a tall single column). direction="right" / "down" pins the main entry axis; aspect={1.6} sets the wanted width / height; h="100%" fills a layer.
+- Write nodes, groups, and edges in reading order. Write the primary request edge before its callback / reply (api → kernel before kernel → api): the entry domain anchors upstream and bidirectional calls route on separate parallel lanes.
+- Mark asynchronous side-flows async (usage events, audit logs): they draw dashed and stay visually distinct from the synchronous call path.
+- When two chains feed one node (author → storage → player, and viewer → player), write the upstream chain's groups and edges first, in the direction data flows.
+- pin="start" / pin="end" constrains a node or group to the first / last rank of its container. The layout covers every element, including ones hidden with when: nodes never move between steps.
 - In each step only the traced call is bold, colored, with a moving dot and its label outlined; other edges turn thin and light. One call per step reads best.
 
 ## Traces: light up a call
@@ -113,7 +113,7 @@ export const diagnostics = `- Every node belongs to a domain group; 2–6 groups
 - UNKNOWN_DIAGRAM_NODE: An edge, transition, or message endpoint is not a node / group / state / participant id in the same diagram. Correct the endpoint ids.
 - UNKNOWN_DIAGRAM_GROUP / DIAGRAM_GROUP_CONFLICT / DIAGRAM_GROUP_CYCLE: group="…" names a missing group, disagrees with the group the element is nested in, or makes groups contain each other. Use nesting or group=, not both. See diagram.
 - DIAGRAM_EDGE_INTO_OWN_GROUP: An edge connects an element to a group that contains it. Connect to an element inside, or to another group.
-- INVALID_DIAGRAM_PROP / INVALID_DIAGRAM_CHILD: tone, pin, kind, or block kind is not a preset, or a child is in the wrong container (messages in Sequence.Group, actors in Sequence.Block). See diagram.
+- INVALID_DIAGRAM_PROP / INVALID_DIAGRAM_CHILD: layout, tone, pin, kind, or block kind is not a preset (layout accepts "tala" or "elk"), or a child is in the wrong container (messages in Sequence.Group, actors in Sequence.Block). See diagram.
 - DIAGRAM_UNGROUPED (info): Many nodes and no domain groups. Group them with <Diagram.Group label icon> so viewers see what belongs where.
 - DIAGRAM_LAYOUT_FAILED (warning): The automatic layout failed and the diagram shows a simple grid. Check its edges and groups; report it if they look right.`;
 
@@ -123,7 +123,7 @@ From check:
 - TRACE_UNKNOWN: Empty trace, unknown id, ids from different diagrams, or a disconnected path. Use connected ids in one Diagram / StateMachine / Sequence.
 
 From check:
-- INVALID_DIAGRAM_PROP / INVALID_DIAGRAM_CHILD: tone, pin, kind, or block kind is not a preset, or a child is in the wrong container (messages in Sequence.Group, actors in Sequence.Block). See diagram.
+- INVALID_DIAGRAM_PROP / INVALID_DIAGRAM_CHILD: layout, tone, pin, kind, or block kind is not a preset (layout accepts "tala" or "elk"), or a child is in the wrong container (messages in Sequence.Group, actors in Sequence.Block). See diagram.
 
 From check:
 - DIAGRAM_UNGROUPED (info): Many nodes and no domain groups. Group them with <Diagram.Group label icon> so viewers see what belongs where.`;

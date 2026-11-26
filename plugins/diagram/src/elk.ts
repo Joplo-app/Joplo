@@ -10,6 +10,9 @@
 import { createRequire } from 'node:module';
 import { DEFAULT_ASPECT, layoutGraph, type ElkNode, type ElkRun, type LayoutGoal } from './graph-layout.ts';
 import { structureKey, type GraphLayout, type GraphStructure } from './model.ts';
+import { talaLayout } from './tala.ts';
+
+export { layoutGraphTala, runTalaRaw, talaLayout, toTalaInput } from './tala.ts';
 
 type FakeWorker = { onmessage: (e: { data: { id: number; data?: unknown; error?: unknown } }) => void; dispatcher: { saveDispatch: (e: { data: unknown }) => void } };
 
@@ -55,4 +58,9 @@ export function elkLayout(s: GraphStructure, goal: LayoutGoal = { aspect: DEFAUL
   cache.set(key, l);
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
   return structuredClone(l);
+}
+
+/** 默认的编译期图表布局引擎：优先使用 D2 TALA，作者显式声明 layout="elk" 时使用 ELK。 */
+export function defaultGraphLayout(s: GraphStructure, goal: LayoutGoal = { aspect: DEFAULT_ASPECT }): GraphLayout {
+  return s.layoutEngine === 'elk' ? elkLayout(s, goal) : talaLayout(s, goal);
 }

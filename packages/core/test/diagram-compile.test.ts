@@ -10,7 +10,6 @@ import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-a
 import { $, feature, flow, layer, work, page, set, shot, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { cameraAt, compile, type AuthoringProject, type SceneNode } from '../src/index.ts';
-import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
@@ -35,7 +34,7 @@ function build(tree: unknown, steps: (f: Flow) => Flow = (f) => f, opts: { layou
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
-  return compile(src, 'dev', { pluginOptions: { diagram: { layout: opts.layout === false ? undefined : elkLayout } } });
+  return compile(src, 'dev', opts.layout === false ? { pluginOptions: { diagram: { layout: undefined } } } : undefined);
 }
 const codes = (r: ReturnType<typeof build>, sev = 'error') => r.diagnostics.filter((d) => d.severity === sev).map((d) => d.code);
 const msgs = (r: ReturnType<typeof build>, code: string) => r.diagnostics.filter((d) => d.code === code).map((d) => d.message).join('\n');
@@ -181,15 +180,22 @@ describe('trace：分组、状态机、时序图', () => {
 });
 
 describe('布局写进 IR', () => {
-  it('每张图表根节点带 layout（ELK）；when 隐藏的元素也在布局里（逐段出现时已有元素不动）', () => {
+  it('每张图表根节点默认带 TALA layout（显式 layout="elk" 用 ELK，非法 layout 报 INVALID_DIAGRAM_PROP）；when 隐藏的元素也在布局里', () => {
     const r = build(h(D, { id: 'd' }, h(D.Node, { id: 'a', label: 'A' }), h(D.Node, { id: 'b', label: 'B', when: $.ui.show }), h(D.Edge, { from: 'a', to: 'b', when: $.ui.show })));
     const d = rootOf(r);
     const layout = nodeData(d)!.layout;
     expect(layout.kind).toBe('graph');
     if (layout.kind !== 'graph') throw new Error();
-    expect(layout.engine).toBe('elk');
+    expect(layout.engine).toBe('tala');
     expect(Object.keys(layout.nodes).sort()).toEqual(['a', 'b']);
     expect(layout.edges['a->b']).toBeDefined();
+
+    const elkRes = build(h(D, { id: 'd', layout: 'elk' }, h(D.Node, { id: 'a', label: 'A' }), h(D.Node, { id: 'b', label: 'B' }), h(D.Edge, { from: 'a', to: 'b' })));
+    expect(codes(elkRes)).toEqual([]);
+    expect(nodeData(rootOf(elkRes))!.layout).toMatchObject({ kind: 'graph', engine: 'elk' });
+
+    const badLayout = build(h(D, { id: 'd', layout: 'dagre' }, h(D.Node, { id: 'a', label: 'A' })));
+    expect(codes(badLayout)).toEqual(['INVALID_DIAGRAM_PROP']);
   });
 
   it('只有步骤不同的两个项目：图表布局完全相同（坐标只由结构决定）', () => {

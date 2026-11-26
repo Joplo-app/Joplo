@@ -7,7 +7,8 @@ Joplo 六个发行包使用 PolyForm Shield 1.0.0（可免费商用，禁止做�
 | 包 | 版本 | 许可证 | 用途与安装位置 |
 | --- | --- | --- | --- |
 | zod | 4.6.7 | MIT | core/server：IR 和接口校验 |
-| elkjs | 0.12.1（固定） | EPL-2.0 | core（仅 Node 入口 `@joplo-app/core/node`）：编译期图表布局（D69）。不进 web 包，发布站不带它；npm 解包约 8.2 MB |
+| D2 TALA（`d2layouts/d2talalayout`） | 0.9.0（预编译 Wasm） | MPL-2.0 | `@joplo-app/plugin-diagram`（仅编译期 Node 加载 `tala.wasm.br`，源码见 `plugins/diagram/tala-wasm/main.go`，许可证见 `plugins/diagram/src/licenses/MPL-2.0.txt`）：默认架构图与状态机布局。不进 web 包，发布站不带它；压缩体积约 2.5 MB |
+| elkjs | 0.12.1（固定） | EPL-2.0 | `@joplo-app/plugin-diagram`（仅编译期 Node 加载）：`layout="elk"` 可选分层图表布局（D69）。不进 web 包，发布站不带它；npm 解包约 8.2 MB |
 | tsx | 4.23.15 | MIT | CLI：加载作者 TS/TSX；仓库运行脚本 |
 | commander | 15.0.0（^15.0.0） | MIT | CLI 参数与帮助 |
 | vite | 8.3.5 | MIT | server 运行时：看板服务和站点构建；web 构建 |

@@ -1,6 +1,6 @@
 import { isNode, type JNode, type JChild } from '@joplo-app/kit/node';
 import type { PluginReport as Report } from '@joplo-app/kit/plugin';
-import { DIAGRAM_GROUP_ICONS, DIAGRAM_NODE_KINDS, DIAGRAM_PINS, DIAGRAM_TONES, GRAPH_FAMILY, SEQUENCE_BLOCK_KINDS, SEQUENCE_FAMILY, isDiagramRoot, type DiagramIndex } from './model-index.ts';
+import { DIAGRAM_GROUP_ICONS, DIAGRAM_LAYOUT_ENGINES, DIAGRAM_NODE_KINDS, DIAGRAM_PINS, DIAGRAM_TONES, GRAPH_FAMILY, SEQUENCE_BLOCK_KINDS, SEQUENCE_FAMILY, isDiagramRoot, type DiagramIndex } from './model-index.ts';
 import type { Trace } from './schema.ts';
 export function resolveTrace(diagrams: DiagramIndex[], ids: string[], tmode: Trace['mode'], at: string | undefined, err: Report): Trace | null {
       const shown = `trace(${ids.map((x) => JSON.stringify(x)).join(', ')})`;
@@ -125,6 +125,7 @@ export function checkDiagramRoot(d: JNode, err: Report): void {
     return;
   }
   const fam = GRAPH_FAMILY[type];
+  oneOf(d, 'layout', DIAGRAM_LAYOUT_ENGINES);
   const nodes = new Set<string>();
   const groups = new Map<string, JNode>();
   /** 元素 → 它的父分组（嵌套或 group= 引用）；记录嵌套父分组，用来查冲突。 */

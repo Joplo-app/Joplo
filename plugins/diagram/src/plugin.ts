@@ -14,7 +14,7 @@ import { componentLabels, inspectFields } from './inspect.ts';
 
 export { trace } from './effects.ts';
 export * from './components.ts';
-import { elkLayout } from './elk.ts';
+import { defaultGraphLayout } from './elk.ts';
 const links = new Set(['diagram:Diagram.Edge', 'diagram:StateMachine.Transition', 'diagram:Sequence.Message']);
 const required = new Set(['Diagram.Node', 'StateMachine.State', 'Sequence.Actor']);
 const cleanChild = (c: JChild): JChild => Array.isArray(c) ? c.map(cleanChild) : isNode(c) ? clean(c) : c;
@@ -61,7 +61,7 @@ const hooks: PluginCompileHooks = {
   derive(node, { viewport, options, report }) {
     if (!isDiagramRoot(node.type)) return;
     const n = node as SceneNode;
-    const layout = layoutFor(n, (Object.hasOwn(options, 'layout') ? options.layout : elkLayout) as GraphLayoutEngine | undefined, message => report('DIAGRAM_LAYOUT_FAILED', `<${n.type}> "${n.id}" could not be laid out (${message}); showing a simple grid instead. Check the edges and groups of this diagram`, n.source, 'warning'), viewport);
+    const layout = layoutFor(n, (Object.hasOwn(options, 'layout') ? options.layout : defaultGraphLayout) as GraphLayoutEngine | undefined, message => report('DIAGRAM_LAYOUT_FAILED', `<${n.type}> "${n.id}" could not be laid out (${message}); showing a simple grid instead. Check the edges and groups of this diagram`, n.source, 'warning'), viewport);
     const data = layout ? { layout, structure: n.type === 'diagram:Sequence' ? sequenceStructure(n) : graphStructure(n) } : undefined;
     const framing: NonNullable<import('@joplo-app/kit/plugin').PluginDerived['framing']> = {};
     const index = diagramsIn(n).find(d => d.id === n.id);

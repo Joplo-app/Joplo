@@ -58,7 +58,7 @@ describe('D69 不变量 1：节点在一个场景的所有步骤里位置不变'
     const arch = Object.values(p.scenes).flatMap((s) => (s.root.type === 'diagram:Diagram' ? [s.root] : [])).find((n) => n.id === 'arch')!;
     expect(nodeData(arch)?.layout.kind).toBe('graph');
     const l = nodeData(arch)!.layout as GraphLayout;
-    expect(l.engine).toBe('elk');
+    expect(l.engine).toBe('tala');
     const boxes = nodeBoxes(render(p, 2));
     // 节点在分组里：位置相对分组框
     const g = l.groups.g_run!;
