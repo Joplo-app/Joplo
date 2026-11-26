@@ -6,7 +6,10 @@
  * warning-free WASI preview1 host shim. Browser bundles (Board & Published sites)
  * never import this module — they read precomputed coordinates from IR.
  */
+import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import zlib from 'node:zlib';
 import {
   DEFAULT_ASPECT,
@@ -85,6 +88,9 @@ type TalaGlobalState = {
   exports: TalaExports | null;
   resetClock: (() => void) | null;
   cache: Map<string, GraphLayout>;
+  codeDigest: string | null;
+  diskDir: string | null;
+  diskSeq: number;
 };
 
 const TALA_GLOBAL_KEY = Symbol.for('@joplo-app/plugin-diagram:tala:v1');
@@ -92,7 +98,7 @@ const TALA_GLOBAL_KEY = Symbol.for('@joplo-app/plugin-diagram:tala:v1');
 function getGlobalState(): TalaGlobalState {
   const g = globalThis as Record<symbol, TalaGlobalState | undefined>;
   if (!g[TALA_GLOBAL_KEY]) {
-    g[TALA_GLOBAL_KEY] = { exports: null, resetClock: null, cache: new Map() };
+    g[TALA_GLOBAL_KEY] = { exports: null, resetClock: null, cache: new Map(), codeDigest: null, diskDir: null, diskSeq: 0 };
   }
   return g[TALA_GLOBAL_KEY]!;
 }
@@ -772,14 +778,62 @@ export function layoutGraphTala(s: GraphStructure, goal: LayoutGoal = { aspect: 
 
 const CACHE_MAX = 500;
 
-/** Compile-time D2 TALA layout engine with deterministic structural caching. */
+function diskCachePath(state: TalaGlobalState, key: string): string | null {
+  try {
+    if (!state.codeDigest) {
+      const h = crypto.createHash('sha256');
+      try {
+        h.update(fs.readFileSync(new URL(import.meta.url)));
+      } catch {
+        h.update('tala-v1');
+      }
+      h.update(fs.readFileSync(new URL('./tala.wasm.br', import.meta.url)));
+      state.codeDigest = h.digest('hex').slice(0, 16);
+    }
+    if (!state.diskDir) {
+      const dir = path.join(os.tmpdir(), `joplo-tala-cache-${state.codeDigest}`);
+      fs.mkdirSync(dir, { recursive: true });
+      state.diskDir = dir;
+    }
+    const hash = crypto.createHash('sha256').update(key).digest('hex');
+    return path.join(state.diskDir, `${hash}.json`);
+  } catch {
+    return null;
+  }
+}
+
+/** Compile-time D2 TALA layout engine with deterministic in-memory + content-addressed tmpdir caching. */
 export function talaLayout(s: GraphStructure, goal: LayoutGoal = { aspect: DEFAULT_ASPECT }): GraphLayout {
-  const { cache } = getGlobalState();
+  const state = getGlobalState();
+  const { cache } = state;
   const key = `tala|${goal.aspect.toFixed(3)}|${goal.width ?? ''}|${goal.height ?? ''}|${structureKey(s)}`;
   const hit = cache.get(key);
   if (hit) return structuredClone(hit);
+
+  const diskFile = diskCachePath(state, key);
+  if (diskFile) {
+    try {
+      const raw = fs.readFileSync(diskFile, 'utf8');
+      const parsed = JSON.parse(raw) as GraphLayout;
+      cache.set(key, parsed);
+      if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
+      return structuredClone(parsed);
+    } catch {
+      // Cache miss or concurrent write — compute below.
+    }
+  }
+
   const l = layoutGraphTala(structuredClone(s), goal);
   cache.set(key, l);
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
+  if (diskFile) {
+    try {
+      const tmp = `${diskFile}.${process.pid}.${state.diskSeq++}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(l));
+      fs.renameSync(tmp, diskFile);
+    } catch {
+      // Best-effort cache write.
+    }
+  }
   return structuredClone(l);
 }

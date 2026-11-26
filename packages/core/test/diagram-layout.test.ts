@@ -436,7 +436,7 @@ describe('D2 TALA 默认布局（talaLayout / defaultGraphLayout）', () => {
     const n = agentArch('a', 'auto', { h: '100%' });
     const file = join(tmpdir(), `joplo-tala-${process.pid}.json`);
     writeFileSync(file, JSON.stringify({ s: graphStructure(n), g: diagramGoal(n) }));
-    const script = `import { readFileSync } from 'node:fs'; import { talaLayout } from ${JSON.stringify(join(import.meta.dirname, '../../../plugins/diagram/src/elk.ts'))}; const { s, g } = JSON.parse(readFileSync(${JSON.stringify(file)}, 'utf8')); process.stdout.write(JSON.stringify(talaLayout(s, g)));`;
+    const script = `import { readFileSync } from 'node:fs'; import { layoutGraphTala } from ${JSON.stringify(join(import.meta.dirname, '../../../plugins/diagram/src/elk.ts'))}; const { s, g } = JSON.parse(readFileSync(${JSON.stringify(file)}, 'utf8')); process.stdout.write(JSON.stringify(layoutGraphTala(s, g)));`;
     const out = execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], { encoding: 'utf8', cwd: join(import.meta.dirname, '..') });
     expect(JSON.parse(out)).toEqual(runTala(n));
   }, 30000);
