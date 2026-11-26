@@ -1,0 +1,17 @@
+Author-side compile-time layout engines (not included in @joplo-app/web or published sites)
+
+D2 / TALA layout engine v0.9.0 (d2layouts/d2talalayout), MPL-2.0
+Project: https://d2lang.com/
+Upstream repository and tag: https://github.com/d2lang/d2/tree/v0.9.0
+Bundled artifact: tala.wasm.br (compiled from plugins/diagram/tala-wasm/main.go via
+plugins/diagram/scripts/build-tala-wasm.mjs against github.com/d2lang/d2@v0.9.0).
+License: Mozilla Public License 2.0 (see licenses/MPL-2.0.txt).
+Under MPL-2.0 Section 3.3, @joplo-app/plugin-diagram is distributed as a Larger Work;
+the MPL-2.0 Covered Software (D2/TALA and plugins/diagram/tala-wasm/main.go) remains
+available in source form under MPL-2.0 at https://github.com/Joplo-app/Joplo and
+https://github.com/d2lang/d2/tree/v0.9.0.
+
+elkjs 0.12.1 (Eclipse Layout Kernel JavaScript build), EPL-2.0
+Upstream repository: https://github.com/kieler/elkjs
+Upstream npm tarball: https://registry.npmjs.org/elkjs/-/elkjs-0.12.1.tgz
+Used when a diagram explicitly selects layout="elk".

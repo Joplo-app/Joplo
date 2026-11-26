@@ -5,7 +5,6 @@ import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-a
 import { $, feature, flow, layer, work, page, set, shot } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
-import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
@@ -47,7 +46,7 @@ export function project(): Project {
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
-  const r = compile(src, 'dev', { pluginOptions: { diagram: { layout: elkLayout } } });
+  const r = compile(src, 'dev');
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
   return r.project!;
 }
@@ -86,7 +85,7 @@ export function machineProject(): Project {
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
-  const r = compile(src, 'dev', { pluginOptions: { diagram: { layout: elkLayout } } });
+  const r = compile(src, 'dev');
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
   return r.project!;
 }

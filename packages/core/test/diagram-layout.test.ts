@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { START, graphStructure, layoutSequence, sampleRoute, sequenceStructure, structureKey, type Box, type GraphLayout, type Point } from '../../../plugins/diagram/src/model-index.ts';
-import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
+import { defaultGraphLayout, elkLayout, talaLayout } from '../../../plugins/diagram/src/elk.ts';
 import { agentArch, E, G, N, loopDiagram } from './fixtures/diagram-arch.ts';
 
 const layout = (n: SceneNode) => elkLayout(graphStructure(n), diagramGoal(n));
@@ -418,4 +418,125 @@ describe('D69 补充：布局适应舞台、连线可读', () => {
     // 没有多余的点：看不见的中转点不出现在节点里
     expect(Object.keys(l.nodes).some((k) => k.startsWith('__'))).toBe(false);
   });
+});
+
+describe('D2 TALA 默认布局（talaLayout / defaultGraphLayout）', () => {
+  const stageW = 1232;
+  const stageH = 756;
+  const fitOf = (l: GraphLayout) => Math.min(1, stageW / l.width, stageH / l.height);
+  const runTala = (n: SceneNode) => defaultGraphLayout(graphStructure(n), diagramGoal(n));
+
+  it('默认引擎为 tala；显式 layout="elk" 时切回 elk；跨进程坐标一致且无 stderr 警告', () => {
+    const a = runTala(fixture());
+    const b = runTala(fixture());
+    expect(b).toEqual(a);
+    expect(a.engine).toBe('tala');
+    expect(defaultGraphLayout(graphStructure({ ...fixture(), props: { direction: 'right', layout: 'elk' } })).engine).toBe('elk');
+
+    const n = agentArch('a', 'auto', { h: '100%' });
+    const file = join(tmpdir(), `joplo-tala-${process.pid}.json`);
+    writeFileSync(file, JSON.stringify({ s: graphStructure(n), g: diagramGoal(n) }));
+    const script = `import { readFileSync } from 'node:fs'; import { talaLayout } from ${JSON.stringify(join(import.meta.dirname, '../../../plugins/diagram/src/elk.ts'))}; const { s, g } = JSON.parse(readFileSync(${JSON.stringify(file)}, 'utf8')); process.stdout.write(JSON.stringify(talaLayout(s, g)));`;
+    const out = execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], { encoding: 'utf8', cwd: join(import.meta.dirname, '..') });
+    expect(JSON.parse(out)).toEqual(runTala(n));
+  });
+
+  it('边界输入、group 引用等价、pin="end"、状态机起点圆点均满足几何不变量', () => {
+    expect(runTala({ id: 'd', type: 'diagram:Diagram' })).toMatchObject({ engine: 'tala', width: 0, height: 0 });
+    expect(Object.keys(runTala({ id: 'd', type: 'diagram:Diagram', children: [N('a', 'A'), E('a', 'ghost')] }).edges)).toEqual([]);
+    expect(runTala({ id: 'd', type: 'diagram:Diagram', children: [G('g', '空分组', []), N('a', 'A')] }).groups.g).toBeDefined();
+
+    const nested: SceneNode = { id: 'd', type: 'diagram:Diagram', children: [G('g', 'G', [N('a', 'A'), N('b', 'B')]), N('c', 'C'), E('a', 'c'), E('b', 'c')] };
+    const flat: SceneNode = { id: 'd', type: 'diagram:Diagram', children: [G('g', 'G', []), N('a', 'A', { group: 'g' }), N('b', 'B', { group: 'g' }), N('c', 'C'), E('a', 'c'), E('b', 'c')] };
+    expect(runTala(flat)).toEqual(runTala(nested));
+    checkGroups(flat, runTala(flat));
+
+    const pinNode = (pin?: string): SceneNode => ({ id: 'd', type: 'diagram:Diagram', props: { direction: 'right' }, children: [G('g', 'G', [N('a', 'A'), N('b', 'B'), N('c', 'C'), N('x', 'X', pin ? { pin } : {})]), E('a', 'b'), E('b', 'c'), E('a', 'x')] });
+    expect(runTala(pinNode()).nodes.x!.x).toBeLessThan(runTala(pinNode()).nodes.c!.x);
+    expect(runTala(pinNode('end')).nodes.x!.x).toBeCloseTo(runTala(pinNode('end')).nodes.c!.x, 0);
+
+    const S = (id: string, extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'diagram:StateMachine.State', props: { label: id, ...extra } });
+    const T = (from: string, to: string): SceneNode => ({ id: `${from}->${to}`, type: 'diagram:StateMachine.Transition', props: { from, to, label: `${from} 到 ${to}` } });
+    const sm: SceneNode = { id: 'sm', type: 'diagram:StateMachine', props: { direction: 'right' }, children: [S('created', { initial: true }), S('paid'), S('closed', { final: true }), T('created', 'paid'), T('paid', 'closed'), T('created', 'closed')] };
+    const smLayout = runTala(sm);
+    expect(smLayout.starts!.created!.x).toBeLessThan(smLayout.nodes.created!.x);
+    const startEnd = smLayout.edges[`${START}created`]!.points.at(-1)!;
+    expect(Math.abs(startEnd.x - smLayout.nodes.created!.x)).toBeLessThanOrEqual(2);
+  });
+
+  it('agent-arch 与典型架构图：容器包围、零穿模、零共线重叠、标签紧贴连线且不压节点、入口域位于主流向上游', () => {
+    const cases: (readonly [string, SceneNode])[] = [
+      ['agent-arch a/auto', agentArch('a', 'auto', { h: '100%' })],
+      ['agent-arch b/auto', agentArch('b', 'auto', { h: '100%' })],
+      ['agent-arch a/right', agentArch('a', 'right')],
+      ['agent-arch a/down', agentArch('a', 'down')],
+      ['agent-arch b/right', agentArch('b', 'right')],
+      ['agent-arch b/down', agentArch('b', 'down')],
+      ['执行回路', loopDiagram({ h: '100%' })],
+      ['八节点夹具', { ...fixture(), props: { h: '100%' } }],
+    ];
+    for (const [name, n] of cases) {
+      const s = graphStructure(n);
+      const l = talaLayout(s, diagramGoal(n));
+      checkGroups(n, l);
+      expect(l.width / l.height, `${name} ${l.width}×${l.height}`).toBeGreaterThanOrEqual(0.75);
+      expect(collinearOverlap(l).len, `${name} collinear`).toBeLessThanOrEqual(8);
+      for (const e of s.edges) {
+        const pts = l.edges[e.id]!.points;
+        for (const [id, box] of Object.entries(l.nodes)) {
+          if (id !== e.from && id !== e.to) expect(samples(pts).find((pt) => inside(pt, box)), `${name}: ${e.id} 穿过 ${id}`).toBeUndefined();
+        }
+      }
+      const labels = s.edges.filter((e) => e.label).map((e) => [e.id, l.edges[e.id]!.label!] as const);
+      for (const [id, lb] of labels) {
+        expect(lb, `${name}: ${id}`).toBeTruthy();
+        const near = Math.min(...sampleRoute(l.edges[id]!.points, 2).map((p) => distToBox(p, lb)));
+        expect(near, `${name}: ${id} dist`).toBeLessThanOrEqual(4);
+        for (const [nid, b] of Object.entries(l.nodes)) expect(area(lb, b), `${name}: ${id} overlaps node ${nid}`).toBe(0);
+      }
+      for (let i = 0; i < labels.length; i++) for (let j = i + 1; j < labels.length; j++) expect(area(labels[i]![1], labels[j]![1]), `${name}: ${labels[i]![0]} & ${labels[j]![0]}`).toBe(0);
+      if (l.nodes.app && l.nodes.biz) {
+        if (l.direction === 'down') expect(l.nodes.app.y, name).toBeLessThan(l.nodes.biz.y);
+        else expect(l.nodes.app.x, name).toBeLessThan(l.nodes.biz.x);
+      }
+      if (name.endsWith('/auto')) expect(fitOf(l), name).toBeGreaterThan(0.65);
+    }
+  }, 30000);
+
+  it('20 张确定性随机结构图：全部满足分组与节点不重叠几何不变量', () => {
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+    for (let k = 0; k < 20; k++) {
+      const groups: SceneNode[] = [];
+      const loose: SceneNode[] = [];
+      const ids: string[] = [];
+      const gn = 1 + Math.floor(rnd() * 4);
+      for (let g = 0; g < gn; g++) {
+        const kids: SceneNode[] = [];
+        const nn = 1 + Math.floor(rnd() * 4);
+        for (let i = 0; i < nn; i++) {
+          const id = `n${g}_${i}`;
+          ids.push(id);
+          kids.push(N(id, `节点 ${id}`, { description: rnd() > 0.5 ? '说明文字' : undefined }));
+        }
+        if (rnd() > 0.6 && groups.length) groups[groups.length - 1]!.children!.push(G(`g${g}`, `分组 ${g}`, kids));
+        else groups.push(G(`g${g}`, `分组 ${g}`, kids));
+      }
+      for (let i = 0; i < 2; i++) {
+        ids.push(`x${i}`);
+        loose.push(N(`x${i}`, `独立 ${i}`));
+      }
+      const edges: SceneNode[] = [];
+      const en = ids.length + Math.floor(rnd() * ids.length);
+      for (let i = 0; i < en; i++) {
+        const a = ids[Math.floor(rnd() * ids.length)]!;
+        const b = ids[Math.floor(rnd.call(null) * ids.length)]!;
+        if (a !== b) edges.push(E(a, b, { id: `e${i}`, label: rnd() > 0.5 ? `调用 ${i}` : undefined }));
+      }
+      const n: SceneNode = { id: 'd', type: 'diagram:Diagram', props: { direction: rnd() > 0.5 ? 'down' : 'right' }, children: [...groups, ...loose, ...edges] };
+      const l = runTala(n);
+      checkGroups(n, l);
+      for (const e of edges) expect(l.edges[e.id]!.points.length, `${k}: ${e.id}`).toBeGreaterThanOrEqual(2);
+    }
+  }, 30000);
 });
