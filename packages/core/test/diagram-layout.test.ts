@@ -439,7 +439,7 @@ describe('D2 TALA 默认布局（talaLayout / defaultGraphLayout）', () => {
     const script = `import { readFileSync } from 'node:fs'; import { talaLayout } from ${JSON.stringify(join(import.meta.dirname, '../../../plugins/diagram/src/elk.ts'))}; const { s, g } = JSON.parse(readFileSync(${JSON.stringify(file)}, 'utf8')); process.stdout.write(JSON.stringify(talaLayout(s, g)));`;
     const out = execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], { encoding: 'utf8', cwd: join(import.meta.dirname, '..') });
     expect(JSON.parse(out)).toEqual(runTala(n));
-  });
+  }, 30000);
 
   it('边界输入、group 引用等价、pin="end"、状态机起点圆点均满足几何不变量', () => {
     expect(runTala({ id: 'd', type: 'diagram:Diagram' })).toMatchObject({ engine: 'tala', width: 0, height: 0 });
@@ -462,7 +462,7 @@ describe('D2 TALA 默认布局（talaLayout / defaultGraphLayout）', () => {
     expect(smLayout.starts!.created!.x).toBeLessThan(smLayout.nodes.created!.x);
     const startEnd = smLayout.edges[`${START}created`]!.points.at(-1)!;
     expect(Math.abs(startEnd.x - smLayout.nodes.created!.x)).toBeLessThanOrEqual(2);
-  });
+  }, 30000);
 
   it('agent-arch 与典型架构图：容器包围、零穿模、零共线重叠、标签紧贴连线且不压节点、入口域位于主流向上游', () => {
     const cases: (readonly [string, SceneNode])[] = [

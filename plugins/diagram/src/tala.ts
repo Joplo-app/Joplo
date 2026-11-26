@@ -81,10 +81,25 @@ type TalaExports = {
   tala_out_len: () => number;
 };
 
-let instanceExports: TalaExports | null = null;
+type TalaGlobalState = {
+  exports: TalaExports | null;
+  resetClock: (() => void) | null;
+  cache: Map<string, GraphLayout>;
+};
 
-function getTalaExports(): TalaExports {
-  if (instanceExports) return instanceExports;
+const TALA_GLOBAL_KEY = Symbol.for('@joplo-app/plugin-diagram:tala:v1');
+
+function getGlobalState(): TalaGlobalState {
+  const g = globalThis as Record<symbol, TalaGlobalState | undefined>;
+  if (!g[TALA_GLOBAL_KEY]) {
+    g[TALA_GLOBAL_KEY] = { exports: null, resetClock: null, cache: new Map() };
+  }
+  return g[TALA_GLOBAL_KEY]!;
+}
+
+function getTalaExports(): { exp: TalaExports; resetClock: () => void } {
+  const state = getGlobalState();
+  if (state.exports && state.resetClock) return { exp: state.exports, resetClock: state.resetClock };
   const compressed = fs.readFileSync(new URL('./tala.wasm.br', import.meta.url));
   const wasmBytes = zlib.brotliDecompressSync(compressed);
   const mod = new WebAssembly.Module(wasmBytes);
@@ -96,6 +111,9 @@ function getTalaExports(): TalaExports {
   // Minimal deterministic WASI preview1 host — avoids node:wasi ExperimentalWarning
   // and eliminates wall-clock / OS-entropy variance across runs and architectures.
   let ticks = 1_000_000_000n;
+  const resetClock = () => {
+    ticks = 1_000_000_000n;
+  };
   const wasi = {
     args_sizes_get(argcPtr: number, argvBufSizePtr: number) {
       const v = view();
@@ -157,13 +175,15 @@ function getTalaExports(): TalaExports {
   const exp = inst.exports as unknown as TalaExports;
   mem = exp.memory;
   exp._initialize();
-  instanceExports = exp;
-  return exp;
+  state.exports = exp;
+  state.resetClock = resetClock;
+  return { exp, resetClock };
 }
 
 /** Execute one raw TALA layout pass synchronously. */
 export function runTalaRaw(input: TalaInputGraph): TalaOutputGraph {
-  const exp = getTalaExports();
+  const { exp, resetClock } = getTalaExports();
+  resetClock();
   const payload = Buffer.from(JSON.stringify(input), 'utf8');
   const inPtr = exp.tala_alloc(payload.length);
   new Uint8Array(exp.memory.buffer, inPtr, payload.length).set(payload);
@@ -750,11 +770,11 @@ export function layoutGraphTala(s: GraphStructure, goal: LayoutGoal = { aspect: 
   return best!.l;
 }
 
-const cache = new Map<string, GraphLayout>();
-const CACHE_MAX = 300;
+const CACHE_MAX = 500;
 
 /** Compile-time D2 TALA layout engine with deterministic structural caching. */
 export function talaLayout(s: GraphStructure, goal: LayoutGoal = { aspect: DEFAULT_ASPECT }): GraphLayout {
+  const { cache } = getGlobalState();
   const key = `tala|${goal.aspect.toFixed(3)}|${goal.width ?? ''}|${goal.height ?? ''}|${structureKey(s)}`;
   const hit = cache.get(key);
   if (hit) return structuredClone(hit);
