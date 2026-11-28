@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { LocalReviewWrite, stateAt, JoploError, type Project } from '@joplo-app/core';
+import { LocalReviewEventId, LocalReviewReceiptStatus, LocalReviewWrite, stateAt, JoploError, type Project } from '@joplo-app/core';
 import { checkWithProject } from './check.ts';
 import { resolveWorkId } from './work.ts';
 import { reviewSessions } from './local-review.ts';
@@ -14,6 +14,9 @@ export type LocalReviewWriteOptions = {
   scene?: string;
   requestId?: string;
   approve?: boolean;
+  event?: string;
+  status?: string;
+  note?: string;
 };
 
 async function projectAndWork(dir: string, work: string | undefined, sessionWork: string | undefined): Promise<{ project: Project; workId: string }> {
@@ -24,10 +27,13 @@ async function projectAndWork(dir: string, work: string | undefined, sessionWork
   return { project: result.project, workId: resolveWorkId(result.project, requested) };
 }
 
-export async function writeBoardReview(client: BoardClient, dir: string, options: LocalReviewWriteOptions): Promise<{ sessionId: string; requestId: string; type: 'feedback' | 'approved'; state: unknown }> {
+export async function writeBoardReview(client: BoardClient, dir: string, options: LocalReviewWriteOptions): Promise<{ sessionId: string; requestId: string; type: 'feedback' | 'approved' | 'receipt'; state: unknown }> {
+  if (options.event !== undefined && (!LocalReviewEventId.safeParse(options.event).success || !LocalReviewReceiptStatus.safeParse(options.status).success))
+    throw new JoploError('USAGE', '--event must identify feedback (rv_…:seq) and --status must be addressed, deferred, or declined');
+  const source = options.event !== undefined && !options.work && !options.session ? reviewSessions(dir, { session: options.event.split(':')[0] })[0] : undefined;
   const listed = reviewSessions(dir, { session: options.session });
   if (options.session && listed.length !== 1) throw new JoploError('NOT_FOUND', 'The requested local review session was not found in this project');
-  const { project, workId } = await projectAndWork(dir, options.work, listed[0]?.workId);
+  const { project, workId } = await projectAndWork(dir, options.work, source?.workId ?? listed[0]?.workId);
   const matches = reviewSessions(dir, { session: options.session, workId });
   if (!matches.length) throw new JoploError('NOT_FOUND', 'No active local review matches. Run npx joplo feedback list --local --all, or restart joplo dev');
   if (matches.length !== 1) throw new JoploError('USAGE', `Multiple local reviews match. Pass --session <id>:\n${matches.map(session => session.id).join('\n')}`);
@@ -37,6 +43,17 @@ export async function writeBoardReview(client: BoardClient, dir: string, options
   if (options.approve) {
     for (const key of ['body', 'scenario', 'position', 'scene'] as const) if (options[key] !== undefined) throw new JoploError('USAGE', `--${key} cannot be used when approving a review`);
     input = { sessionId: session.id, requestId, type: 'approved' };
+  } else if (options.event !== undefined) {
+    if ((options.scenario !== undefined) !== (options.position !== undefined)) throw new JoploError('USAGE', '--scenario and --position must be supplied together');
+    if (options.scene !== undefined && options.scenario === undefined) throw new JoploError('USAGE', '--scene requires --scenario and --position');
+    let target;
+    if (options.scenario !== undefined && options.position !== undefined) {
+      const scenario = project.scenarios[options.scenario];
+      if (!scenario || scenario.workId !== workId) throw new JoploError('INVALID_REFERENCE', `Scenario ${options.scenario} does not belong to ${workId}`);
+      if (!Number.isSafeInteger(options.position) || options.position < 0 || options.position > scenario.steps.length) throw new JoploError('USAGE', `--position must be an integer from 0 to ${scenario.steps.length}`);
+      target = { scenarioId: scenario.id, position: options.position, sceneId: options.scene ?? stateAt(project, scenario.id, options.position).sceneId };
+    }
+    input = { sessionId: session.id, requestId, type: 'receipt', targetEventId: options.event, status: options.status, ...(options.note === undefined ? {} : { note: options.note }), ...(target ? { target } : {}) };
   } else {
     if (!options.body?.trim() || options.body.length > 10_000) throw new JoploError('USAGE', '--body must contain 1-10000 characters');
     if (!options.scenario || options.position === undefined) throw new JoploError('USAGE', 'Local feedback requires --scenario <id> and --position <n>; these describe the reviewed position, not playback control');

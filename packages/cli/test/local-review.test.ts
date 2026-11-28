@@ -2,17 +2,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
-import { afterEach, expect, it } from 'vitest';
-import { compile, localReviewStatus } from '@joplo-app/core';
+import { afterEach, expect, it, vi } from 'vitest';
+import { compile, LocalReviewWrite, localReviewStatus } from '@joplo-app/core';
 import { localReviewWatcherCount, readLocalReview, writeLocalReview, localReviewFile } from '@joplo-app/core/node';
 import { reviewSource } from '../../core/test/fixtures/review.ts';
 import { LocalReviewHub } from '../../server/src/local-review.ts';
 import { followLocalReviews, reviewSessions, watchLocalReview } from '../src/local-review.ts';
 import { runCli } from '../src/cli.ts';
+import { checkWithProject } from '../src/check.ts';
+import { localFeedbackEvent, writeFeedbackEvent } from '../src/feedback-stream.ts';
 
 const dirs: string[] = [];
 const controllers: AbortController[] = [];
-afterEach(() => { controllers.splice(0).forEach(c => c.abort()); dirs.splice(0).forEach(d => fs.rmSync(d, { recursive: true, force: true })); });
+afterEach(() => {
+  controllers.splice(0).forEach(c => c.abort());
+  vi.unstubAllGlobals();
+  dirs.splice(0).forEach(d => fs.rmSync(d, { recursive: true, force: true }));
+});
 const setup = () => {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-watch-'))); dirs.push(dir);
   const project = compile(reviewSource(), 'dev').project!;
@@ -215,6 +221,89 @@ it('--once ignores closed rounds from source edits (the agent own work) and stil
   x.feedback('After the edit');
   expect(await result).toBe(0);
   expect(io.out).toContain('After the edit');
+});
+
+it('--once prints receipts without exiting before the next reviewer action', async () => {
+  const x = setup(), io = capture(), ac = signal(); x.feedback();
+  const createdAt = readLocalReview(x.dir, x.session.id).events[0]!.createdAt;
+  await new Promise(r => setTimeout(r, 5));
+  x.hub.write(x.dir, x.project, { sessionId: x.session.id, requestId: crypto.randomUUID(), type: 'receipt', targetEventId: `${x.session.id}:1`, status: 'addressed', note: 'Updated the title' });
+  let ended = false;
+  const result = followLocalReviews(x.dir, { json: true, once: true, since: createdAt }, io.io, ac.signal).then(code => { ended = true; return code; });
+  await until(() => io.out.includes('"receipt"'));
+  await new Promise(r => setTimeout(r, 550));
+  expect(ended).toBe(false);
+  expect(JSON.parse(io.out.trim())).toMatchObject({ type: 'receipt', targetEventId: `${x.session.id}:1`, status: 'addressed', note: 'Updated the title', target: null });
+  x.approve(); expect(await result).toBe(0);
+  expect(io.err).toContain('Received 1 reviewer event');
+});
+
+it('formats receipt details in JSON and safe text output', () => {
+  const x = setup(); x.feedback();
+  const saved = x.hub.write(x.dir, x.project, { sessionId: x.session.id, requestId: crypto.randomUUID(), type: 'receipt', targetEventId: `${x.session.id}:1`, status: 'deferred', note: 'Later\u001b[31m', target: { scenarioId: 'f.a.main', position: 1, sceneId: x.project.scenarios['f.a.main']!.initial.sceneId } });
+  const event = localFeedbackEvent(saved.session, saved.session.events.at(-1)!);
+  const json = capture(), text = capture(); writeFeedbackEvent(event, true, json.io); writeFeedbackEvent(event, false, text.io);
+  expect(JSON.parse(json.out)).toMatchObject({ source: 'local', eventId: `${x.session.id}:2`, targetEventId: `${x.session.id}:1`, type: 'receipt', status: 'deferred', target: { scenarioId: 'f.a.main', position: 1 } });
+  expect(text.out).toContain(`deferred → ${x.session.id}:1`);
+  expect(text.out).toContain('step 1'); expect(text.out).toContain('Later'); expect(text.out).not.toContain('\u001b');
+});
+
+const replySetup = async () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-reply-cli-'))); dirs.push(root);
+  const dir = path.join(root, 'project'), home = path.join(root, 'home'); fs.mkdirSync(home);
+  fs.cpSync('examples/invite', dir, { recursive: true, filter: source => !/[/\\](dist|node_modules|\.joplo)([/\\]|$)/.test(source) });
+  fs.symlinkSync(path.resolve('node_modules'), path.join(root, 'node_modules'));
+  const project = (await checkWithProject(dir)).project!;
+  const hub = new LocalReviewHub(() => 'http://127.0.0.1:4790/'); hub.sync(dir, 'test', project);
+  const workId = 'invite.a-modal', scenarioId = 'invite.a-modal.success';
+  const old = hub.state(dir, workId).session;
+  hub.write(dir, project, { sessionId: old.id, requestId: crypto.randomUUID(), type: 'feedback', body: 'Explain recovery', context: { scenarioId, position: 1, sceneId: project.scenarios[scenarioId]!.initial.sceneId } });
+  hub.invalidate(dir, 'source_changed'); hub.sync(dir, 'test', project);
+  const current = hub.state(dir, workId).session;
+  // Exercise CLI parsing, compilation, BoardClient serialization and the real Hub with an in-memory HTTP transport.
+  vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+    if (new URL(url).pathname === '/__joplo/ping') return Response.json({ joplo: true, pid: process.pid });
+    try { return Response.json(hub.write(dir, project, LocalReviewWrite.parse(JSON.parse(String(init?.body))))); }
+    catch (error) { const e = error as { code: string; message: string }; return Response.json({ error: { code: e.code, message: e.message } }, { status: 409 }); }
+  });
+  fs.writeFileSync(path.join(home, 'server.json'), JSON.stringify({ port: 4790, pid: process.pid, token: 'test-token' }));
+  const cli = async (args: string[]) => {
+    const io = capture(); const code = await runCli(['feedback', 'reply', dir, ...args], { stdout: io.io.out, stderr: io.io.err, cloud: { env: { JOPLO_HOME: home } } });
+    return { code, out: io.out, err: io.err };
+  };
+  return { dir, project, hub, old, current, workId, scenarioId, cli, args: ['--local', '--event', `${old.id}:1`, '--status', 'addressed'] };
+};
+
+it('feedback reply infers the original work and writes an idempotent receipt to its current round', async () => {
+  const x = await replySetup(), requestId = crypto.randomUUID();
+  const args = [...x.args, '--scenario', x.scenarioId, '--position', '1', '--note', '  Recovery explained  ', '--request-id', requestId, '--format', 'json'];
+  const first = await x.cli(args); expect(first.code, first.out + first.err).toBe(0);
+  expect(JSON.parse(first.out).data).toMatchObject({ sessionId: x.current.id, type: 'receipt', requestId, state: { session: { events: [{ type: 'receipt', targetEventId: `${x.old.id}:1`, targetBody: 'Explain recovery', note: 'Recovery explained', status: 'addressed', target: { scenarioId: x.scenarioId, position: 1 } }] } } });
+  expect((await x.cli(args)).code).toBe(0);
+  expect(x.hub.state(x.dir, x.workId).session.events).toHaveLength(1);
+  const changed = await x.cli([...args, '--note', 'Different']);
+  expect(changed.code).toBe(1); expect(JSON.parse(changed.out).error.code).toBe('IDEMPOTENCY_MISMATCH');
+  const text = await x.cli([...x.args, '--work', x.workId, '--status', 'deferred', '--format', 'text']);
+  expect(text.code, text.err).toBe(0); expect(text.out).toContain(`Replied to ${x.old.id}:1 in ${x.current.id}`);
+  expect(x.hub.state(x.dir, x.workId).session.events.at(-1)).toMatchObject({ target: null, note: null, status: 'deferred' });
+  expect((await x.cli([...x.args, '--session', x.current.id, '--status', 'declined'])).code).toBe(0);
+});
+
+it('feedback reply validates paired locations, ownership, bounds, statuses, and explicit sessions', async () => {
+  const x = await replySetup();
+  for (const [extra, code] of [
+    [['--scenario', x.scenarioId], 'USAGE'], [['--position', '1'], 'USAGE'], [['--scene', 'missing'], 'USAGE'],
+    [['--scenario', x.scenarioId, '--position', '9999'], 'USAGE'], [['--scenario', 'missing', '--position', '0'], 'INVALID_REFERENCE'],
+    [['--status', 'pending'], 'USAGE'], [['--event', `${x.old.id}:0`], 'USAGE'], [['--session', x.old.id], 'REVISION_CONFLICT'],
+    [['--scenario', 'invite.b-page.success', '--position', '0'], 'INVALID_REFERENCE'], [['--request-id', 'invalid'], 'USAGE'],
+  ] as const) {
+    const result = await x.cli([...x.args, ...extra, '--format', 'json']);
+    expect(result.code, result.out + result.err).toBe(code === 'USAGE' ? 2 : 1); expect(JSON.parse(result.out).error.code, extra.join(' ')).toBe(code);
+  }
+  const other = new LocalReviewHub(() => 'http://127.0.0.1:4791/'); other.sync(x.dir, 'test', x.project);
+  const ambiguous = await x.cli([...x.args, '--format', 'json']);
+  expect(ambiguous.code).toBe(2); expect(JSON.parse(ambiguous.out).error.message).toContain('Multiple local reviews');
+  expect((await x.cli([...x.args, '--session', x.current.id, '--format', 'json'])).code).toBe(0);
 });
 
 it('核心统一忽略旧版本，显式 CLI 会话选择保留重新发起提示', () => {

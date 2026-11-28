@@ -6,6 +6,9 @@ export const LOCAL_REVIEW_MAX_BODY = 10_000;
 export const LOCAL_REVIEW_MAX_EVENTS = 1000;
 export const LOCAL_REVIEW_MAX_FILE_BYTES = 16 * 1024 * 1024;
 export const LocalReviewId = z.string().regex(/^rv_[a-f0-9]{32}$/);
+export const LocalReviewEventId = z.string().regex(/^rv_[a-f0-9]{32}:[1-9]\d*$/);
+export const LocalReviewReceiptStatus = z.enum(['addressed', 'deferred', 'declined']);
+export type LocalReviewReceiptStatus = z.infer<typeof LocalReviewReceiptStatus>;
 const ref = z.string().min(1).max(300);
 export const LocalReviewLocation = z.strictObject({
   scenarioId: ref.nullable(),
@@ -29,6 +32,7 @@ const eventBase = {
 };
 export const LocalReviewEvent = z.discriminatedUnion('type', [
   z.strictObject({ ...eventBase, type: z.literal('feedback'), body: z.string().trim().min(1).max(LOCAL_REVIEW_MAX_BODY), context: LocalReviewContext }),
+  z.strictObject({ ...eventBase, type: z.literal('receipt'), targetEventId: LocalReviewEventId, targetBody: z.string().trim().min(1).max(LOCAL_REVIEW_MAX_BODY), status: LocalReviewReceiptStatus, note: z.string().trim().max(LOCAL_REVIEW_MAX_BODY).nullable(), target: LocalReviewContext.nullable() }),
   z.strictObject({ ...eventBase, type: z.literal('approved') }),
   z.strictObject({ ...eventBase, type: z.literal('closed'), reason: z.enum(['source_changed', 'compile_error', 'work_removed', 'server_stopped']) }),
 ]);
@@ -52,7 +56,7 @@ export const LocalReviewSession = z.strictObject({
 }).superRefine((s, ctx) => {
   const requests = new Set<string>();
   s.events.forEach((e, i) => {
-    if (e.sessionId !== s.id || e.seq !== i + 1 || requests.has(e.requestId) || (e.type !== 'feedback' && i !== s.events.length - 1))
+    if (e.sessionId !== s.id || e.seq !== i + 1 || requests.has(e.requestId) || ((e.type === 'approved' || e.type === 'closed') && i !== s.events.length - 1))
       ctx.addIssue({ code: 'custom', message: 'Invalid review event order, session, or request id', path: ['events', i] });
     requests.add(e.requestId);
   });
@@ -60,10 +64,13 @@ export const LocalReviewSession = z.strictObject({
 export type LocalReviewSession = z.infer<typeof LocalReviewSession>;
 export const LocalReviewWrite = z.discriminatedUnion('type', [
   z.strictObject({ sessionId: LocalReviewId, requestId: z.string().uuid(), type: z.literal('feedback'), body: z.string().trim().min(1).max(LOCAL_REVIEW_MAX_BODY), context: LocalReviewLocation }),
+  z.strictObject({ sessionId: LocalReviewId, requestId: z.string().uuid(), type: z.literal('receipt'), targetEventId: LocalReviewEventId, status: LocalReviewReceiptStatus, note: z.string().trim().max(LOCAL_REVIEW_MAX_BODY).optional(), target: LocalReviewLocation.optional() }),
   z.strictObject({ sessionId: LocalReviewId, requestId: z.string().uuid(), type: z.literal('approved') }),
 ]);
 export type LocalReviewWrite = z.infer<typeof LocalReviewWrite>;
-export type LocalReviewState = { session: LocalReviewSession; watchers: number };
+export type LocalReviewState = { session: LocalReviewSession; watchers: number; previousFeedback?: Array<{
+  eventId: string; sessionId: string; seq: number; body: string; createdAt: string; context: LocalReviewContext;
+}> };
 export function localReviewStatus(session: LocalReviewSession): 'open' | 'approved' | 'closed' {
   const last = session.events.at(-1);
   return last?.type === 'approved' ? 'approved' : last?.type === 'closed' ? 'closed' : 'open';

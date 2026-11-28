@@ -1,4 +1,31 @@
-import { LocalReviewLocation, type LocalReviewSession, type Project } from '@joplo-app/core/runtime';
+import { LocalReviewLocation, stateAt, type LocalReviewSession, type LocalReviewState, type Project } from '@joplo-app/core/runtime';
+
+/** 只让仍属于当前作品、仍可见的位置成为复审入口；旧反馈位置可能已随源码删除。 */
+export function localReviewJump(project: Project, workId: string, location: LocalReviewLocation | null): LocalReviewLocation | null {
+  if (!location?.scenarioId) return null;
+  const scenario = project.scenarios[location.scenarioId];
+  const work = project.works[workId];
+  if (!work || !scenario || scenario.workId !== workId || !Number.isSafeInteger(location.position) || location.position < 0 || location.position > scenario.steps.length || !project.scenes[location.sceneId]) return null;
+  try {
+    return stateAt(project, scenario.id, location.position).sceneId === location.sceneId || Object.values(work.layers).some(l => l.sceneId === location.sceneId) ? location : null;
+  } catch { return null; }
+}
+
+/** 同一条反馈多次回执时展示最新处理结果，避免同时显示互相冲突的状态。 */
+export function localReviewUpdates(project: Project, workId: string, state: LocalReviewState) {
+  const receipts = state.session.events.filter(e => e.type === 'receipt');
+  const latest = new Map(receipts.map(e => [e.targetEventId, e]));
+  const original = new Map([
+    ...(state.previousFeedback ?? []).map(e => [e.eventId, e.context] as const),
+    ...state.session.events.flatMap(e => e.type === 'feedback' ? [[`${state.session.id}:${e.seq}`, e.context] as const] : []),
+  ]);
+  return [
+    ...[...latest.values()].map(e => ({ eventId: e.targetEventId, body: e.targetBody, status: e.status, note: e.note,
+      target: localReviewJump(project, workId, e.target) ?? localReviewJump(project, workId, original.get(e.targetEventId) ?? null) })),
+    ...(state.previousFeedback ?? []).filter(e => !latest.has(e.eventId)).map(e => ({ eventId: e.eventId, body: e.body, status: null, note: null,
+      target: localReviewJump(project, workId, e.context) })),
+  ];
+}
 
 export type ReviewDraft = { sessionId: string; text: string; context: LocalReviewLocation; pageTitle: string; scenarioName: string | null; requestId?: string };
 export function captureReviewDraft(session: LocalReviewSession, project: Project, context: LocalReviewLocation, text = ''): ReviewDraft {

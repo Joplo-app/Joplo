@@ -171,7 +171,7 @@ export async function followLocalReviews(dir: string, opts: ReviewFilter & { aft
         // --since：已经处理过的事件（重新启动时会重放开着的轮次）只推进游标，不再输出
         if (since === null || Date.parse(e.createdAt) > since) {
           writeFeedbackEvent(localFeedbackEvent(s, e), !!opts.json, io, id => opts.labels?.[id] ?? id);
-          // --once 只为评审人的动作退出：feedback / approved。改源码带来的 closed 是 Agent 自己的工作，照常输出但不唤醒
+          // --once 只为评审人的动作退出：feedback / approved。Agent 的 receipt / closed 照常输出但不唤醒。
           if (e.type === 'feedback' || e.type === 'approved') emitted.push({ createdAt: e.createdAt });
         }
         t.cursor = e.seq;

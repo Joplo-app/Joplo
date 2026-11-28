@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { work, chapter } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, LocalReviewWrite, localReviewStatus, type Project } from '@joplo-app/core';
-import { listLocalReviews, readLocalReview } from '@joplo-app/core/node';
+import { listLocalReviews, readLocalReview, localReviewFile, writeLocalReview } from '@joplo-app/core/node';
 import { reviewSource } from '../../core/test/fixtures/review.ts';
 import { LocalReviewHub, localReviewContext, localReviewRevision } from '../src/local-review.ts';
 import { createDev, type InternalDevHandle } from '../src/dev.ts';
@@ -23,6 +23,68 @@ const feedback = (id: string, p: Project, body = 'Keep the form open') => LocalR
 const approve = (id: string) => LocalReviewWrite.parse({ sessionId: id, requestId: crypto.randomUUID(), type: 'approved' });
 
 describe('local review persistence and identity', () => {
+  it('carries the last feedback round across empty rounds and replies using persisted feedback', () => {
+    const dir = temp(), p = project(), h = hubFor(dir, p), old = h.state(dir, 'f.a').session;
+    const first = h.write(dir, p, feedback(old.id, p, 'Clarify the title')).session.events[0]!;
+    h.write(dir, p, feedback(old.id, p, 'Keep the hint'));
+    p.works['f.a']!.title = 'Revised'; h.sync(dir, 'project-a', p);
+    p.works['f.a']!.title = 'Revised again'; h.sync(dir, 'project-a', p);
+    // A fresh Hub must resolve historical feedback from disk rather than its own in-memory map.
+    const restarted = hubFor(dir, p);
+    const next = restarted.state(dir, 'f.a');
+    expect(next.previousFeedback).toMatchObject([
+      { eventId: `${old.id}:1`, sessionId: old.id, seq: 1, body: 'Clarify the title', createdAt: first.createdAt, context: location(p) },
+      { eventId: `${old.id}:2`, body: 'Keep the hint' },
+    ]);
+    const input = LocalReviewWrite.parse({ sessionId: next.session.id, requestId: crypto.randomUUID(), type: 'receipt', targetEventId: `${old.id}:1`, status: 'addressed', note: '  Reworded the title  ', target: location(p) });
+    const saved = restarted.write(dir, p, input);
+    expect(saved.session.events[0]).toMatchObject({ type: 'receipt', targetEventId: `${old.id}:1`, targetBody: 'Clarify the title', note: 'Reworded the title', status: 'addressed', target: { ...location(p), pageTitle: expect.any(String), route: '/' } });
+    expect(saved.previousFeedback).toHaveLength(2);
+    expect(readLocalReview(dir, next.session.id)).toEqual(saved.session);
+    expect(restarted.write(dir, p, input)).toEqual(saved);
+    if (input.type !== 'receipt') throw new Error('Expected receipt');
+    for (const change of [{ status: 'deferred' as const }, { note: 'Different' }, { targetEventId: `${old.id}:2` }, { target: undefined }, { target: { ...location(p), position: 0 } }])
+      expect(() => restarted.write(dir, p, { ...input, ...change })).toThrowError(expect.objectContaining({ code: 'IDEMPOTENCY_MISMATCH' }));
+    restarted.write(dir, p, feedback(next.session.id, p));
+    restarted.write(dir, p, approve(next.session.id));
+    expect(() => restarted.write(dir, p, { ...input, requestId: crypto.randomUUID() })).toThrow(/ended/);
+    p.works['f.a']!.summary = 'New revision'; restarted.sync(dir, 'project-a', p);
+    expect(restarted.state(dir, 'f.a').session.events).toEqual([]);
+    expect(localReviewStatus(readLocalReview(dir, next.session.id))).toBe('approved');
+  });
+  it('validates receipt references, work ownership, target positions, and optional fields', () => {
+    const dir = temp(), other = temp(), p = project(), h = hubFor(dir, p), s = h.state(dir, 'f.a').session;
+    h.write(dir, p, feedback(s.id, p));
+    const input = { sessionId: s.id, requestId: crypto.randomUUID(), type: 'receipt' as const, targetEventId: `${s.id}:1`, status: 'deferred' as const };
+    const saved = h.write(dir, p, input);
+    expect(saved.session.events[1]).toMatchObject({ type: 'receipt', note: null, target: null, targetBody: 'Keep the form open' });
+    expect(h.write(dir, p, input).session.events).toHaveLength(2);
+    const foreign = hubFor(other, p).state(other, 'f.a').session;
+    const b = h.state(dir, 'f.b').session;
+    const scenario = Object.values(p.scenarios).find(sc => sc.workId === 'f.b')!;
+    h.write(dir, p, { sessionId: b.id, requestId: crypto.randomUUID(), type: 'feedback', body: 'Other work', context: { scenarioId: scenario.id, position: 0, sceneId: scenario.initial.sceneId } });
+    for (const targetEventId of [`${foreign.id}:1`, `${s.id}:99`, `${s.id}:2`, `${b.id}:1`, '../../secret:1'])
+      expect(() => h.write(dir, p, { ...input, requestId: crypto.randomUUID(), targetEventId })).toThrowError(expect.objectContaining({ code: 'INVALID_REFERENCE' }));
+    for (const target of [{ ...location(p), position: 999 }, { scenarioId: scenario.id, position: 0, sceneId: scenario.initial.sceneId }])
+      expect(() => h.write(dir, p, { ...input, requestId: crypto.randomUUID(), target })).toThrowError(expect.objectContaining({ code: 'INVALID_REFERENCE' }));
+    // The persisted body is authoritative even for feedback in the current session.
+    const persisted = readLocalReview(dir, s.id);
+    if (persisted.events[0]?.type !== 'feedback') throw new Error('Expected feedback');
+    persisted.events[0].body = 'Body from disk'; writeLocalReview(localReviewFile(dir, s.id), persisted);
+    expect(h.write(dir, p, { ...input, requestId: crypto.randomUUID(), status: 'declined' }).session.events.at(-1)).toMatchObject({ targetBody: 'Body from disk', status: 'declined' });
+  });
+  it('selects the newest historical feedback round for the same work', () => {
+    const dir = temp(), p = project(), h = hubFor(dir, p), old = h.state(dir, 'f.a').session;
+    h.write(dir, p, feedback(old.id, p, 'Earlier'));
+    p.works['f.a']!.title = 'Second'; h.sync(dir, 'project-a', p);
+    const second = h.state(dir, 'f.a').session;
+    h.write(dir, p, feedback(second.id, p, 'Most recent')); h.write(dir, p, approve(second.id));
+    p.works['f.a']!.title = 'Third'; h.sync(dir, 'project-a', p);
+    // Remove timestamp ties so this also proves selection independently of directory order.
+    const earlier = readLocalReview(dir, old.id); earlier.createdAt = '2020-01-01T00:00:00.000Z'; writeLocalReview(localReviewFile(dir, old.id), earlier);
+    expect(h.state(dir, 'f.a').previousFeedback).toMatchObject([{ eventId: `${second.id}:1`, body: 'Most recent' }]);
+    expect(h.state(dir, 'f.b').previousFeedback).toBeUndefined();
+  });
   it('persists page context and approval, with private atomic records', () => {
     const dir = temp(), p = project(), h = hubFor(dir, p), session = h.state(dir, 'f.a').session;
     h.write(dir, p, feedback(session.id, p));
@@ -118,6 +180,16 @@ it('HTTP review endpoints enforce token, origin, project ownership, and revision
   expect((await fetch(url)).status).toBe(403);
   expect((await fetch(url, { headers: { ...headers, origin: 'https://untrusted.example' } })).status).toBe(403);
   const current = await (await fetch(url, { headers })).json() as { session: { id: string } };
+  const scenario = Object.values(p.scenarios).find(s => s.workId === option)!;
+  const context = { scenarioId: scenario.id, position: 0, sceneId: scenario.initial.sceneId };
+  const submitted = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ sessionId: current.session.id, requestId: crypto.randomUUID(), type: 'feedback', body: 'Explain the opening', context }) });
+  expect(submitted.status).toBe(200);
+  const receipt = { sessionId: current.session.id, requestId: crypto.randomUUID(), type: 'receipt', targetEventId: `${current.session.id}:1`, status: 'addressed', note: 'Opening explained', target: context };
+  const replied = await fetch(url, { method: 'POST', headers, body: JSON.stringify(receipt) });
+  expect(replied.status).toBe(200);
+  expect((await replied.json() as any).session.events.at(-1)).toMatchObject({ type: 'receipt', targetBody: 'Explain the opening', target: { ...context, route: expect.any(String) } });
+  const invalidReference = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ ...receipt, requestId: crypto.randomUUID(), targetEventId: `${current.session.id}:999` }) });
+  expect(invalidReference.status).toBe(400);
   const body = JSON.stringify(approve(current.session.id));
   expect((await fetch(url, { method: 'POST', headers: { 'x-joplo-token': dev.token }, body })).status).toBe(415);
   const saved = await fetch(url, { method: 'POST', headers, body });

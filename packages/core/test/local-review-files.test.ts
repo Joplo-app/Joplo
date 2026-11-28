@@ -53,3 +53,17 @@ it('keeps malformed JSON and invalid current records visible as errors', () => {
   expect(() => readLocalReview(dir, current.id)).toThrowError(expect.objectContaining({ code: 'INVALID_SCHEMA' }));
   expect(() => listLocalReviews(dir)).toThrowError(expect.objectContaining({ code: 'INVALID_SCHEMA' }));
 });
+
+it('round trips version 2 receipts alongside existing feedback and approval records', () => {
+  const dir = temp(), current = session(dir);
+  const context = { scenarioId: 'intro.main', position: 0, sceneId: 'intro.page', route: '/', stepId: null, source: null, pageTitle: 'Intro', scenarioName: 'Main' };
+  const base = { sessionId: current.id, createdAt: current.createdAt };
+  current.events = [
+    { ...base, seq: 1, requestId: crypto.randomUUID(), type: 'feedback', body: 'Clarify the opening', context },
+    { ...base, seq: 2, requestId: crypto.randomUUID(), type: 'receipt', targetEventId: `${current.id}:1`, targetBody: 'Clarify the opening', status: 'addressed', note: 'Updated', target: context },
+    { ...base, seq: 3, requestId: crypto.randomUUID(), type: 'approved' },
+  ];
+  writeLocalReview(localReviewFile(dir, current.id), current);
+  expect(readLocalReview(dir, current.id)).toEqual(current);
+  expect(listLocalReviews(dir)).toEqual([current]);
+});
