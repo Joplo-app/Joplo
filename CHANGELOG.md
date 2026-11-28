@@ -1,5 +1,11 @@
 # 更新日志
 
+## 0.8.2
+
+- **本地评审闭环**：新增 `joplo feedback reply --local --event <session:seq> --status <addressed|deferred|declined> [--scenario <id> --position <n>] [--note <text>]`，看板评审浮层展示结构化回执并支持一键跳至复核场景与步骤（含 10 语种界面文案，PR #131）。
+- **Diagram 手工架构、白板与并发泳道**（`@joplo-app/plugin-diagram`）：新增手工架构与云原生原语（`BoardZone`、`ClusterBox`、`ArchNode`、`Database`、`QueuePipe`、`CacheNode`、`FlowEdge` 及 `pulse()` / `setStatus()`）、86 个离线技术/云/K8s/数据库/语言/框架图标（`TechIcon` / `IconGrid`）、5 套内置主题（`juice` / `sketch` / `juice-dark` / `riso` / `blueprint`）、白板/设备/数据结构/ER/泳道组件，以及多泳道并发时间线 `TimeLanes`（PR #131）。
+- **UI / Content 表现力与叙事节奏校验**：`@joplo-app/plugin-ui` 修复 `Arrow` 自环并新增 `RatioBar`、`Compare` / `Compare.Side`、`Image.Region`；`@joplo-app/plugin-content` 新增 `camera()` 景别预设（`framing` / `waitForMove`）与对象追踪轨道 `ItemTrack`；`@joplo-app/core` 修复 `NARRATE_TOO_LONG` / `SAY_TOO_LONG` 按 10 秒真实语音预算判定，新增 `READING_BUDGET_SHORT`、`CHAPTERS_TOO_FEW`、`CHAPTER_TITLE_GENERIC` 三项低噪声诊断，并同步更新官方与插件技能（PR #131）。
+
 ## 0.8.1
 
 - 图表插件 `@joplo-app/plugin-diagram` 集成 D2 开源版 TALA 布局与正交布线引擎（MPL-2.0，Node 编译期 Wasm 同步运行，浏览器与发布站体积零增加），并将 `<Diagram>` 与 `<StateMachine>` 的默认排版切换为 `layout="tala"`；需要一维 Sugiyama 分层列时仍可显式指定 `layout="elk"`。补充内容寻址跨进程布局缓存与图表技能指南（PR #130）。

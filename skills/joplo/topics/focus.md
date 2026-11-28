@@ -68,4 +68,4 @@ flow('Plan a weekend trip', { start: '/' })
 Full example: examples/camping.
 
 Related topics: demo, plugins, check
-<!-- joplo-skill 0.8.1 sha256:7b3c26e04d8a08c7835dddacf2b70d4cd02b66aaf9b2fc085394cc8cc73e5028 -->
+<!-- joplo-skill 0.8.2 sha256:7b3c26e04d8a08c7835dddacf2b70d4cd02b66aaf9b2fc085394cc8cc73e5028 -->
