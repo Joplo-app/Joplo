@@ -1,6 +1,6 @@
 # Joplo publishing: publish
 
-Compare cases and options in the board, then decide which option to publish for each feature.
+Review cases and options in the board, then decide which option to publish for each feature.
 
 ## Standalone works and feature pick
 - Standalone works in works/ publish without pick. Empty works stay local until they have a slice (WORK_EMPTY); explicit selection fails. draft: true excludes the whole work, its slices and views from both ordinary and review versions; WORK_DRAFT_SKIPPED lists what was skipped. Only drafts means nothing can publish: finish a work first.
@@ -148,4 +148,4 @@ For local comparisons and PR CI, read npx joplo skill diff. It compares two real
 - --ref works only together with --applied. --applied is idempotent; text output without --format json ends with a Next: line listing the ids.
 
 Related topics: diff, demo, review, plugins
-<!-- joplo-skill 0.8.1 sha256:806948011a3720296a20dab475b69c98de1273685c38e81919c2102bdc623ca8 -->
+<!-- joplo-skill 0.8.1 sha256:27d5fe1883e653f34281cdc97e006d085e19e1af8a41d21f4253073ce4f066f2 -->

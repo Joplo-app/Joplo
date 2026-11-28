@@ -60,7 +60,7 @@ Pick relevant cases to ask the user before starting. Do not include every preset
 - Each option uses flow(..., { cases: ['happy'] }) to reference the shared cases for comparison.
 - A case with a scenario is automatically `expressed`; one with neither a scenario nor a declaration is `missing`.
 - After adding a case, run check: reconsider it in every option.
-- Start with two scenarios per work, the happy path and one error-and-recovery case; add the rest after the user has seen them in the board.
+- Start with the Minimal Decision Recipe: 1 thin happy path, 1 failure-and-recovery path, and 1 contested boundary case per work (add Option B only when a real trade-off needs comparing; skip extra screens, polish, and voice until after the first board check), then add remaining cases after the user has seen them in the board.
 - A rule the user stated in this conversation is origin: 'user', status: 'confirmed'; a rule you inferred stays ai_assumption, pending.
 
 ## Declare coverage without a scenario
@@ -76,4 +76,4 @@ See authoring for flow and rule syntax; check for locating coverage diagnostics.
 No mobile example yet; create a separate demo when mobile is needed (D44).
 
 Related topics: story, authoring, check
-<!-- joplo-skill 0.8.1 sha256:6ffc4ff9045550ae956605a7ef7316bc059eb668024f09de41dd8594b44b4f17 -->
+<!-- joplo-skill 0.8.1 sha256:a5408a1fcd1ed8a471013d6cb03f2aac7bf88679fb9fc8e90073fcf3b89c4116 -->

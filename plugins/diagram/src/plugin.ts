@@ -1,19 +1,23 @@
 import packageInfo from './version.json' with { type: 'json' };
 import { dataSpec } from './data-spec.ts';
 import { definePlugin, type PluginCompileHooks, type PluginIRNode } from '@joplo-app/kit/plugin';
-import { isNode, type JNode, type JChild } from '@joplo-app/kit/node';
+import { isBind, isNode, type JNode, type JChild } from '@joplo-app/kit/node';
 import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
 import { docs, examples } from './catalog.ts';
-import { skill, patterns } from './guide.ts';
+import { skill, patterns, boardSkillTopics } from './guide.ts';
 import { checkDiagramRoot, resolveTrace } from './compile-helpers.ts';
 import { diagramsIn, isDiagramRoot, layoutFor, graphStructure, sequenceStructure, type GraphLayoutEngine } from './model-index.ts';
-import { NodeData, FrameData, type Trace } from './schema.ts';
+import { NodeData, FrameData, type NodeStatus, type PulseSnapshot, type Trace } from './schema.ts';
 import { advanceStates } from './state.ts';
 import { machineStates } from './machine.ts';
 import { componentLabels, inspectFields } from './inspect.ts';
+import { readTimeLanes } from './time-lanes.ts';
+import { NODE_STATUSES, TONES, pulseDurationMs, type Tone } from './board/tokens.ts';
+import { blueprintTheme, juiceDarkTheme, juiceLightTheme, risoTheme, sketchTheme } from './board/themes.ts';
 
-export { trace } from './effects.ts';
+export { trace, pulse, setStatus } from './effects.ts';
 export * from './components.ts';
+export { TECH_ICONS, resolveTechIconId, type TechIconId } from './board/icon-catalog.ts';
 import { defaultGraphLayout } from './elk.ts';
 const links = new Set(['diagram:Diagram.Edge', 'diagram:StateMachine.Transition', 'diagram:Sequence.Message']);
 const required = new Set(['Diagram.Node', 'StateMachine.State', 'Sequence.Actor']);
@@ -42,9 +46,30 @@ function dotLapMs(roots: readonly PluginIRNode[], edgeIds: string[]): number {
   }
   return longest ? Math.round(dotLapSeconds(longest) * 1000) + 200 : 0;
 }
+const isBoardTone = (v: unknown): v is Tone => typeof v === 'string' && (TONES as readonly string[]).includes(v);
+const isBoardStatus = (v: unknown): v is NodeStatus => typeof v === 'string' && (NODE_STATUSES as readonly string[]).includes(v);
+type BoardStepOp =
+  | { kind: 'pulse'; edge: string; label?: string; reverse?: boolean; tone?: Tone; durationMs: number }
+  | { kind: 'setStatus'; target: string; status: NodeStatus };
+
 const hooks: PluginCompileHooks = {
   node(raw, { ids, report }) {
     const n = clean(raw);
+    if (n.type === 'diagram:FlowEdge') {
+      if (typeof n.props.from !== 'string' || !n.props.from || typeof n.props.to !== 'string' || !n.props.to) {
+        report('DIAGRAM_EDGE_INVALID', '<FlowEdge> requires nonempty string "from" and "to" target ids', n.source);
+      }
+      return n;
+    }
+    if (n.type === 'diagram:TimeLanes') {
+      const { domain, spans, spanIds } = n.props;
+      if (spanIds !== undefined && !(Array.isArray(spanIds) && spanIds.every(id => typeof id === 'string' && id.trim()) && new Set(spanIds).size === spanIds.length)) {
+        report('TIME_LANES_INVALID', '<TimeLanes spanIds> expects unique, nonempty target ids.', n.source);
+      }
+      const result = readTimeLanes({ ...n.props, domain: isBind(domain) ? [-Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER] : domain, spans: isBind(spans) ? [] : spans });
+      if (result.error) report('TIME_LANES_INVALID', `<TimeLanes> ${result.error}`, n.source);
+      return;
+    }
     if (isDiagramRoot(n.type)) {
       checkDiagramRoot(n, report);
       if (n.props.scale !== undefined && (typeof n.props.scale !== 'number' || !Number.isFinite(n.props.scale) || n.props.scale <= 0)) report('DIAGRAM_SCALE_INVALID', 'Diagram scale must be a finite number greater than 0', n.source);
@@ -59,6 +84,9 @@ const hooks: PluginCompileHooks = {
     return n;
   },
   derive(node, { viewport, options, report }) {
+    if (node.type === 'diagram:TimeLanes') {
+      return { framing: Object.fromEntries(all(node).map(n => [n.id, { kind: n === node ? 'root' : 'content' }])) };
+    }
     if (!isDiagramRoot(node.type)) return;
     const n = node as SceneNode;
     const layout = layoutFor(n, (Object.hasOwn(options, 'layout') ? options.layout : defaultGraphLayout) as GraphLayoutEngine | undefined, message => report('DIAGRAM_LAYOUT_FAILED', `<${n.type}> "${n.id}" could not be laid out (${message}); showing a simple grid instead. Check the edges and groups of this diagram`, n.source, 'warning'), viewport);
@@ -77,6 +105,41 @@ const hooks: PluginCompileHooks = {
     return { data, framing };
   },
   effect(effect, ctx) {
+    const previous = ctx.data as { traces?: Trace[]; traceScenes?: string[]; boardOps?: BoardStepOp[] } | undefined;
+    if (effect.name === 'pulse' || effect.name === 'setStatus') {
+      const p = (effect.payload ?? {}) as Record<string, unknown>;
+      const allNodes = ctx.roots.flatMap(all);
+      const boardOps = [...(previous?.boardOps ?? [])];
+      const keepPrev = { ...(previous?.traces ? { traces: previous.traces } : {}), ...(previous?.traceScenes ? { traceScenes: previous.traceScenes } : {}) };
+      if (effect.name === 'pulse') {
+        const edge = typeof p.edge === 'string' ? p.edge : '';
+        if (!allNodes.some((n) => n.id === edge && n.type === 'diagram:FlowEdge')) {
+          ctx.report('DIAGRAM_EDGE_UNKNOWN', `pulse("${edge}"): no <FlowEdge id="${edge}"> on this step`, ctx.source);
+          return;
+        }
+        const durationMs = pulseDurationMs(typeof p.durationMs === 'number' ? p.durationMs : undefined);
+        boardOps.push({
+          kind: 'pulse',
+          edge,
+          ...(typeof p.label === 'string' ? { label: p.label } : {}),
+          ...(typeof p.reverse === 'boolean' ? { reverse: p.reverse } : {}),
+          ...(isBoardTone(p.tone) ? { tone: p.tone } : {}),
+          durationMs,
+        });
+        return { data: { ...keepPrev, boardOps }, references: [edge], holdMs: durationMs + 150 };
+      }
+      const target = typeof p.target === 'string' ? p.target : '';
+      if (!allNodes.some((n) => n.id === target)) {
+        ctx.report('DIAGRAM_TARGET_UNKNOWN', `setStatus("${target}"): node not found on this step`, ctx.source);
+        return;
+      }
+      if (!isBoardStatus(p.status)) {
+        ctx.report('DIAGRAM_STATUS_INVALID', `setStatus("${target}"): invalid status`, ctx.source);
+        return;
+      }
+      boardOps.push({ kind: 'setStatus', target, status: p.status });
+      return { data: { ...keepPrev, boardOps }, references: [target] };
+    }
     if (effect.name !== 'trace') { ctx.report('PLUGIN_EFFECT_UNKNOWN', `Unknown diagram effect ${effect.name}`, ctx.source); return; }
     const p = effect.payload as { ids?: unknown; mode?: unknown; focus?: unknown } | null;
     if (!p || !Array.isArray(p.ids) || !p.ids.every(id => typeof id === 'string') || !['ok', 'fail', 'skip'].includes(String(p.mode)) || (p.focus !== undefined && typeof p.focus !== 'boolean')) {
@@ -84,39 +147,99 @@ const hooks: PluginCompileHooks = {
     }
     const t = resolveTrace(ctx.roots.flatMap(r => diagramsIn(r as SceneNode)), p.ids as string[], p.mode as Trace['mode'], ctx.source, ctx.report);
     if (!t) return;
-    const previous = ctx.data as { traces?: Trace[]; traceScenes?: string[] } | undefined;
     const owner = ctx.scenes.find(s => diagramsIn(s.root as SceneNode).some(d => (p.ids as string[]).every(id => d.nodes.has(id) || d.edges.some(e => e.id === id))));
     return {
       ...(t.mode === 'ok' ? { holdMs: dotLapMs(ctx.roots, t.edges.map(e => e.id)) } : {}),
-      data: { traces: [...previous?.traces ?? [], t], traceScenes: [...previous?.traceScenes ?? [], owner!.id] },
+      data: { ...(previous?.boardOps ? { boardOps: previous.boardOps } : {}), traces: [...previous?.traces ?? [], t], traceScenes: [...previous?.traceScenes ?? [], owner!.id] },
       targets: t.mode === 'skip' || p.focus === false ? undefined : t.targets ?? t.nodes,
       references: [...t.nodes, ...t.edges.map(e => e.id), ...t.groups ?? [], ...t.errorGroups ?? [], ...t.targets ?? []],
     };
   },
   frame(ctx) {
-    if (!ctx.roots.some(r => all(r).some(n => isDiagramRoot(n.type)))) return undefined;
-    const traces = (ctx.data as { traces?: Trace[] } | undefined)?.traces ?? [];
-    const traceScenes = (ctx.data as { traceScenes?: string[] } | undefined)?.traceScenes ?? [];
-    const previous = ctx.previousData as import('./data.ts').Frame | undefined;
-    const scenes: import('./data.ts').Frame['scenes'] = {};
+    const stepData = ctx.data as { traces?: Trace[]; traceScenes?: string[]; boardOps?: BoardStepOp[] } | undefined;
+    const traces = stepData?.traces ?? [];
+    const traceScenes = stepData?.traceScenes ?? [];
+    const boardOps = stepData?.boardOps ?? [];
+    const previous = ctx.previousData as (import('./data.ts').Frame & { scenes: Record<string, { pulses?: Record<string, PulseSnapshot>; nodeStates?: Record<string, NodeStatus> }> }) | undefined;
+    const scenes: Record<string, any> = {};
     for (const scene of ctx.scenes) {
-      if (!all(scene.root).some(n => isDiagramRoot(n.type))) continue;
-      const calls = traces.filter((_, i) => traceScenes[i] === scene.id);
-      const states = advanceStates(previous?.scenes[scene.id]?.states ?? {}, calls);
-      const machines: Record<string, ReturnType<typeof machineStates>> = {};
-      for (const node of all(scene.root)) if (node.type === 'diagram:StateMachine') {
-        const n = node as SceneNode;
-        const props = ctx.resolveProps(n);
-        const prev = ctx.previousState ? ctx.resolveProps(n, true).value : undefined;
-        machines[n.id] = machineStates(graphStructure(n), props.value, prev);
+      const nodes = all(scene.root);
+      const bound = nodes.filter(n => n.type === 'diagram:TimeLanes' && (typeof n.props?.spans === 'string' || typeof n.props?.domain === 'string'));
+      const used = bound.length ? new Set(nodes.map(n => n.id)) : new Set<string>();
+      for (const node of bound) {
+        const chart = readTimeLanes(ctx.resolveProps(node));
+        const at = `<TimeLanes id="${node.id}"> at position ${ctx.position}`;
+        if (!chart.data) { ctx.report('TIME_LANES_INVALID', `${at}: ${chart.error}`, node.source); continue; }
+        const declared = new Set(node.children?.map(child => child.id));
+        for (const { id } of chart.data.spans) {
+          if (!declared.has(id) && used.has(id)) ctx.report('TIME_LANES_INVALID', `${at}: span id "${id}" already belongs to another element on this stage.`, node.source);
+          used.add(id);
+        }
       }
-      scenes[scene.id] = { traces: calls, states, now: [...new Set(calls.filter(t => t.mode !== 'skip').flatMap(t => [...t.nodes, ...t.edges.map(e => e.id)]))], machines };
+      const nodeIds = new Set(nodes.map(n => n.id));
+      const sceneHasClassic = nodes.some(n => isDiagramRoot(n.type));
+      const calls = traces.filter((_, i) => traceScenes[i] === scene.id);
+      const states = sceneHasClassic ? advanceStates(previous?.scenes[scene.id]?.states ?? {}, calls) : {};
+      const machines: Record<string, ReturnType<typeof machineStates>> = {};
+      if (sceneHasClassic) {
+        for (const node of nodes) if (node.type === 'diagram:StateMachine') {
+          const n = node as SceneNode;
+          const props = ctx.resolveProps(n);
+          const prev = ctx.previousState ? ctx.resolveProps(n, true).value : undefined;
+          machines[n.id] = machineStates(graphStructure(n), props.value, prev);
+        }
+      }
+      const prevNodeStates = previous?.scenes[scene.id]?.nodeStates;
+      const nodeStates: Record<string, NodeStatus> = { ...(prevNodeStates ?? {}) };
+      for (const op of boardOps) {
+        if (op.kind === 'setStatus' && nodeIds.has(op.target)) nodeStates[op.target] = op.status;
+      }
+      const pulses: Record<string, PulseSnapshot> = {};
+      for (const node of nodes) {
+        if (node.type !== 'diagram:FlowEdge') continue;
+        const pulseOp = [...boardOps].reverse().find((o): o is Extract<BoardStepOp, { kind: 'pulse' }> => o.kind === 'pulse' && o.edge === node.id);
+        if (pulseOp) {
+          pulses[node.id] = {
+            active: true,
+            ...(pulseOp.label !== undefined ? { label: pulseOp.label } : {}),
+            ...(pulseOp.reverse !== undefined ? { reverse: pulseOp.reverse } : {}),
+            ...(pulseOp.tone !== undefined ? { tone: pulseOp.tone } : {}),
+            durationMs: pulseOp.durationMs,
+          };
+        }
+      }
+      const hasPulses = Object.keys(pulses).length > 0;
+      const hasNodeStates = Object.keys(nodeStates).length > 0;
+      if (!sceneHasClassic && !hasPulses && !hasNodeStates) continue;
+      scenes[scene.id] = {
+        traces: calls,
+        states,
+        now: [...new Set(calls.filter(t => t.mode !== 'skip').flatMap(t => [...t.nodes, ...t.edges.map(e => e.id)]))],
+        machines,
+        ...(hasPulses ? { pulses } : {}),
+        ...(hasNodeStates ? { nodeStates } : {}),
+      };
     }
-    return { scenes };
+    if (Object.keys(scenes).length) return { scenes };
   },
 };
-export default /* @__PURE__ */ definePlugin({ skillTopics: { patterns: { description: 'Recipes and individual pitfalls', body: patterns } }, packageName: '@joplo-app/plugin-diagram',
-  id: 'diagram', title: 'Diagrams', version: packageInfo.version, runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url), skill,
-  components: Object.fromEntries(Object.entries(docs).map(([name, doc]) => [name, { ...(componentLabels[name] ? { label: componentLabels[name] } : {}), ...(inspectFields[name] ? { inspect: inspectFields[name] } : {}), doc, example: examples[name], catalogFamily: !name.includes('.'), traits: { text: ['label', 'description', 'name', 'value'] }, selfEvident: true, ...(required.has(name) ? { needsId: true } : {}) }])),
-  data: dataSpec, compile: hooks, schemas: { node: NodeData, step: FrameData },
+export default /* @__PURE__ */ definePlugin({
+  skillTopics: { patterns: { description: 'Recipes and individual pitfalls', body: patterns }, ...boardSkillTopics },
+  packageName: '@joplo-app/plugin-diagram',
+  id: 'diagram',
+  title: 'Diagrams',
+  version: packageInfo.version,
+  runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
+  themes: {
+    juice: juiceLightTheme,
+    sketch: sketchTheme,
+    'juice-dark': juiceDarkTheme,
+    riso: risoTheme,
+    blueprint: blueprintTheme,
+  },
+  skill,
+  components: Object.fromEntries(Object.entries(docs).map(([name, doc]) => [name, { ...(componentLabels[name] ? { label: componentLabels[name] } : {}), ...(inspectFields[name] ? { inspect: inspectFields[name] } : {}), doc, example: examples[name], catalogFamily: !name.includes('.'), traits: name === 'TimeLanes' ? { textPaths: [['spans', '*', 'label'], ['spans', '*', 'lane']] } : { text: ['label', 'description', 'name', 'value', 'title', 'sub', 'text', 'eyebrow', 'metric', 'detail', 'author', 'speaker', 'role', 'pointer', 'tag', 'badge', 'storage', 'ttl', 'lag'] }, selfEvident: true, ...(required.has(name) ? { needsId: true } : {}) }])),
+  data: dataSpec,
+  compile: hooks,
+  schemas: { node: NodeData, step: FrameData },
 });

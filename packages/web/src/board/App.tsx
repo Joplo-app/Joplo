@@ -553,7 +553,13 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         selectedId={drawer && selection && state && selection.sceneId === state.sceneId ? selection.nodeId : null}
         stageOverlay={work ? (sceneId) => <LocalReview key={work.id} projectId={projectId} project={project} workId={work.id}
           context={sceneId ? { sceneId, scenarioId: scenario?.id ?? null, position: state?.position ?? 0 } : null}
-          version={ir.payload?.version ?? 0} enabled={!compileError} completed={!!state?.completed} onOpen={() => ctl.pause()} approvable={!independentWork} /> : undefined}
+          version={ir.payload?.version ?? 0} enabled={!compileError} completed={!!state?.completed} onOpen={() => ctl.pause()}
+          onJump={(loc) => {
+            if (loc.scenarioId && project.scenarios[loc.scenarioId]?.workId === work.id) {
+              ctl.setScenario(loc.scenarioId, loc.position, { quiet: true });
+              ctl.pause();
+            }
+          }} approvable={!independentWork} /> : undefined}
         flash={flash}
         drawer={
           <>

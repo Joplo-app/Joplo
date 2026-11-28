@@ -365,9 +365,9 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         await withWatchSignal(signal => watchCloudFeedback(client, shareId, opts, { out: stdout, err: stderr }, signal));
       }
     });
-  const localReviewWrite = async (dir: string, opts: { work?: string; session?: string; body?: string; scenario?: string; position?: number; scene?: string; requestId?: string; approve?: boolean; format?: string }) => {
+  const localReviewWrite = async (dir: string, opts: import('./board-review.ts').LocalReviewWriteOptions & { format?: string }) => {
     const written = await (await import('./board-review.ts')).writeBoardReview(await boardClient(), resolve(dir), opts);
-    const summary = written.type === 'approved' ? `Approved ${written.sessionId}` : `Submitted feedback to ${written.sessionId}`;
+    const summary = written.type === 'approved' ? `Approved ${written.sessionId}` : written.type === 'receipt' ? `Replied to ${opts.event} in ${written.sessionId}` : `Submitted feedback to ${written.sessionId}`;
     if (opts.format === 'json') json(result(resolve(dir), summary, written));
     else line(`${summary}\nRequest: ${written.requestId}`);
   };
@@ -376,6 +376,11 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .requiredOption('--scenario <id>', 'Reviewed scenario id (not a playback action)').requiredOption('--position <n>', 'Executed step count: 0 is initial', position).option('--scene <id>', 'Visible scene id; defaults to the scene at this position').option('--request-id <uuid>', 'Idempotency key for a safe retry').addOption(format()).action(localReviewWrite);
   feedbackCommand.command('approve').description('Confirm a local option revision (does not change pick or publish)').argument('[dir]', 'Project directory', '.').requiredOption('--local', 'Write to the running local board')
     .option('--session <id>', 'Exact local review session').option('--work <id>', 'Standalone work key or qualified option id').option('--request-id <uuid>', 'Idempotency key for a safe retry').addOption(format()).action(async (dir, opts) => localReviewWrite(dir, { ...opts, approve: true }));
+  feedbackCommand.command('reply').description('Reply to local feedback in the current review round').argument('[dir]', 'Project directory', '.').requiredOption('--local', 'Write to the running local board')
+    .requiredOption('--event <id>', 'Original feedback event id (rv_…:seq)').requiredOption('--status <status>', 'addressed, deferred, or declined')
+    .option('--session <id>', 'Exact current local review session').option('--work <id>', 'Standalone work key or qualified option id; inferred from --event by default')
+    .option('--scenario <id>', 'Scenario to review after the change').option('--position <n>', 'Executed step count: 0 is initial', position).option('--scene <id>', 'Visible scene id; defaults to the scene at this position')
+    .option('--note <text>', 'Agent explanation, up to 10000 characters').option('--request-id <uuid>', 'Idempotency key for a safe retry').addOption(format()).action(localReviewWrite);
   feedbackCommand.command('comment').description('Submit a Cloud review comment at an explicit version and position').requiredOption('--share <id>', 'Cloud share id').requiredOption('--review-id <id>', 'Review link id from cloud /review/<id>')
     .requiredOption('--version <n>', 'Reviewed and expected current share version', integer('version')).requiredOption('--work <id>', 'Exact work id').requiredOption('--scenario <id>', 'Reviewed scenario id').requiredOption('--position <n>', 'Executed step count: 0 is initial', position)
     .option('--step-id <id>', 'Step id; required after a step and omitted at position 0').option('--layer <id>', 'Visible layer id').option('--element <id>', 'Reviewed element id').option('--element-label <label>', 'Element label (defaults to its id)')

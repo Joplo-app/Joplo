@@ -27,7 +27,8 @@ describe('one real Joplo design workspace', () => {
     for (const id of original.works) expect(dev.works[id], id).toBeDefined();
     for (const id of original.scenarios) expect(dev.scenarios[id], id).toBeDefined();
     // film_form 保留稳定 ID；D102 修订已选定左栏章节清单，进入公开设计记录。
-    expect(dev.entryIds).toEqual([...order, 'film_form', 'sampling-proof']);
+    // decision-review 为本地战略结论草稿（draft: true），仅出现于 dev，不进入公开构建。
+    expect(dev.entryIds).toEqual([...order, 'film_form', 'decision-review', 'sampling-proof']);
   });
   it('publishes every feature with a visible design journey while keeping unpicked alternatives private', () => {
     expect(published.entryIds).toEqual([...order, 'film_form', 'sampling-proof']);

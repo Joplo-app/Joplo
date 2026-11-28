@@ -1,9 +1,22 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { compile, type LocalReviewSession } from '@joplo-app/core';
+import { compile, type LocalReviewLocation, type LocalReviewSession, type LocalReviewState } from '@joplo-app/core';
 import { reviewSource } from '../../core/test/fixtures/review';
-import { captureReviewDraft, localReviewCommand, localReviewTitle, readReviewDraft, reviewDraftKey, saveReviewDraft } from '../src/board/review-model';
+import { captureReviewDraft, localReviewCommand, localReviewTitle, localReviewJump, localReviewUpdates, readReviewDraft, reviewDraftKey, saveReviewDraft } from '../src/board/review-model';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { I18nProvider } from '../src/i18n/context';
+import { LocalReviewUpdates } from '../src/board/LocalReview';
+import { DemoController } from '../src/runtime/demo';
+const jumpClicks = vi.hoisted(() => [] as Array<() => void>);
+vi.mock('../src/player/controls', async () => {
+  const { createElement } = await import('react');
+  return { Btn: (props: { label: string; onClick: () => void; 'data-testid'?: string }) => {
+    if (props['data-testid'] === 'local-review-jump') jumpClicks.push(props.onClick);
+    return createElement('button', { 'data-testid': props['data-testid'], onClick: props.onClick }, props.label);
+  } };
+});
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); jumpClicks.length = 0; });
 const session = { id: 'rv_' + 'a'.repeat(32), projectDir: "/work/a project/it's-a-demo" } as LocalReviewSession;
 it('captures the original page and step independently of subsequent navigation', () => {
   const p = compile(reviewSource(), 'dev').project!;
@@ -42,4 +55,58 @@ it('本地评审的独立作品会话只显示作品标题，不显示空功能�
   expect(localReviewTitle(independent)).toBe('A story');
   const attached = { featureId: 'invite', featureName: 'Invite', workId: 'invite.a', workTitle: 'A · Dialog' };
   expect(localReviewTitle(attached)).toBe('Invite / A · Dialog');
+});
+
+const updatesFixture = () => {
+  const p = compile(reviewSource(), 'dev').project!;
+  const context = { scenarioId: 'f.a.main', position: 1, sceneId: p.scenarios['f.a.main']!.initial.sceneId, route: '/', stepId: null, source: null, pageTitle: 'Page', scenarioName: 'Main' };
+  const previousId = `rv_${'b'.repeat(32)}`;
+  const base = { sessionId: session.id, requestId: '4a03cf69-a9da-41ac-b46a-397767b55322', createdAt: '2026-11-28T00:00:00.000Z' };
+  const state: LocalReviewState = { session: { ...session, events: [
+    { ...base, seq: 1, type: 'receipt', targetEventId: `${previousId}:1`, targetBody: 'Original suggestion', status: 'deferred', note: 'Later', target: null },
+    { ...base, seq: 2, type: 'receipt', targetEventId: `${previousId}:1`, targetBody: 'Original suggestion', status: 'addressed', note: 'Updated the heading', target: { ...context, position: 0 } },
+  ] }, watchers: 0, previousFeedback: [
+    { eventId: `${previousId}:1`, sessionId: previousId, seq: 1, body: 'Original suggestion', createdAt: base.createdAt, context },
+    { eventId: `${previousId}:2`, sessionId: previousId, seq: 2, body: 'Still waiting', createdAt: base.createdAt, context },
+  ] };
+  return { p, state, context };
+};
+
+it('shows the latest receipt once, its note and original feedback, plus unanswered prior feedback', () => {
+  const { p, state, context } = updatesFixture();
+  expect(localReviewUpdates(p, 'f.a', state)).toEqual([
+    { eventId: state.previousFeedback![0]!.eventId, body: 'Original suggestion', status: 'addressed', note: 'Updated the heading', target: { ...context, position: 0 } },
+    { eventId: state.previousFeedback![1]!.eventId, body: 'Still waiting', status: null, note: null, target: context },
+  ]);
+  const ctl = new DemoController(); ctl.setProject(p, 1); ctl.setScenario('f.b.only', 0, { quiet: true });
+  const onJump = vi.fn((location: LocalReviewLocation) => { ctl.setScenario(location.scenarioId!, location.position, { quiet: true }); ctl.pause(); });
+  const html = renderToStaticMarkup(createElement(I18nProvider, { explicit: 'zh-CN', children: createElement(LocalReviewUpdates, { project: p, workId: 'f.a', state, onJump }) }));
+  expect(html).toContain('已处理'); expect(html).toContain('等待处理回执'); expect(html).toContain('Updated the heading');
+  expect(html.match(/Original suggestion/g)).toHaveLength(1);
+  expect(html).toContain('直达第 0 步复审'); expect(html).toContain('直达第 1 步复审'); expect(html.match(/data-testid="local-review-jump"/g)).toHaveLength(2);
+  jumpClicks[0]!(); expect(onJump).toHaveBeenLastCalledWith({ ...context, position: 0 });
+  expect(ctl.getSnapshot()).toMatchObject({ scenarioId: context.scenarioId, state: { position: 0 }, playing: false });
+  jumpClicks[1]!(); expect(onJump).toHaveBeenLastCalledWith(context);
+  expect(ctl.getSnapshot()).toMatchObject({ scenarioId: context.scenarioId, state: { position: 1 }, playing: false });
+});
+
+it.each(['deferred', 'declined'] as const)('renders %s receipts with a valid original position when no new target was supplied', status => {
+  const { p, state, context } = updatesFixture();
+  const receipt = state.session.events[1]!; if (receipt.type !== 'receipt') throw new Error('Expected receipt');
+  state.session.events = [{ ...receipt, status, target: null }];
+  expect(localReviewUpdates(p, 'f.a', state)[0]!.target).toEqual(context);
+  const html = renderToStaticMarkup(createElement(I18nProvider, { explicit: 'zh-CN', children: createElement(LocalReviewUpdates, { project: p, workId: 'f.a', state, onJump: () => {} }) }));
+  expect(html).toContain(status === 'deferred' ? '暂缓' : '不采纳');
+});
+
+it('offers no jump for deleted, out of range, or other-work positions and accepts old states', () => {
+  const { p, state, context } = updatesFixture();
+  for (const location of [null, { ...context, scenarioId: null }, { ...context, scenarioId: 'missing' }, { ...context, position: 999 }, { ...context, position: -1 }, { ...context, position: 0.5 }, { ...context, sceneId: 'missing' }])
+    expect(localReviewJump(p, 'f.a', location)).toBeNull();
+  expect(localReviewJump(p, 'f.b', context)).toBeNull();
+  delete p.scenarios['f.a.main'];
+  expect(localReviewUpdates(p, 'f.a', state).every(e => e.target === null)).toBe(true);
+  const html = renderToStaticMarkup(createElement(LocalReviewUpdates, { project: p, workId: 'f.a', state, onJump: () => {} }));
+  expect(html).not.toContain('local-review-jump'); expect(html).toContain('Still waiting');
+  expect(localReviewUpdates(p, 'f.a', { session: { ...session, events: [] }, watchers: 0 })).toEqual([]);
 });

@@ -12,7 +12,7 @@ import * as ui from '@joplo-app/plugin-ui';
 import { Canvas, camera, cameraSequence } from '../src/plugin.ts';
 import { $, feature, flow, go, layer, narrate, work, page, patch, set, spotlight, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { cameraAt, compile, scenarioEstimateMs, stateAt, voiceMs, type AuthoringProject } from '@joplo-app/core';
+import { cameraAt, compile, stepPlan, scenarioEstimateMs, stateAt, voiceMs, type AuthoringProject } from '@joplo-app/core';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
@@ -76,6 +76,41 @@ describe('camera()', () => {
     expect(stateAt(p, sc.id, 3).ui.__plugins).toEqual({ content: { camera: { targets: [] } } });
     expect(cameraAt(p, sc.id, 2).directorLayer).toBe('world');
   });
+  it.each([
+    ['overview', 128, 1.25, 1400], ['medium', 64, 2, 1200], ['detail', 16, 4, 900],
+  ] as const)('expands %s and waits only for its move', (framing, pad, zoom, ms) => {
+    const r = build({ one: flow('One', { start: '/' }).system('Frame', camera('tape', { framing, waitForMove: true, drift: { zoom: 1.1, ms: 8000 } })).system('Read') });
+    expect(errorCodes(r)).toEqual([]);
+    const [frame, read] = r.project!.scenarios['f.a.one']!.steps;
+    expect(frame!.ext!.content).toMatchObject({ scenes: { 'f.a~world': { camera: { pad, zoom, ms } } } });
+    expect(frame!.effectHold).toBe(ms);
+    expect(read!.effectHold).toBeUndefined();
+  });
+
+  it('applies explicit timing and geometry per option, including zero, and preserves opt-in scheduling', () => {
+    const r = build({ one: flow('One', { start: '/' })
+      .system('A', camera('tape', { framing: 'detail', ms: 7000, pad: 0, waitForMove: true }))
+      .system('B', camera('chat', { framing: 'overview', ms: 0, zoom: 5, waitForMove: true }))
+      .system('C', camera('tape', { waitForMove: true }))
+      .system('D', camera('chat', { framing: 'medium', waitForMove: false })) });
+    expect(errorCodes(r)).toEqual([]);
+    const steps = r.project!.scenarios['f.a.one']!.steps;
+    expect(steps.map(s => s.effectHold)).toEqual([7000, undefined, 1200, undefined]);
+    expect(stepPlan(r.project!, steps[0]!).dwellMs).toBeGreaterThanOrEqual(7000);
+    expect(steps[0]!.ext!.content).toMatchObject({ scenes: { 'f.a~world': { camera: { pad: 0, zoom: 4, ms: 7000 } } } });
+    expect(steps[1]!.ext!.content).toMatchObject({ scenes: { 'f.a~world': { camera: { pad: 128, zoom: 5, ms: 0 } } } });
+  });
+
+  it('rounds fractional moves up to a full scheduling millisecond', () => {
+    const r = build({ one: flow('One').system('Frame', camera('chat', { ms: 1200.25, waitForMove: true })) });
+    expect(errorCodes(r)).toEqual([]);
+    expect(r.project!.scenarios['f.a.one']!.steps[0]!.effectHold).toBe(1201);
+  });
+
+  it.each([{ framing: 'tight' }, { waitForMove: 1 }])('diagnoses invalid camera options %o', options => {
+    expect(errorCodes(build({ one: flow('One').system('Frame', camera('chat', options as never)) }))).toContain('CAMERA_INVALID');
+  });
+
   it('rejects unknown targets and invalid works', () => {
     expect(errorCodes(build({ one: flow('One', { start: '/' }).system('Zoom', camera('nope')) }))).toContain('CAMERA_UNKNOWN');
     expect(errorCodes(build({ one: flow('One', { start: '/' }).system('Zoom', camera('chat', { zoom: 0 })) }))).toContain('CAMERA_INVALID');

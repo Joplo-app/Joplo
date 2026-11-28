@@ -1,7 +1,7 @@
 # Joplo diagnostics: check
 
 ## Music checks
-Referenced music is inspected by its enabled plugin on the author machine: duration, part note counts and marker times. Compare these with chapter holds; short loops over long scenes and music ending early warn. Unknown start markers are errors when the local inspector is available. Missing local tools warn without blocking unrelated checks; this is not proof that sound was rendered. Build reports each audio asset's bytes/duration, aggregate raw and embedded bytes, and complete site size. Check publication and decoded-memory budgets in the enabled plugin guide; a compressed file's size does not represent PCM memory. Sound-library attribution is cached with the artifact; missing required attribution blocks publication even when score inspection is unavailable. Listen to playback/export; when only measurements were possible, report LUFS/peak and explicitly say not verified by human listening. Read the enabled music plugin's skill for composition and recovery.
+Referenced music is inspected by its enabled plugin on the author machine: duration, part note counts and marker times. Check these against chapter holds; short loops over long scenes and music ending early warn. Unknown start markers are errors when the local inspector is available. Missing local tools warn without blocking unrelated checks; this is not proof that sound was rendered. Build reports each audio asset's bytes/duration, aggregate raw and embedded bytes, and complete site size. Check publication and decoded-memory budgets in the enabled plugin guide; a compressed file's size does not represent PCM memory. Sound-library attribution is cached with the artifact; missing required attribution blocks publication even when score inspection is unavailable. Listen to playback/export; when only measurements were possible, report LUFS/peak and explicitly say not verified by human listening. Read the enabled music plugin's skill for composition and recovery.
 
 
 STEP_KEY_INVALID: use a letter followed by up to 63 letters/digits/underscores/hyphens. STEP_KEY_DUPLICATE: each step key must be unique within its scenario; keep the same key only for the same action across versions. See diff for identity guidance.
@@ -56,13 +56,13 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - UNKNOWN_SLOT / UNKNOWN_ROUTE / UNKNOWN_LAYOUT: Check routes, layouts, and Slot declarations; add elements only to existing locations.
 - FEATURE_ORDER_INVALID: feature({ order }) must be a finite number; omit it for natural folder-name order. NaN, Infinity and strings are invalid.
 - UNKNOWN_PICK: pick must be a work filename under this feature's works/.
-- NOT_PICKED: The feature has no picked option and will not publish. Compare options, then set feature.pick to the chosen filename.
+- NOT_PICKED: The feature has no picked option and will not publish. Review options, then set feature.pick to the chosen filename.
 - ROUTE_EXISTS: An option route duplicates an existing route. Use on to add elements, or choose a new route.
 - BAD_ROUTE: The route does not start with /. Use an absolute static product route.
 - DUPLICATE_ELEMENT: Duplicate element ids within a stage. Change only conflicting ids and update references.
-- CAPTION_TOO_LONG: Shorten the caption to about 24 units: CJK characters count as 1 each, all others as 0.5; whitespace is ignored. One thing per step; move long content to an explanation layer. See demo.
+- CAPTION_TOO_LONG: Top-left step title or fallback subtitle exceeds 24 units (CJK 1, other 0.5, whitespace ignored). Keep one visible state per step; move rationale to explain() or narrate(). See demo.
 - EXPLAIN_TOO_LONG: Shorten the explain note to about 48 units, using the same CJK 1 / other 0.5 calculation. Put detailed rationale in a separate explanation layer. See demo.
-- SAY_TOO_LONG / NARRATE_TOO_LONG (warning): a say() or narrate() line over about 80 units (about 10 seconds aloud). Autoplay waits until it is read; say less or split the step.
+- SAY_TOO_LONG / NARRATE_TOO_LONG (warning): spoken line exceeds 10 seconds (using measured prepared audio duration when available, else estimated speech duration — roughly 43 CJK chars or 127 Latin letters). Autoplay waits until it finishes; tighten or split the step.
 - SAY_EMPTY / NARRATE_EMPTY: say() needs the character's words, narrate() the narrator's. Remove it to fall back to the caption.
 - SAY_ROLE_CONFLICT: one step has say(…, { role }) lines from two different roles. A step reads one speaker; split the lines into consecutive steps.
 - AUDIO_SOURCE_INVALID / AUDIO_INVALID: supply asset() audio bytes or an enabled localResource() reference, prepare a valid decodable audio artifact and check again. No remote URL fetching or provider fallback occurs for explicit audio.
@@ -75,6 +75,9 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - I18N_MISSING / I18N_STALE / I18N_UNUSED (warnings): texts with no translation (viewers see the source text), a source text that changed (the closest old entry is shown: rename the key and update the translation), entries nothing uses. npx joplo i18n add <lang> adds the missing keys.
 - DESCRIPTION_TOO_LONG: flow('Slice title', { description }) is the scenario cover sentence; keep it within 30 units, one sentence saying what this scenario shows. See story.
 - CARD_TEXT_TOO_LONG (info): a transition card's sub is over 48 units, a point over 24, or more than 4 points. Keep one sentence and a few short points; move details into steps.
+- READING_BUDGET_SHORT (info): the displayed card or step text needs noticeably longer to read than the step's visible dwell time. Shorten the copy, split into two steps, or add hold().
+- CHAPTERS_TOO_FEW (info): a standalone linear work runs 2 minutes or longer with fewer than 3 main playable chapters. Break it into 3–6 chapters (~25–60 s each) so viewers can scan and jump back cleanly.
+- CHAPTER_TITLE_GENERIC (info): two or more chapters in a linear work use bare placeholder titles ('Intro', 'Principles', 'Summary', or equivalent bare placeholders). Name each chapter after its concrete question, outcome, or stage.
 - SCENARIO_TOO_LONG (info): the scenario plays over 90 s at 1×. One scenario tells one thing: split it (happy path, then each recovery) or branch with fork(). npx joplo outline shows the pacing.
 - HAPPY_PATH_ONLY (info): every case is a main-flow case and every scenario succeeds. Ask about input, permission, async, and lifecycle cases (see cases), then add an error-and-recovery scenario. Do not invent behavior. This applies only to feature review; standalone explainers use work()/chapter() and have no cases.
 - ROLE_UNKNOWN: A layer, card or say() role is not in the work or feature roles. Declare roles as { key: role('Name') }; see demo.
@@ -91,7 +94,7 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED: from must name another scenario key in the same work, the dependency must not loop, and the preceding scenario must replay successfully. Fix that scenario first.
 - FROM_WITH_START: from already determines the starting route; remove start or start a separate story.
 - LAYER_UNKNOWN: Invalid layer key, missing content, or flow('Slice title', { layer }) names no declared layer. Use letters/digits/underscores/hyphens, do not start with @, and provide nonempty JSX.
-- Every node belongs to a domain group; 2–6 groups, ~3–15 nodes per diagram. One group around everything says nothing (check reports PLUGIN_UNGROUPED).
+- In opt-in auto-layout diagrams, every node belongs to a domain group (2–6 groups; one group around everything reports PLUGIN_UNGROUPED). For curated 3–14 node architectures, prefer intentional manual composition and explicit connectors (see npx joplo skill diagram).
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
 - Node kind: client, service, model, database, queue, storage, external, tool, user. description says the responsibility in a few words; edge label says what flows.
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
@@ -101,7 +104,7 @@ Read the relevant installed plugin skill for the visual component, its props and
 - PLUGIN_EDGE_INTO_OWN_GROUP: An edge connects an element to a group that contains it. Connect to an element inside, or to another group.
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
-- PLUGIN_LAYOUT_FAILED (warning): The automatic layout failed and the diagram shows a simple grid. Check its edges and groups; report it if they look right.
+- PLUGIN_LAYOUT_FAILED (warning): An opt-in automatic layout failed and fell back to a simple grid. Check its edges and groups, or switch to intentional manual composition.
 - THEME_UNKNOWN: config({ theme }) names neither a built-in nor themes/<name>.css. Use a built-in or add that CSS file; see Write a theme in demo.
 - ELEMENT_PROP: A component prop contains JSX. Use strings for icons, such as leftSection="+", and children for content.
 - ASSUMPTION_CONFIRMED: Keep AI assumptions `pending`. After user confirmation, record the actual origin; do not change only status.
@@ -133,4 +136,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.8.1 sha256:acf3910ede1f59d269608f7019e20c64928f9bcbe7a115f3df5a928e658d0889 -->
+<!-- joplo-skill 0.8.1 sha256:cd2da5d5bdf553ed47cb0929c548e2eca5b318011cfa342a8ee7ba0ae113e819 -->

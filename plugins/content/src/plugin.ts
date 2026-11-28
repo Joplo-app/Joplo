@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { definePlugin, pluginComponent, pluginEffect, type PluginIRNode } from '@joplo-app/kit/plugin';
 import { studio } from './theme.ts';
 import { skill, patterns } from './guide.ts';
+import { DEFAULT_MOVE_MS, FRAMING } from './camera-framing.ts';
+import { isBind, type JNode } from '@joplo-app/kit/node';
+import { readTrack, type ItemTrackProps } from './item-track.ts';
+export type { ItemTrackProps } from './item-track.ts';
 
 /** 进退场预设（D92）：每个预设是一个“离场姿态”，进场 = 离场姿态 → 原样，退场 = 原样 → 离场姿态。 */
 export const TRANSITIONS = ['fade', 'rise', 'zoom', 'shrink', 'wipe', 'iris', 'grow', 'growUp', 'blur'] as const;
@@ -14,7 +18,7 @@ export type Ease = (typeof EASES)[number];
 export const SPLITS = ['word', 'char'] as const;
 /** 镜头漂移（D92）：落定后继续缓慢推近 / 拉远 / 平移，有终点、非匀速。数字 = 在 ms 内再推近到这个倍数。 */
 export type Drift = number | false | { zoom?: number; x?: number; y?: number; ms?: number };
-export type CameraOpts = { pad?: number; zoom?: number; ms?: number; drift?: Drift };
+export type CameraOpts = { framing?: keyof typeof FRAMING; waitForMove?: boolean; pad?: number; zoom?: number; ms?: number; drift?: Drift };
 /** Move within the design world; no ids restores the whole world. This factory has no player semantics. */
 export const camera = (...args: (string | CameraOpts)[]) => {
   const targets = args.filter((arg): arg is string => typeof arg === 'string');
@@ -26,6 +30,7 @@ const Safe = z.tuple([z.number().min(0).max(2000), z.number().min(0).max(2000), 
 const CameraBase = z.strictObject({ targets: z.array(z.string()), pad: z.number().min(0).max(2000).optional(), zoom: z.number().min(.1).max(10).optional(), ms: z.number().min(0).max(10000).optional(), drift: DriftSchema.optional() });
 const Waypoint = CameraBase.omit({ ms: true, drift: true }).extend({ atMs: z.number().min(0).max(60000), ease: z.enum(['easeInOut', 'easeOut', 'linear']).optional() });
 const Camera = CameraBase.extend({ sequence: z.array(Waypoint).min(2).max(32).optional(), sequenceId: z.number().int().nonnegative().optional() });
+const CameraCommand = Camera.extend({ framing: z.enum(['overview', 'medium', 'detail']).optional(), waitForMove: z.boolean().optional() });
 export type CameraWaypoint = { atMs: number; target?: string; targets?: string[]; pad?: number; zoom?: number; ease?: 'easeInOut' | 'easeOut' | 'linear' };
 /** Explicit state-to-state camera waypoints, milliseconds from this step commit. */
 export const cameraSequence = (points: CameraWaypoint[]) => pluginEffect('content', 'camera', {
@@ -40,6 +45,7 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
   id: 'content', title: 'Visual explainers', version: packageInfo.version,
   runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
   components: {
+    ItemTrack: { doc: 'capacity, items (array or binding), keyField="id", labelField="label", accentField="accent", direction="row"|"column", emptyLabel; fixed slots with keyed item flights', example: '<ItemTrack id="cache" capacity={4} items={$.data.entries} />', traits: { text: ['emptyLabel'], textPaths: [['items', '*', 'label']] }, selfEvident: true },
     Canvas: { doc: 'w, h, view=[1280,800], drift?, safe?=[top,right,bottom,left]; scaled design world with fixed screen children; drift = default camera drift; safe = the view area not covered by screen chrome, where targeted camera() frames land', selfEvident: true },
     Split: { doc: 'text, by="word"|"char"; text that enters piece by piece: enter / enterMs / enterEase apply to each piece, enterStagger (default word 70, char 30 ms) spaces them; screen readers get the whole text', example: '<Split text="It is not typing, it is guessing" enter="rise" enterEase="spring" />', traits: { text: ['text'] }, selfEvident: true },
   },
@@ -65,6 +71,12 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
   data: { step: { scope: [{ path: ['scenes'], kind: 'map', domain: 'scene', children: [{ path: ['camera', 'targets'], kind: 'values', domain: 'element' }, { path: ['camera', 'sequence', '*', 'targets'], kind: 'values', domain: 'element' }] }] } },
   compile: {
     node(node, ctx) {
+      if (node.type === 'content:ItemTrack') {
+        const props = node.props;
+        const track = readTrack(isBind(props.items) ? { ...props, items: [] } : props);
+        for (const issue of track.issues) ctx.report('ITEM_TRACK_INVALID', `<ItemTrack> ${issue}`, node.source);
+        return;
+      }
       if (node.type === 'content:Split') {
         const text = node.props?.text;
         // 绑定状态（$.ui.title）在这里不是字符串；只拦没写、空白和数字 / 布尔字面量
@@ -79,24 +91,34 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
     },
     effect(effect, ctx) {
       if (effect.name !== 'camera') { ctx.report('PLUGIN_EFFECT_UNKNOWN', `Unknown content effect ${effect.name}`, ctx.source); return; }
-      const parsed = Camera.safeParse(effect.payload);
-      if (!parsed.success) { ctx.report('CAMERA_INVALID', `camera(…): targets must be strings; pad 0–2000, zoom 0.1–10, ms 0–10000, drift false | 0.5–2 | { zoom 0.5–2, x/y −2000–2000, ms 500–60000 } (${parsed.error.issues.map(i => i.message).join('; ')})`, ctx.source); return; }
-      const value = parsed.data;
+      const parsed = CameraCommand.safeParse(effect.payload);
+      if (!parsed.success) { ctx.report('CAMERA_INVALID', `camera(…): targets must be strings; pad 0–2000, zoom 0.1–10, ms 0–10000, drift false | 0.5–2 | { zoom 0.5–2, x/y −2000–2000, ms 500–60000 } (${parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')})`, ctx.source); return; }
+      const { framing, waitForMove, ...settings } = parsed.data;
+      const preset = framing && FRAMING[framing];
+      const value = preset ? {
+        ...settings, pad: settings.pad ?? preset.pad, zoom: settings.zoom ?? preset.zoom, ms: settings.ms ?? preset.ms,
+      } : settings;
       if (value.sequence && (value.sequence[0]!.atMs !== 0 || value.sequence.some((p, i, a) => i > 0 && p.atMs <= a[i - 1]!.atMs))) { ctx.report('CAMERA_INVALID', 'cameraSequence starts at 0 and needs strictly increasing atMs', ctx.source); return; }
       const targets = [...value.targets, ...value.sequence?.flatMap(p => p.targets) ?? []];
       const nodes = ctx.roots.flatMap(all);
       const missing = targets.filter(id => !nodes.some(n => n.id === id));
       if (missing.length) { ctx.report('CAMERA_UNKNOWN', `camera(${missing.map(m => JSON.stringify(m)).join(', ')}) target is not in any layer or the stage for this step; aim it at elements inside a <Canvas>`, ctx.source); return; }
+      const holdMs = value.sequence?.at(-1)?.atMs ?? (waitForMove ? Math.ceil(value.ms ?? DEFAULT_MOVE_MS) : undefined);
       return {
         writes: [{ path: 'ui.__plugins.content.camera', value }],
         data: { cameraIssued: true },
         references: targets,
-        ...(value.sequence ? { holdMs: value.sequence.at(-1)!.atMs } : {}),
+        ...(holdMs !== undefined ? { holdMs } : {}),
         ...(value.targets.length ? { directorTarget: value.targets[0] } : {}),
       };
     },
     frame(ctx) {
-      const scenes = ctx.scenes.filter(s => all(s.root).some(n => n.type === 'content:Canvas'));
+      const sceneNodes = ctx.scenes.map(scene => ({ id: scene.id, nodes: all(scene.root) }));
+      for (const scene of sceneNodes) for (const node of scene.nodes) {
+        if (node.type !== 'content:ItemTrack' || typeof node.props?.items !== 'string') continue;
+        for (const issue of readTrack(ctx.resolveProps(node)).issues) ctx.report('ITEM_TRACK_INVALID', `<ItemTrack id="${node.id}"> at position ${ctx.position}: ${issue}`, node.source);
+      }
+      const scenes = sceneNodes.filter(s => s.nodes.some(n => n.type === 'content:Canvas'));
       if (!scenes.length) return;
       const value = (ctx.state.ui.__plugins as { content?: { camera?: unknown } } | undefined)?.content?.camera;
       const parsed = Camera.safeParse(value ?? { targets: [] });
@@ -104,16 +126,17 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
       // 历史 DOM 缓存无法在深链/静帧重现同样的取景；在编译快照中明确提示，作者可改用稳定锚点。
       const targets = new Set([...parsed.data.targets, ...parsed.data.sequence?.flatMap(p => p.targets) ?? []]);
       for (const scene of scenes) {
-        const nodes = all(scene.root);
+        const nodes = scene.nodes;
         for (const id of targets) {
           const node = nodes.find(n => n.id === id);
           if (node && !ctx.isVisible(scene.id, id)) ctx.report('CAMERA_TARGET_HIDDEN', `Camera target "${id}" is hidden at position ${ctx.position}; its bounds cannot be measured and framing may fall back to the whole canvas. Aim camera() at an always-visible anchor, switch to a visible target, or reset with camera().`, node.source, 'warning');
         }
       }
-      return { scenes: Object.fromEntries(scenes.map(s => [s.id, { camera: { ...parsed.data, ...(parsed.data.sequence ? { sequenceId: ctx.position === 0 ? 0 : (ctx.data as {cameraIssued?: boolean})?.cameraIssued ? ctx.position : (ctx.previousData as ContentFrame | undefined)?.scenes[s.id]?.camera.sequenceId ?? 0 } : {}), targets: parsed.data.targets.filter(id => all(s.root).some(n => n.id === id)) } }])) };
+      return { scenes: Object.fromEntries(scenes.map(s => [s.id, { camera: { ...parsed.data, ...(parsed.data.sequence ? { sequenceId: ctx.position === 0 ? 0 : (ctx.data as {cameraIssued?: boolean})?.cameraIssued ? ctx.position : (ctx.previousData as ContentFrame | undefined)?.scenes[s.id]?.camera.sequenceId ?? 0 } : {}), targets: parsed.data.targets.filter(id => s.nodes.some(n => n.id === id)) } }])) };
     },
   },
 });
 export const Canvas = pluginComponent(content, 'Canvas');
 export const Split = pluginComponent(content, 'Split');
+export const ItemTrack = pluginComponent(content, 'ItemTrack') as (props: ItemTrackProps) => JNode;
 export default content;

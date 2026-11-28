@@ -2,10 +2,12 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { defineRuntime, type ComponentCtx, type PluginObserve } from '@joplo-app/kit/plugin';
 import { useEngineFrame, useRoot } from '@joplo-app/kit/renderer';
 import type { ContentFrame } from './plugin.ts';
+import { DEFAULT_MOVE_MS } from './camera-framing.ts';
+import { ItemTrackView } from './item-track-view.tsx';
 const stillCss = '.jstage[data-jstill] [data-jcanvas],.jstage[data-jstill] [data-jcanvas] *{transition:none!important;animation-delay:0s!important;animation-duration:0s!important}';
 
 type Box = { x: number; y: number; w: number; h: number };
-type SubjectBox = Box & { style?: Record<string, string>; text?: string; look?: string; clone?: HTMLElement; shells?: HTMLElement[] };
+type SubjectBox = Box & { trackItem?: boolean; style?: Record<string, string>; text?: string; look?: string; clone?: HTMLElement; shells?: HTMLElement[] };
 const subjectStyle = (el: HTMLElement) => {
   // Read the authored destination, not this observer's currently interpolated style.
   const active = (el.getAnimations?.() ?? []).filter(a => a.id === 'jmotion').map(a => ({ a, effect: a.effect }));
@@ -229,11 +231,11 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
       const glide = timed && (camMoves || dk !== driftKey.current) && !jumped && mounted && !!clock?.running;
       driftKey.current = dk;
       const from = glide ? cameraAt(seg.current, now, lensView) : next;
-      seg.current = { from, to: next, start: now, ms: glide ? cam?.ms ?? 1200 : 0, drift };
+      seg.current = { from, to: next, start: now, ms: glide ? cam?.ms ?? DEFAULT_MOVE_MS : 0, drift };
       redraw((n) => n + 1);
     }
     // 镜头同一步也在动：变形用镜头的时长与缓动，两者同步落定（否则屏幕上的轨迹会先冲过头再折回）
-    const flight = camMoves && ctx.animate ? { ms: cam?.ms ?? 1200, ease: CAMERA_EASE } : { ms: MOTION_MS, ease: MOTION_EASE };
+    const flight = camMoves && ctx.animate ? { ms: cam?.ms ?? DEFAULT_MOVE_MS, ease: CAMERA_EASE } : { ms: MOTION_MS, ease: MOTION_EASE };
     w.dataset.flightMs = String(flight.ms);
     w.dataset.flightEase = flight.ease;
   });
@@ -246,7 +248,7 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
   const ox = (box.w - view.w * s) / 2;
   const oy = (box.h - view.h * s) / 2;
   const frame = cam?.sequence && pathRef.current ? sequenceFrameAt(pathRef.current.frames, !timed || ctx.playground || !clock?.running && !clock?.paused ? Infinity : now - pathRef.current.start) : timed ? cameraAt(seg.current, now, lensView) : seg.current.to;
-  const ms = cam?.ms ?? 1200;
+  const ms = cam?.ms ?? DEFAULT_MOVE_MS;
   return (
     <div {...root}>
       <style>{stillCss}</style>
@@ -555,7 +557,10 @@ export const observe: PluginObserve = (root, initial) => {
         }
       }
       // 画布世界与固定屏幕层（screen 子元素：时间轴、角标）都是“表面”：进退场与变形在两者里都生效，镜头只动世界
-      const worlds = [...root.querySelectorAll<HTMLElement>('[data-jcanvas-world],[data-jcanvas-screen]')];
+      const canvasSurface = '[data-jcanvas-world],[data-jcanvas-screen]';
+      // A standalone track supplies its own design space. Inside a Canvas the existing surface owns the flight.
+      const worlds = [...root.querySelectorAll<HTMLElement>(canvasSurface + ',[data-jitem-track]')]
+        .filter(w => w.dataset.jitemTrack === undefined || !w.closest(canvasSurface));
       for (const w of layouts.keys()) if (!worlds.includes(w)) { cancel(w); layouts.delete(w); exitBoxes.delete(w); watchers.get(w)?.disconnect(); watchers.delete(w); }
       for (const w of worlds) {
         const fresh = !layouts.has(w);
@@ -564,6 +569,8 @@ export const observe: PluginObserve = (root, initial) => {
         const flight = { ms: Number(w.dataset.flightMs ?? MOTION_MS), ease: w.dataset.flightEase ?? MOTION_EASE };
         // 2) 变形（FLIP）：同一个 motion 键的布局位置变了 → 从旧位置、旧大小补间到新位置
         const seen = new Map(previous);
+        // Track membership is explicit. After eviction the same object must enter the track afresh.
+        for (const [key, box] of previous) if (box.trackItem) seen.delete(key);
         for (const el of w.querySelectorAll<HTMLElement>('[data-jp-content-motion]')) {
           const key = el.dataset.jpContentMotion!;
           const r = offsetIn(el, w);
@@ -572,7 +579,7 @@ export const observe: PluginObserve = (root, initial) => {
           const style = subjectStyle(el), text = el.textContent ?? '', look = lookKey(el);
           const shells: HTMLElement[] = [];
           for (let p = el.parentElement; p && p !== w; p = p.parentElement) shells.push(p.cloneNode(false) as HTMLElement);
-          seen.set(key, { ...r, style, text, look, clone: el.cloneNode(true) as HTMLElement, shells });
+          seen.set(key, { ...r, trackItem: el.dataset.jtrackItem !== undefined, style, text, look, clone: el.cloneNode(true) as HTMLElement, shells });
           if (!context.frame.animate) { for (const a of el.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel(); }
           // 跳转、停止后的提交与静态画面直接显示新布局（D92）：变形飞行只属于连续播放
           if (!prev || !context.frame.animate || context.frame.playground || quiet) { if (quiet) for (const a of el.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel(); continue; }
@@ -645,4 +652,4 @@ export const observe: PluginObserve = (root, initial) => {
   };
 };
 
-export default defineRuntime({ id: 'content', observe, components: { Canvas: { react: Canvas }, Split: { react: Split } } });
+export default defineRuntime({ id: 'content', observe, components: { Canvas: { react: Canvas }, Split: { react: Split }, ItemTrack: { react: ItemTrackView } } });

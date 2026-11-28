@@ -18,15 +18,15 @@ const STRUCTURE = [
   'Container', 'Stack', 'Group', 'Flex', 'Grid', 'Grid.Col', 'SimpleGrid', 'Center', 'Box', 'Space',
   'Paper', 'Card', 'Card.Section', 'Divider', 'ScrollArea',
   // 文字与展示
-  'Title', 'Text', 'Code', 'Kbd', 'Blockquote', 'List', 'List.Item', 'Badge', 'Avatar', 'Image', 'ThemeIcon', 'Indicator',
+  'Title', 'Text', 'Code', 'Kbd', 'Blockquote', 'List', 'List.Item', 'Badge', 'Avatar', 'Image', 'Image.Region', 'ThemeIcon', 'Indicator',
   'Timeline', 'Timeline.Item',
   'Table', 'Table.Thead', 'Table.Tbody', 'Table.Tr', 'Table.Th', 'Table.Td', 'DataTable',
   'Accordion', 'Accordion.Item', 'Accordion.Panel',
   'Radio',
   // 导航
-  'Tabs.List', 'Tabs.Panel', 'Breadcrumbs', 'Stepper', 'Stepper.Step',
+  'Tabs.List', 'Tabs.Panel', 'Compare.Side', 'Breadcrumbs', 'Stepper', 'Stepper.Step',
   // 反馈与浮层
-  'Alert', 'Loader', 'Progress', 'RingProgress', 'Skeleton', 'Notification', 'Modal', 'Drawer',
+  'Alert', 'Loader', 'Progress', 'RatioBar', 'RingProgress', 'Skeleton', 'Notification', 'Modal', 'Drawer',
   // AI 交互（Joplo 自有）
   'ChatMessage', 'ToolCall', 'Thinking', 'Artifact', 'Email', 'DataCard', 'StateFlow',
   // 设备外框（Joplo 自有）：终端与手机
@@ -46,7 +46,7 @@ const STRUCTURE = [
 const INTERACTIVE = [
   'Button', 'ActionIcon', 'CloseButton', 'Anchor', 'a', 'NavLink', 'Burger',
   'TextInput', 'PasswordInput', 'NumberInput', 'Textarea', 'Select', 'MultiSelect', 'Checkbox', 'Radio.Group', 'Switch',
-  'SegmentedControl', 'FileInput', 'Tabs', 'Tabs.Tab', 'Accordion.Control', 'Pagination', 'PromptInput', 'Terminal.Input',
+  'SegmentedControl', 'FileInput', 'Tabs', 'Compare', 'Tabs.Tab', 'Accordion.Control', 'Pagination', 'PromptInput', 'Terminal.Input',
   'Artifact.Ref',
   // 产品界面（D68）
   'Menu.Item', 'TabBar',
@@ -60,7 +60,7 @@ export const INTERACTIVE_TYPES: ReadonlySet<string> = new Set<string>(INTERACTIV
 /** 可接收输入值；type/select/toggle 动作写入 state.inputs[nodeId]。 */
 export const VALUE_TYPES: ReadonlySet<string> = new Set<string>([
   'TextInput', 'PasswordInput', 'NumberInput', 'Textarea', 'Select', 'MultiSelect', 'Checkbox', 'Radio.Group', 'Switch',
-  'SegmentedControl', 'FileInput', 'Tabs', 'Accordion', 'Pagination', 'PromptInput', 'Terminal.Input', 'TabBar',
+  'SegmentedControl', 'FileInput', 'Tabs', 'Compare', 'Accordion', 'Pagination', 'PromptInput', 'Terminal.Input', 'TabBar',
 ]);
 
 /**
@@ -105,7 +105,11 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   'List.Item': 'List item',
   Badge: 'color, variant: filled|light|outline|dot|default, size',
   Avatar: 'name (shows first character), src, color, radius, size',
-  Image: 'src={asset("./photo.jpg")} (embeds a project image), alt, h, w, radius, fit: cover|contain (default cover), position (e.g. "center 20%"); other src values draw a placeholder with alt',
+  Image: 'src={asset("./photo.jpg")} (embeds a project image), alt, h, w, radius, fit: cover|contain|fill (default cover), position (e.g. "center 20%"); other src values draw a placeholder with alt',
+  'Image.Region': 'Direct child of Image. Give the anchor an id and rect={[x, y, width, height]} in original-image fractions. Optional label names the region for focus cues.',
+  Compare: 'id, value or defaultValue, mode="auto" | "side-by-side" | "toggle". Compare two direct Compare.Side children. Auto uses side-by-side at the stage sm breakpoint. select(id, value) or the segmented buttons switch the active side.',
+  'Compare.Side': 'value (unique string), label, children. Both sides occupy the same grid cell in toggle mode so switching preserves height.',
+  RatioBar: 'total, left, optional right and threshold in the same units. labels={[leftLabel, rightLabel]}, remainderLabel, thresholdLabel, colors={[leftColor, rightColor, remainderColor]}, unit, height (track thickness). Numeric props accept state bindings.',
   ThemeIcon: 'color, variant, size, radius; one character as child',
   Indicator: 'label, color, disabled (hides the badge; can be a condition), processing; wraps one element with a corner badge',
   Timeline: 'active (completed item index), bulletSize; Timeline.Item children',
@@ -182,7 +186,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Board: 'dots (dotted paper, default true); a whiteboard: place screens, notes and arrows on it with pos="absolute" top / left (design px). Put it inside content:Canvas to move the camera between screens',
   BrowserWindow: 'url, label (caption above the frame, e.g. "1. Sign in"), w, h; a browser window frame for one screen on a Board; children are its page',
   Note: 'color (yellow default; pink, blue, green, gray), rotate (degrees, default -2), w; a sticky note that stays on the Board; children = text',
-  Arrow: 'from, to (ids of elements on the same Board), label, bend (-1…1, default 0.25), dashed, color; a persistent arrow between two elements; direct child of Board, reveal it with when',
+  Arrow: 'from, to (ids of elements on the same Board), label, bend (-1…1, default 0.25), dashed, color; a persistent arrow between two elements, or a self-loop when both ids match; direct child of Board, reveal it with when',
   Button: 'variant: filled|light|outline|subtle|default|white, color, size, fullWidth, loading, leftSection / rightSection (character)',
   ActionIcon: "Icon button: aria-label (required as name), variant, color, size; one character child such as '+'",
   CloseButton: 'aria-label, size',
@@ -254,6 +258,17 @@ export const COMPONENT_EXAMPLES: Partial<Record<ComponentType, string>> = {
   <Stat label="Failed payments" value="3" diff="-2" color="red" />
 </SimpleGrid>`,
   KeyValue: `<KeyValue withDivider total items={[{ label: 'Seats', value: '5 × $9' }, { label: 'Tax', value: '$4.50' }, { label: 'Total', value: $.data.total }]} />`,
+  Arrow: `<Board><Box id="job" pos="absolute" left={160} top={120} w={120} h={64}>Job</Box>
+  <Arrow from="job" to="job" label="Retry on timeout" /></Board>`,
+  RatioBar: `<RatioBar total={100} left={$.data.used} right={25} labels={['Used', 'Reserved']} remainderLabel="Available" threshold={80} unit="%" height={20} />`,
+  Compare: `<Compare id="policy" value={$.ui.pick} defaultValue="a">
+  <Compare.Side value="a" label="Keep draft"><Text>Draft preserved</Text></Compare.Side>
+  <Compare.Side value="b" label="Clear draft"><Text>Draft cleared</Text></Compare.Side>
+</Compare>
+// In a flow: .select('policy', 'b')`,
+  'Image.Region': `<Image src={asset('./billing.png')} alt="Billing" h={320} fit="contain">
+  <Image.Region id="quota" rect={[0.60, 0.18, 0.22, 0.09]} label="Quota" />
+</Image>`,
   Image: `<Image src={asset('../../assets/capitol.jpg')} alt="U.S. Capitol" h={240} fit="cover" position="center 40%" radius="md" />
 // import { asset } from '@joplo-app/kit'; the path is relative to this file. jpg/png/gif/webp/avif/svg, up to 2 MB each; compress first.
 // The image is embedded, so the board, build and share show it offline. For a tinted or full-bleed background, use style={{ backgroundImage: \`url(\${asset('./bg.jpg')})\` }}.`,

@@ -1,7 +1,7 @@
 import { entriesOf, projectThemes } from '@joplo-app/core';
 import crypto from 'node:crypto';
-import { JoploError, LOCAL_REVIEW_VERSION, LOCAL_REVIEW_MAX_EVENTS, LOCAL_REVIEW_MAX_FILE_BYTES, LocalReviewSession, localReviewStatus, stateAt, type LocalReviewContext, type LocalReviewEvent, type LocalReviewLocation, type LocalReviewState, type LocalReviewWrite, type Project } from '@joplo-app/core';
-import { localReviewFile, localReviewWatcherCount, writeLocalReview } from '@joplo-app/core/node';
+import { JoploError, LOCAL_REVIEW_VERSION, LOCAL_REVIEW_MAX_EVENTS, LOCAL_REVIEW_MAX_FILE_BYTES, LocalReviewEventId, LocalReviewSession, localReviewStatus, stateAt, type LocalReviewContext, type LocalReviewEvent, type LocalReviewLocation, type LocalReviewState, type LocalReviewWrite, type Project } from '@joplo-app/core';
+import { listLocalReviews, readLocalReview, localReviewFile, localReviewWatcherCount, writeLocalReview } from '@joplo-app/core/node';
 
 /** 对象键的插入顺序不构成新版本；数组顺序属于方案内容。 */
 function stable(value: unknown): unknown {
@@ -54,7 +54,7 @@ export class LocalReviewHub {
   private key(dir: string, option: string) { return `${dir}\0${option}`; }
   private persist(session: LocalReviewSession) {
     if (!LocalReviewSession.safeParse(session).success) throw new JoploError('INVALID_SCHEMA', 'Invalid local review record');
-    if (Buffer.byteLength(JSON.stringify(session)) > LOCAL_REVIEW_MAX_FILE_BYTES - (session.events.at(-1)?.type === 'feedback' ? 16_384 : 0))
+    if (Buffer.byteLength(JSON.stringify(session)) > LOCAL_REVIEW_MAX_FILE_BYTES - (localReviewStatus(session) === 'open' ? 16_384 : 0))
       throw new JoploError('USAGE', 'Local review storage limit reached. Confirm this review before starting another');
     writeLocalReview(localReviewFile(session.projectDir, session.id), session);
     this.sessions.set(session.id, session);
@@ -94,28 +94,52 @@ export class LocalReviewHub {
   state(dir: string, workId: string): LocalReviewState {
     const session = this.current.get(this.key(dir, workId));
     if (!session) throw new JoploError('NOT_FOUND', 'No current review for this option. Wait for a successful compilation');
-    return { session, watchers: localReviewWatcherCount(dir, session.id) };
+    const older = listLocalReviews(dir).filter(s => s.id !== session.id && s.workId === workId && s.createdAt <= session.createdAt && s.events.some(e => e.type === 'feedback'));
+    const previous = older.find(s => localReviewStatus(s) !== 'open') ?? older[0];
+    const previousFeedback = previous?.events.flatMap(e => e.type === 'feedback'
+      ? [{ eventId: `${previous.id}:${e.seq}`, sessionId: previous.id, seq: e.seq, body: e.body, createdAt: e.createdAt, context: e.context }] : []);
+    return { session, watchers: localReviewWatcherCount(dir, session.id), ...(previousFeedback ? { previousFeedback } : {}) };
   }
   write(dir: string, project: Project, input: LocalReviewWrite): LocalReviewState {
     const session = this.sessions.get(input.sessionId);
     if (!session || session.projectDir !== dir) throw new JoploError('NOT_FOUND', 'Review session does not belong to this project and instance');
     const previous = session.events.find(e => e.requestId === input.requestId);
     if (previous) {
-      const same = previous.type === input.type && (previous.type !== 'feedback' || input.type === 'feedback' && previous.body === input.body &&
-        previous.context.sceneId === input.context.sceneId && previous.context.scenarioId === input.context.scenarioId && previous.context.position === input.context.position);
+      const sameLocation = (a: LocalReviewLocation | null, b: LocalReviewLocation | null) => a === null || b === null ? a === b : a.sceneId === b.sceneId && a.scenarioId === b.scenarioId && a.position === b.position;
+      const same = previous.type === input.type && (previous.type === 'feedback'
+        ? input.type === 'feedback' && previous.body === input.body && sameLocation(previous.context, input.context)
+        : previous.type === 'receipt' ? input.type === 'receipt' && previous.targetEventId === input.targetEventId && previous.status === input.status && previous.note === (input.note ?? null) && sameLocation(previous.target, input.target ?? null)
+        : true);
       if (!same) throw new JoploError('IDEMPOTENCY_MISMATCH', 'Request id was already used for different feedback');
-      return { session, watchers: localReviewWatcherCount(dir, session.id) };
+      return this.current.get(this.key(dir, session.workId))?.id === session.id
+        ? this.state(dir, session.workId) : { session, watchers: localReviewWatcherCount(dir, session.id) };
     }
     if (this.current.get(this.key(dir, session.workId))?.id !== session.id || localReviewRevision(project, session.workId) !== session.revision)
       throw new JoploError('REVISION_CONFLICT', 'The option changed. Open its current review before submitting');
     if (input.type === 'approved' && localReviewStatus(session) === 'approved') return this.state(dir, session.workId);
     if (localReviewStatus(session) !== 'open') throw new JoploError('REVISION_CONFLICT', 'This review has ended');
-    if (input.type === 'feedback' && session.events.length >= LOCAL_REVIEW_MAX_EVENTS - 1)
+    if (input.type !== 'approved' && session.events.length >= LOCAL_REVIEW_MAX_EVENTS - 1)
       throw new JoploError('USAGE', 'This review has reached its feedback limit. Confirm it before starting a new review');
     const base = { sessionId: session.id, seq: session.events.length + 1, requestId: input.requestId, createdAt: new Date().toISOString() };
-    const event: LocalReviewEvent = input.type === 'feedback'
+    let receipt: Extract<LocalReviewEvent, { type: 'receipt' }> | undefined;
+    if (input.type === 'receipt') {
+      if (!LocalReviewEventId.safeParse(input.targetEventId).success) throw new JoploError('INVALID_REFERENCE', 'Invalid feedback event id');
+      const [sourceSessionId, seq] = input.targetEventId.split(':');
+      let source: LocalReviewSession;
+      try { source = readLocalReview(dir, sourceSessionId!); }
+      catch (e) {
+        if ((e as NodeJS.ErrnoException).code === 'ENOENT' || e instanceof JoploError && e.code === 'NOT_FOUND')
+          throw new JoploError('INVALID_REFERENCE', 'Referenced feedback was not found in this project');
+        throw e;
+      }
+      const feedback = source.events.find(e => e.seq === Number(seq));
+      if (source.workId !== session.workId || feedback?.type !== 'feedback') throw new JoploError('INVALID_REFERENCE', 'Referenced event must be feedback for the same work');
+      receipt = { ...base, type: 'receipt', targetEventId: input.targetEventId, targetBody: feedback.body, status: input.status, note: input.note ?? null,
+        target: input.target ? localReviewContext(project, session.workId, input.target) : null };
+    }
+    const event: LocalReviewEvent = receipt ?? (input.type === 'feedback'
       ? { ...base, type: 'feedback', body: input.body, context: localReviewContext(project, session.workId, input.context) }
-      : { ...base, type: 'approved' };
+      : { ...base, type: 'approved' });
     this.persist({ ...session, events: [...session.events, event] });
     return this.state(dir, session.workId);
   }

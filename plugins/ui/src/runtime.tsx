@@ -8,6 +8,9 @@ import { defineRuntime, embeddedAsset, type PluginIRNode as SceneNode, type Plug
 import { useCtx, useI18n as useHostI18n, useRoot, useRootAttrs, RenderNode, rectOf, nodeLabel, resolveProps, isSelfVisible, walkNodes, type NodeProps } from '@joplo-app/kit/renderer';
 import { useR, useStroke, useLook, RendererContextProvider, Rough, RoughPath, roundRectPath, resolveValue, atWidth, childWidth, choicesOf, layoutRegions, styleOf } from '@joplo-app/kit/renderer-internal';
 import { ACCENT, BG, DANGER, onFill, DIMMED, FONT, INFO, INK, INK2, LINE, LINE_STRONG, MONO, OK, SOFT, SPACING, SUBTLE, SURFACE, TITLE_SIZE, WARN, color, dim, fontSize, light, radius, space, spaceNum, tint } from '@joplo-app/kit/renderer-style';
+import { boardArrow, type BoardRect } from './board-arrow.ts';
+import { RatioBar } from './ratio-bar.tsx';
+import { ImageRegion, RegionImage } from './image-region.tsx';
 import { changeFor, dataRows, displayData, stateFlowItems } from './story-data.ts';
 import type { ComponentType } from './catalog.ts';
 type StageMessages = {artifact: string;artifactSummary: (...args:any[])=>string;breadcrumbs: string;close: string;code: string;dataRecords: string;document: string;done: string;error: string;generated: string;generating: string;generationFailed: string;image: string;modal: string;navigation: string;noData: string;noRecords: string;noStates: string;noSubject: string;placeholder: string;preparing: string;recipient: (...args:any[])=>string;running: string;selectAnOption: string;sender: string;sheet: string;stateChange: (...args:any[])=>string;thinking: string;thinkingActive: string;thoughtFor: (...args:any[])=>string;toolCall: string;typeAMessage: string;unspecified: string;webPage: string};
@@ -478,22 +481,27 @@ function Avatar({ node, p, children }: NodeProps) {
 /** 嵌入的图片：asset() 的 data URL，或发布产物里的素材文件（D98）；远程地址仍画占位。 */
 export const embeddedImage = (src: unknown): string | null => embeddedAsset(src, 'image');
 
-function ImageBox({ node, p }: NodeProps) {
+function ImageBox({ node, p, hold }: NodeProps & { hold?: () => () => void }) {
   const { t: i18n } = useI18n();
 
   const r = useR(p);
   const src = embeddedImage(p.src);
+  const h = dim(r('h'));
+  const fit = p.fit === 'contain' || p.fit === 'fill' ? p.fit : 'cover';
+  const regions = node.children?.filter(child => child.type === 'ui:Image.Region');
+  const root = useRoot(node, p, src ? { style: { display: 'block', position: 'relative', overflow: 'hidden', width: dim(r('w')) ?? '100%', height: h ?? 'auto', borderRadius: radius(p.radius) } }
+    : { className: 'jbox', style: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: dim(r('w')) ?? '100%', height: h ?? 160, background: SUBTLE, color: DIMMED, fontSize: 13, borderRadius: radius(p.radius) } });
   if (src) {
-    const h = dim(r('h'));
-    const fit = p.fit === 'contain' ? 'contain' : 'cover';
-    const root = useRoot(node, p, { style: { display: 'block', position: 'relative', overflow: 'hidden', width: dim(r('w')) ?? '100%', height: h ?? 'auto', borderRadius: radius(p.radius) } });
     return (
       <div {...root} role="img" aria-label={str(p.alt, i18n.stage.image)} data-jimage="">
-        <img src={src} alt="" draggable={false} style={{ display: 'block', width: '100%', height: h ? '100%' : 'auto', objectFit: fit, objectPosition: str(p.position, 'center') }} />
+        {regions?.length
+          ? <RegionImage key={src} src={src} fit={fit} position={str(p.position, 'center')} hold={hold}>
+              {regions.map(region => <RenderNode key={region.id} node={region} />)}
+            </RegionImage>
+          : <img src={src} alt="" draggable={false} style={{ display: 'block', width: '100%', height: h ? '100%' : 'auto', objectFit: fit, objectPosition: str(p.position, 'center') }} />}
       </div>
     );
   }
-  const root = useRoot(node, p, { className: 'jbox', style: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: dim(r('w')) ?? '100%', height: dim(r('h')) ?? 160, background: SUBTLE, color: DIMMED, fontSize: 13, borderRadius: radius(p.radius) } });
   return (
     <div {...root} role="img" aria-label={str(p.alt, i18n.stage.image)} data-soft="">
       <Rough seedKey={node.id} stroke={SOFT} fill={LINE} fillStyle="cross-hatch" />
@@ -1398,6 +1406,50 @@ function Radio({ node, p, disabled }: NodeProps) {
 }
 
 // ============ Tabs / Breadcrumbs / Pagination / Stepper ============
+
+const CompareContext = createContext<{ value: string | null; stacked: boolean } | null>(null);
+
+function Compare({ node, p, disabled, children }: NodeProps) {
+  const host = useCtx();
+  const selected = useInputValue(node, p);
+  const choices = choicesOf(node, host.state) ?? [];
+  const current = choices.find(c => c.value === selected) ?? choices.find(c => c.label === selected) ?? choices[0];
+  const stacked = p.mode === 'toggle' || (p.mode !== 'side-by-side' && !atWidth({ base: false, sm: true }, host.width));
+  const root = useRoot(node, p, { disabled, style: { width: '100%', minWidth: 0 } });
+  const columns = 'repeat(2, minmax(0, 1fr))';
+  return <CompareContext.Provider value={{ value: current?.value ?? null, stacked }}>
+    <div {...root}>
+      <div role="group" aria-label={str(p['aria-label'], node.id)} data-jcontrol={node.id}
+        style={stacked ? { display: 'inline-flex', maxWidth: '100%', padding: 3, borderRadius: 6, background: SUBTLE } : { display: 'grid', gridTemplateColumns: columns, gap: 16 }}>
+        {choices.map(choice => {
+          const active = choice.value === current?.value;
+          return <button key={choice.value} type="button" aria-pressed={active} data-jchoice={choice.value} disabled={disabled}
+            tabIndex={host.interactive ? undefined : -1}
+            onClick={host.interactive ? event => { event.stopPropagation(); host.act?.(node.id, { type: 'select', value: choice.value }); } : undefined}
+            style={{ padding: '5px 10px', minWidth: 0, border: 0, borderRadius: stacked ? 4 : 0, textAlign: stacked ? 'center' : 'start',
+              background: stacked && active ? SURFACE : 'transparent', color: active ? INK : DIMMED,
+              boxShadow: !stacked && active ? `inset 0 -2px ${ACCENT}` : undefined, fontWeight: active ? 650 : 500 }}>
+            {choice.label}
+          </button>;
+        })}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: stacked ? 'minmax(0, 1fr)' : columns, gap: stacked ? 0 : 16, marginTop: 10 }}>
+        {children}
+      </div>
+    </div>
+  </CompareContext.Provider>;
+}
+
+function CompareSide({ node, p, children }: NodeProps) {
+  const compare = useContext(CompareContext);
+  const host = useCtx();
+  const hidden = compare?.stacked && compare.value !== p.value;
+  const root = useRoot(node, p, { style: { minWidth: 0, gridArea: compare?.stacked ? '1 / 1' : undefined } });
+  return <section {...root} aria-label={str(p.label ?? p.value)} inert={hidden || undefined} aria-hidden={hidden || undefined}
+    style={{ ...root.style, ...(hidden ? { visibility: 'hidden', opacity: 0, pointerEvents: 'none' } : {}) }}>
+    <RendererContextProvider value={{ width: host.width, dialogLayer: hidden ? null : host.dialogLayer }}>{children}</RendererContextProvider>
+  </section>;
+}
 
 function Tabs({ node, p, disabled, children }: NodeProps) {
   const { state } = useCtx();
@@ -2314,7 +2366,6 @@ function Note({ node, p, children }: NodeProps) {
   );
 }
 
-type BoardRect = { x: number; y: number; w: number; h: number };
 /** 元素在白板里的布局位置：offset 链，不受镜头缩放和 FLIP transform 影响。 */
 function offsetInBoard(el: HTMLElement, root: HTMLElement): BoardRect | null {
   let x = 0, y = 0;
@@ -2353,15 +2404,6 @@ function useBoardRects(ids: string[]) {
   return { ref, rects };
 }
 
-/** 从 r 的中心朝 (tx, ty) 出发，落在外扩 pad 的边框上的点。 */
-function edgePoint(r: BoardRect, tx: number, ty: number, pad: number) {
-  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
-  const dx = tx - cx, dy = ty - cy;
-  if (!dx && !dy) return { x: cx, y: cy };
-  const t = Math.min(dx ? (r.w / 2 + pad) / Math.abs(dx) : Infinity, dy ? (r.h / 2 + pad) / Math.abs(dy) : Infinity);
-  return { x: cx + dx * t, y: cy + dy * t };
-}
-
 /** 两个元素之间一直保留的箭头（引擎的 mark 只在一步里出现）。手绘描边用 Rough.js，干净线框退回普通 SVG。 */
 function Arrow({ node, p }: NodeProps) {
   const mode = useStroke();
@@ -2370,17 +2412,8 @@ function Arrow({ node, p }: NodeProps) {
   const { ref, rects } = useBoardRects([str(p.from), str(p.to)]);
   const stroke = color(p.color) ?? INK;
   const a = rects?.[0], b = rects?.[1];
-  let d = '', at: { x: number; y: number } | null = null;
-  if (a && b) {
-    const s = edgePoint(a, b.x + b.w / 2, b.y + b.h / 2, 10), e = edgePoint(b, a.x + a.w / 2, a.y + a.h / 2, 14);
-    const len = Math.hypot(e.x - s.x, e.y - s.y) || 1;
-    const bend = Math.max(-1, Math.min(1, typeof p.bend === 'number' && Number.isFinite(p.bend) ? p.bend : 0.25));
-    const c = { x: (s.x + e.x) / 2 - ((e.y - s.y) / len) * bend * len * 0.3, y: (s.y + e.y) / 2 + ((e.x - s.x) / len) * bend * len * 0.3 };
-    const ang = Math.atan2(e.y - c.y, e.x - c.x), head = 16, spread = 0.45;
-    const f = (n: number) => n.toFixed(1);
-    d = `M${f(s.x)},${f(s.y)} Q${f(c.x)},${f(c.y)} ${f(e.x)},${f(e.y)} M${f(e.x - head * Math.cos(ang - spread))},${f(e.y - head * Math.sin(ang - spread))} L${f(e.x)},${f(e.y)} L${f(e.x - head * Math.cos(ang + spread))},${f(e.y - head * Math.sin(ang + spread))}`;
-    at = { x: 0.25 * s.x + 0.5 * c.x + 0.25 * e.x, y: 0.25 * s.y + 0.5 * c.y + 0.25 * e.y };
-  }
+  const arrow = a && b ? boardArrow(a, b, p.from === p.to, p.bend) : null;
+  const d = arrow?.path;
   const dashed = p.dashed === true;
   return (
     <>
@@ -2389,12 +2422,12 @@ function Arrow({ node, p }: NodeProps) {
           ? <path d={d} fill="none" stroke={stroke} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={dashed ? '7 6' : undefined} />
           : <RoughPath seedKey={`${node.id}:${d.length}`} d={d} stroke={stroke} strokeWidth={1.8} dashed={dashed} roughness={1} draw={animate} />) : null}
       </svg>
-      {at && p.label !== undefined ? <div aria-hidden data-jtext="" style={{ position: 'absolute', left: at.x, top: at.y, transform: 'translate(-50%, -50%)', background: SURFACE, padding: '1px 8px', fontSize: 17, color: p.color !== undefined ? stroke : DIMMED, whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 6 }}>{str(p.label)}</div> : null}
+      {arrow && p.label !== undefined ? <div aria-hidden data-jtext="" style={{ position: 'absolute', left: arrow.label.x, top: arrow.label.y, transform: `translate(${arrow.labelShift}, -50%)`, background: SURFACE, padding: '1px 8px', fontSize: 17, color: p.color !== undefined ? stroke : DIMMED, whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 6 }}>{str(p.label)}</div> : null}
     </>
   );
 }
 
-const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
+const IMPL: Record<ComponentType, (props: NodeProps & { hold?: () => () => void }) => ReactNode> = {
   AppShell,
   'AppShell.Header': ShellHeader,
   'AppShell.Navbar': ShellSide,
@@ -2426,6 +2459,10 @@ const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
   Badge,
   Avatar,
   Image: ImageBox,
+  'Image.Region': ImageRegion,
+  RatioBar,
+  Compare,
+  'Compare.Side': CompareSide,
   ThemeIcon,
   Indicator,
   Timeline,
@@ -2518,6 +2555,6 @@ const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
 export const IMPLEMENTED_TYPES = Object.keys(IMPL).map(name=>`ui:${name}`);
 export default defineRuntime({
  id:'ui',
- components:Object.fromEntries(Object.entries(IMPL).map(([name,Impl])=>[name,{react:({ctx})=><Impl node={ctx.model} p={ctx.node.props} disabled={ctx.node.disabled}>{ctx.renderChildren() as ReactNode}</Impl>} ])),
+ components:Object.fromEntries(Object.entries(IMPL).map(([name,Impl])=>[name,{react:({ctx})=><Impl hold={ctx.hold} node={ctx.model} p={ctx.node.props} disabled={ctx.node.disabled}>{ctx.renderChildren() as ReactNode}</Impl>} ])),
  viewports:{mobile:{insets:{x:4+PHONE_BEZEL+PHONE_SAFE.x,y:PHONE_BEZEL+PHONE_SAFE.top},size:phoneFrameSize,react:PhoneFrame}},
 });

@@ -1,5 +1,5 @@
 /** Agent 读取的统一事件格式；本地和云端保留各自真实的身份与游标，不伪造云端事件序号。 */
-import type { LocalReviewEvent, LocalReviewSession } from '@joplo-app/core';
+import type { LocalReviewContext, LocalReviewEvent, LocalReviewReceiptStatus, LocalReviewSession } from '@joplo-app/core';
 import type { FeedbackDecision } from './cloud-feedback.ts';
 import { terminalText } from './cloud-error.ts';
 
@@ -25,6 +25,7 @@ export type FeedbackStreamEvent = {
   | { type: 'approved'; decision?: FeedbackDecision }
   | { type: 'decision'; decision: FeedbackDecision }
   | { type: 'closed'; reason: string }
+  | { type: 'receipt'; targetEventId: string; targetBody: string; status: LocalReviewReceiptStatus; note: string | null; target: LocalReviewContext | null }
 );
 export type FeedbackStreamIo = { out: (s: string) => void; err: (s: string) => void };
 export function localFeedbackEvent(session: LocalReviewSession, event: LocalReviewEvent): FeedbackStreamEvent {
@@ -36,6 +37,7 @@ export function writeFeedbackEvent(event: FeedbackStreamEvent, json: boolean, io
   const prefix = `[${event.seq ?? event.eventId}] ${event.type}`;
   const body = event.type === 'feedback'
     ? `${prefix} ${event.context.route ?? event.context.scenarioId ?? label?.(event.workId) ?? event.workId} · step ${event.context.position}\n${event.body.split('\n').map(line => `  ${line}`).join('\n')}`
+    : event.type === 'receipt' ? `${prefix} ${event.status} → ${event.targetEventId}${event.target ? ` · ${event.target.scenarioId ?? event.target.route} · step ${event.target.position}` : ''}\n  ${event.targetBody}${event.note !== null ? `\n  ${event.note}` : ''}`
     : event.type === 'decision' ? `${prefix} ${event.decision.kind} ${event.decision.targetId}${event.decision.note ? `: ${event.decision.note}` : ''}`
     : event.type === 'closed' ? `${prefix} (${event.reason})` : `${prefix} ${label?.(event.workId) ?? event.workId} @ ${event.revision}`;
   io.out(body.split('\n').map(line => terminalText(line)).join('\n') + '\n');

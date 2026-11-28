@@ -48,11 +48,24 @@ const States = z.record(z.string(), z.strictObject({
   state: z.enum(['idle', 'active', 'ok', 'error', 'dim']),
   reverse: z.boolean().optional(),
 }));
+export const PulseSnapshotS = z.strictObject({
+  active: z.boolean(),
+  label: z.string().optional(),
+  reverse: z.boolean().optional(),
+  tone: z.enum(['neutral', 'accent', 'info', 'violet', 'ok', 'warn', 'danger', 'muted']).optional(),
+  durationMs: z.number().positive(),
+});
+export type PulseSnapshot = z.infer<typeof PulseSnapshotS>;
+export const NodeStatusS = z.enum(['idle', 'healthy', 'active', 'hot', 'degraded', 'down', 'cached']);
+export type NodeStatus = z.infer<typeof NodeStatusS>;
+
 export const SceneFrame = z.strictObject({
   traces: z.array(Trace),
   states: States,
   now: z.array(z.string()),
   machines: z.record(z.string(), z.strictObject({ current: z.string().nullable(), states: States })),
+  pulses: z.record(z.string(), PulseSnapshotS).optional(),
+  nodeStates: z.record(z.string(), NodeStatusS).optional(),
 });
 export const FrameData = z.strictObject({
   scenes: z.record(z.string(), SceneFrame),

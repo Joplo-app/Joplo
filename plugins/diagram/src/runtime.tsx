@@ -11,6 +11,14 @@ import { rectOf } from '@joplo-app/kit/renderer';
 import { DESC_FONT, EDGE_FONT, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, edgeEmphasized, effectiveState, edgePath, graphView, sequenceView, startEdgeId, type GraphLayout, type SequenceLayout } from './render-layout.ts';
 import type { GraphStructure, SequenceStructure } from './model.ts';
 import type { DiagramStates } from './state.ts';
+import { TimeLanesView } from './time-lanes-view.tsx';
+import { IconGrid, TechIcon } from './board/icons.tsx';
+import { ArchNode, BoardZone, CacheNode, ClusterBox, Database, FlowEdge, QueuePipe } from './board/arch.tsx';
+import { Callout, SpeechBubble, StickFigure, StickyNote } from './board/whiteboard.tsx';
+import { DeviceFrame } from './board/devices.tsx';
+import { ArrayCell, ArrayStrip, HashTable, LinkedList, ListNode, MatrixGrid, StackQueue } from './board/dsa.tsx';
+import { ERField, ERTable, FlowNode, SwimLane } from './board/flow.tsx';
+import type { ComponentCtx } from '@joplo-app/kit/plugin';
 import type { FrameData } from './schema.ts';
 import type { z } from 'zod';
 type Frame = z.infer<typeof FrameData>;
@@ -746,10 +754,45 @@ const IMPL: Record<string, (props: NodeProps) => any> = {
   'diagram:StateMachine.Group': DiagramGroup,
   'diagram:StateMachine.State': DiagramNode,
   'diagram:StateMachine.Transition': DiagramEdge,
+  'diagram:TimeLanes': TimeLanesView,
   'diagram:Sequence': SequenceDiagram,
   'diagram:Sequence.Group': SequenceFrame,
   'diagram:Sequence.Block': SequenceFrame,
   'diagram:Sequence.Actor': SequenceActor,
   'diagram:Sequence.Message': SequenceMessage,
 };
-export default defineRuntime({ id: 'diagram', components: Object.fromEntries(Object.entries(IMPL).map(([type, Impl]) => [type.slice(8), { react: ({ ctx }) => <Impl node={ctx.model as SceneNode} p={ctx.node.props} disabled={ctx.node.disabled}>{ctx.renderChildren()}</Impl> }])) });
+const BOARD_COMPONENTS: Record<string, (props: { ctx: ComponentCtx }) => any> = {
+  TechIcon,
+  IconGrid,
+  BoardZone,
+  ArchNode,
+  Database,
+  QueuePipe,
+  CacheNode,
+  ClusterBox,
+  FlowEdge,
+  StickFigure,
+  StickyNote,
+  SpeechBubble,
+  Callout,
+  DeviceFrame,
+  ArrayStrip,
+  ArrayCell,
+  LinkedList,
+  ListNode,
+  StackQueue,
+  HashTable,
+  MatrixGrid,
+  FlowNode,
+  ERTable,
+  ERField,
+  SwimLane,
+};
+
+export default defineRuntime({
+  id: 'diagram',
+  components: {
+    ...Object.fromEntries(Object.entries(IMPL).map(([type, Impl]) => [type.slice(8), { react: ({ ctx }) => <Impl node={ctx.model as SceneNode} p={ctx.node.props} disabled={ctx.node.disabled}>{ctx.renderChildren()}</Impl> }])),
+    ...Object.fromEntries(Object.entries(BOARD_COMPONENTS).map(([name, Comp]) => [name, { react: Comp }])),
+  },
+});

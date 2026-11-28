@@ -17,13 +17,14 @@ import { useBoardI18n } from '../i18n/board/context';
 import { LocalText } from '../i18n/LocalText';
 import type { Text } from '../i18n/messages';
 import { fetchLocalReview, writeLocalReviewEvent } from '../runtime/dev-client';
-import { captureReviewDraft, localReviewCommand, localReviewTitle, readReviewDraft, reviewDraftKey, saveReviewDraft, type ReviewDraft } from './review-model';
+import { captureReviewDraft, localReviewCommand, localReviewTitle, localReviewUpdates, readReviewDraft, reviewDraftKey, saveReviewDraft, type ReviewDraft } from './review-model';
 import { readReviewPosition, saveReviewPosition } from './review-position';
 
 /** 跨页面保留草稿的位置；基于 Juice v0.2.0 CornerSnapOrb（自由边界拖拽 + 触觉音效）、Textarea、CopySnippet 与舒展 Collapsible。 */
-export function LocalReview({ projectId, project, workId, context, version, enabled, completed, onOpen, approvable = true }: {
+export function LocalReview({ projectId, project, workId, context, version, enabled, completed, onOpen, onJump, approvable = true }: {
   projectId: string; project: Project; workId: string; context: LocalReviewLocation | null;
   version: number; enabled: boolean; completed: boolean; onOpen: () => void;
+  onJump: (location: LocalReviewLocation) => void;
   /** 能否“确认方案”：独立作品（D102 修订，entry.featureId === null）没有方案这一层，只留反馈，不出确认按钮。 */
   approvable?: boolean;
 }) {
@@ -249,6 +250,7 @@ export function LocalReview({ projectId, project, workId, context, version, enab
           )}
         </> : null}
         {error || loadError ? <div data-testid="local-review-error"><Alert tone="danger"><span className="whitespace-pre-wrap break-words"><LocalText value={(error ?? loadError)!} /></span></Alert></div> : null}
+        {state ? <LocalReviewUpdates project={project} workId={workId} state={state} onJump={(location) => { onJump(location); setOpen(false); }} /> : null}
         {feedback.length ? (
           <section className="flex flex-col gap-2 border-t border-[var(--juice-edge)] pt-3">
             <h3 className="text-[12px] font-semibold">{l.localReviewHistory}</h3>
@@ -283,4 +285,24 @@ export function LocalReview({ projectId, project, workId, context, version, enab
       ) : null}
     </Popover>
   </>;
+}
+
+export function LocalReviewUpdates({ project, workId, state, onJump }: {
+  project: Project; workId: string; state: LocalReviewState; onJump: (location: LocalReviewLocation) => void;
+}) {
+  const { t } = useBoardI18n();
+  const l = t.board;
+  const updates = localReviewUpdates(project, workId, state);
+  if (!updates.length) return null;
+  return <section className="flex flex-col gap-2 border-t border-[var(--juice-edge)] pt-3" data-testid="local-review-updates">
+    <h3 className="text-[12px] font-semibold">{l.localReviewUpdates}</h3>
+    {updates.map(e => <article key={e.eventId} className="flex flex-col gap-2 rounded-[12px] bg-[var(--juice-w6)] px-3 py-2.5 text-[12px]">
+      <Badge tone={e.status === 'addressed' ? 'ok' : 'neutral'} className="self-start">
+        {e.status === 'addressed' ? l.localReviewAddressed : e.status === 'deferred' ? l.localReviewDeferred : e.status === 'declined' ? l.localReviewDeclined : l.localReviewAwaitingReceipt}
+      </Badge>
+      <p className="line-clamp-3 whitespace-pre-wrap break-words">{e.body}</p>
+      {e.note ? <p className="whitespace-pre-wrap break-words text-jb-muted">{e.note}</p> : null}
+      {e.target ? <Btn label={l.localReviewJump(e.target.position)} onClick={() => onJump(e.target!)} data-testid="local-review-jump" /> : null}
+    </article>)}
+  </section>;
 }

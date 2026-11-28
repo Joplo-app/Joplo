@@ -11,11 +11,14 @@ export const dataSpec: PluginDataSpec = {
     ],
   },
   step: {
+    text: [['scenes', '*', 'pulses', '*', 'label']],
     scope: [
       map(['scenes'], { domain: 'scene', children: [
         map(['states']), { path: ['now'], kind: 'values' },
         map(['machines'], { children: [map(['states']), { path: ['current'], kind: 'reference' }] }),
         { path: ['traces'], kind: 'items', references: [['nodes', '*'], ['edges', '*', 'id'], ['groups', '*'], ['errorGroups', '*'], ['targets', '*']] },
+        map(['pulses']),
+        map(['nodeStates']),
       ] }),
     ],
   },
