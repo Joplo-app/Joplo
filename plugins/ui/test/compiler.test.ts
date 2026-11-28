@@ -2,21 +2,10 @@ import { replay } from '@joplo-app/core';
 import { $, callout, flow, highlight, shot, spotlight } from '@joplo-app/kit';
 import { Fragment } from '@joplo-app/kit/node';
 import { describe, expect, it } from 'vitest';
-import { Arrow, Board, Box, Compare, Image, RatioBar } from '../src/plugin.ts';
+import { Arrow, Board, Box, Compare, Image } from '../src/plugin.ts';
 import { build, h, scenario } from './fixture.ts';
 
 const errors = (tree: ReturnType<typeof h>) => build(tree).diagnostics.filter(d => d.severity === 'error').map(d => d.code);
-
-describe('RatioBar validation', () => {
-  it.each([
-    { total: 0, left: 0 }, { total: -1, left: 0 }, { total: 1, left: -1 }, { total: 10, left: 2, right: -1 },
-    { total: 10, left: 9, right: 2 }, { total: 10, left: 0, threshold: -1 }, { total: 10, left: 0, threshold: 11 },
-    { total: 10, left: $.ui.left, right: 11 }, { total: 10, left: '5' }, { total: 10 }, { total: 100, left: NaN },
-  ])('rejects invalid counts %o', props => expect(errors(h(RatioBar, props))).toContain('RATIO_BAR_INVALID'));
-  it('defers comparisons between bindings', () => {
-    expect(errors(h(RatioBar, { total: $.data.capacity, left: $.ui.count, right: 2, threshold: $.data.limit }))).toEqual([]);
-  });
-});
 
 describe('Compare validation', () => {
   const side = (value: string) => h(Compare.Side, { value, label: value });

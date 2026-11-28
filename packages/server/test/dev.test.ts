@@ -8,7 +8,8 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createDev, isJsonContentType, type InternalDevHandle } from '../src/dev.ts';
+import { createRequire } from 'node:module';
+import { createDev, isJsonContentType, patchViteClientReconnect, shouldSuppressFullReload, type InternalDevHandle } from '../src/dev.ts';
 import { listLocalReviews } from '@joplo-app/core/node';
 import { resolveSelection } from '../src/selection.ts';
 
@@ -316,3 +317,57 @@ it('joining HTTP response waits for review registration without a browser reques
     expect(listLocalReviews(second).filter(s => s.events.length === 0).length).toBeGreaterThan(0);
   } finally { await h.close(); fs.rmSync(dir, { recursive: true, force: true }); fs.rmSync(second, { recursive: true, force: true }); }
 }, 60_000);
+
+describe('zero white-screen reload guards', () => {
+  it('patches installed Vite client disconnect handler to soft-reconnect without location.reload()', () => {
+    const require = createRequire(import.meta.url);
+    const clientFile = path.join(path.dirname(require.resolve('vite/package.json')), 'dist/client/client.mjs');
+    const raw = fs.readFileSync(clientFile, 'utf8');
+    const patched = patchViteClientReconnect(raw);
+    expect(patched).not.toBe(raw);
+    expect(patched).toContain('let wsToken =');
+    expect(patched).toContain('__JOPLO_RECONNECTING__');
+    expect(patched).toContain('transport.connect(createHMRHandler(handleMessage))');
+    expect(patched).toContain('info.boardBuild !== boardBuild');
+  });
+
+  it('suppresses all Vite full-reloads in dist mode and project/plugin full-reloads in source mode', () => {
+    const base = {
+      webDir: '/repo/packages/web',
+      projectDirs: ['/work/demo-a'],
+      pluginRoots: ['/repo/plugins/diagram'],
+      lastWatcherFile: null as string | null,
+    };
+    // dist mode never needs Vite full-reload
+    expect(shouldSuppressFullReload({ type: 'full-reload', path: '*' }, { ...base, mode: 'dist' })).toBe(true);
+    expect(shouldSuppressFullReload({ type: 'update', updates: [] }, { ...base, mode: 'dist' })).toBe(false);
+
+    // source mode suppresses project files, project html, external tsconfig, and plugin files
+    expect(shouldSuppressFullReload({ type: 'full-reload', path: '*', triggeredBy: '/work/demo-a/works/x.tsx' }, { ...base, mode: 'source' })).toBe(true);
+    expect(shouldSuppressFullReload({ type: 'full-reload', path: '/../../../work/demo-a/index.html' }, { ...base, mode: 'source' })).toBe(true);
+    expect(shouldSuppressFullReload({ type: 'full-reload', path: '*' }, { ...base, mode: 'source', lastWatcherFile: '/work/demo-a/tsconfig.json' })).toBe(true);
+    expect(shouldSuppressFullReload({ type: 'full-reload', path: '*', triggeredBy: '/repo/plugins/diagram/src/runtime.tsx' }, { ...base, mode: 'source' })).toBe(true);
+
+    // source mode still allows genuine board index.html / board source full-reloads
+    expect(shouldSuppressFullReload({ type: 'full-reload', path: '/index.html' }, { ...base, mode: 'source', lastWatcherFile: '/repo/packages/web/index.html' })).toBe(false);
+    expect(shouldSuppressFullReload({ type: 'full-reload', path: '*', triggeredBy: '/repo/packages/web/src/main.tsx' }, { ...base, mode: 'source', lastWatcherFile: '/repo/packages/web/src/main.tsx' })).toBe(false);
+  });
+
+  it('ping returns boardBuild and wsToken for same-version soft reconnect', async () => {
+    const dir = copy();
+    const h = await createDev({ projectDir: dir, port: 0, watch: false, log: () => {} });
+    try {
+      const ping = await req(h, { path: '/__joplo/ping' });
+      expect(ping.status).toBe(200);
+      expect(typeof ping.body.boardBuild).toBe('string');
+      expect(ping.body.boardBuild.length).toBeGreaterThan(0);
+      expect(typeof ping.body.wsToken).toBe('string');
+      expect(ping.body.wsToken.length).toBeGreaterThan(0);
+      const html = await req(h, { path: '/' });
+      expect(html.body).toContain(`<meta name="joplo-board-build" content="${ping.body.boardBuild}" />`);
+    } finally {
+      await h.close();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
+});

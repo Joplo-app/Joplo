@@ -80,6 +80,8 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - CHAPTER_TITLE_GENERIC (info): two or more chapters in a linear work use bare placeholder titles ('Intro', 'Principles', 'Summary', or equivalent bare placeholders). Name each chapter after its concrete question, outcome, or stage.
 - SCENARIO_TOO_LONG (info): the scenario plays over 90 s at 1×. One scenario tells one thing: split it (happy path, then each recovery) or branch with fork(). npx joplo outline shows the pacing.
 - HAPPY_PATH_ONLY (info): every case is a main-flow case and every scenario succeeds. Ask about input, permission, async, and lifecycle cases (see cases), then add an error-and-recovery scenario. Do not invent behavior. This applies only to feature review; standalone explainers use work()/chapter() and have no cases.
+- STAGE_RAW_HTML_HEAVY (info): a stage renders mostly raw HTML fallback tags with no expressive plugin components or kinetic plugin properties, even though richer roles are already enabled. Run npx joplo components or read .claude/skills/joplo-plugins/SKILL.md and replace static HTML boxes with specialized primitives from your enabled plugins.
+- WORK_TEXT_ONLY_STAGE (info): a multi-step work builds its stages exclusively from layout and text containers with no expressive or interactive plugin components, plugin step effects, kinetic properties, or media tracks. Inspect .claude/skills/joplo-plugins/SKILL.md and combine richer visual carriers (topology, charts, metrics, comparisons, code/terminal, or interactive screens) instead of text-only panels.
 - ROLE_UNKNOWN: A layer, card or say() role is not in the work or feature roles. Declare roles as { key: role('Name') }; see demo.
 - ICON_UNKNOWN: A layer icon is not a preset. Use one of window, browser, mobile, desktop, terminal, chat, agent, server, data, email, doc, flow; see demo.
 - FORK_UNKNOWN: fork must target another scenario key in the same work; it cannot reference itself.
@@ -89,7 +91,8 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - FOCUS_OFF_LAYER (warning): a spotlight / highlight / numbered / callout / mark target is not in the layer the director shows after this step, so nobody sees it. Add shot('<id>') to switch there, or point at an element in the shown layer. See focus.
 - FOCUS_CONFLICT (warning): the step's shot frames one thing while a cue points outside it. Point both at the same thing, add the id to the shot, or split the step.
 - CALLOUT_TOO_LONG (warning): callout text over about 24 units (same count as captions). Say the reason in a few words; move the rest to explain().
-- FOCUS_IDLE (info): three or more system steps in a row change nothing on stage. Merge them, or show what happens (set() visible state, highlight, callout, shot).
+- FOCUS_IDLE (info): three or more system steps in a row change nothing on stage. Merge them, or enrich the stage with real visual progression (set() visible state, highlight, callout, shot) rather than adding subtle camera drift to mask an idle stage.
+- NARRATION_STATIC_BEAT (info): a system step narrates for about 4.5 s or longer while nothing changes on stage. Enrich the stage with progressive content (reveal a detail, highlight or call out an element, update visible state, or split into visual sub-beats) instead of leaving it static or adding cosmetic camera drift.
 - INVALID_REDACT / AUTOFOCUS_INVALID: redact takes true/false or a condition (redact={not($.ui.revealed)}); config({ autoFocus }) takes true or false.
 - FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED: from must name another scenario key in the same work, the dependency must not loop, and the preceding scenario must replay successfully. Fix that scenario first.
 - FROM_WITH_START: from already determines the starting route; remove start or start a separate story.
@@ -136,4 +139,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.8.2 sha256:cd2da5d5bdf553ed47cb0929c548e2eca5b318011cfa342a8ee7ba0ae113e819 -->
+<!-- joplo-skill 0.8.2 sha256:8da16be0fcc0aabd60ab2bc33af29b22f396d8e5721f23f50ebf9eaeb537ddf3 -->

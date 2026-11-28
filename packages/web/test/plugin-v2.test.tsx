@@ -9,7 +9,7 @@ import { definePlugin, defineRuntime, pluginComponent } from '@joplo-app/kit/plu
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, stateAt } from '@joplo-app/core';
 import { Stage } from '../src/renderer/Stage';
-import { registerPluginRuntime } from '../src/renderer/plugins';
+import { loadPluginRuntimes, pluginStatus, registerPluginRuntime } from '../src/renderer/plugins';
 
 it.each([false, true])('renders React containers with working hooks and host children (nested selection: %s)', nested => {
   const p = definePlugin({ id: 'container', title: 'Container', runtime: '/container.js', components: { Box: { doc: 'box' } } });
@@ -26,4 +26,20 @@ it.each([false, true])('renders React containers with working hooks and host chi
   const html = renderToStaticMarkup(createElement(Stage, { project, state: stateAt(project, 'f.a.s', 0), theme: 'sketch', mode: 'render', animate: false }));
   expect(html).toContain('data-test="shared-react"');
   expect(html).toMatch(/<section[^>]*data-jid="box"[^>]*>[\s\S]*data-jid="child"[\s\S]*Rendered by host[\s\S]*<\/section>/);
+});
+
+it('keeps an already-ready plugin mounted without flashing loading while hot-swapping to a new runtime URL', async () => {
+  const id = 'hot-swap-zero-flash';
+  const v1 = defineRuntime({ id, components: { Pill: { react: () => <span>v1</span> } } });
+  registerPluginRuntime(v1, id);
+  expect(pluginStatus(id)).toEqual({ state: 'ready', runtime: v1 });
+
+  const v2Url = `data:text/javascript,export default ${JSON.stringify({ id, apiVersion: v1.apiVersion, components: {} })};`;
+  const pending = loadPluginRuntimes({ [id]: v2Url });
+  // Synchronously right after requesting the new URL, the previous ready runtime must remain active (never 'loading').
+  expect(pluginStatus(id).state).toBe('ready');
+  await pending;
+  const swapped = pluginStatus(id);
+  expect(swapped.state).toBe('ready');
+  if (swapped.state === 'ready') expect(swapped.runtime).not.toBe(v1);
 });

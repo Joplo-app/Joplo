@@ -58,6 +58,13 @@ export function overlaps(a: Box, b: Box): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
+export function overlapArea(a: Box, b: Box): number {
+  const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  if (ox <= 0) return 0;
+  const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return oy > 0 ? ox * oy : 0;
+}
+
 export type CalloutPlacement = {
   /** 气泡的位置与大小（内容坐标）。 */
   box: Box;
@@ -68,19 +75,53 @@ export type CalloutPlacement = {
 };
 
 /**
- * 标注气泡放在目标哪一侧：写了 side 就用它；否则按 右 → 左 → 下 → 上 取第一个完整放得下、且不压住目标与已放好的气泡的一侧；
- * 都放不下时取空间最大的一侧。最后把气泡夹进可见范围（留 margin）。gap、margin 是内容坐标。
+ * 标注气泡放在目标哪一侧：写了 side 就用它；否则在 右 / 左 / 下 / 上 四侧中综合评分：
+ * 1) 完整放进可见范围；2) 避开目标与已放好的提示/气泡（placed）；3) 避开舞台相邻内容（obstacles）；
+ * 同为完全无遮挡时保持 右 → 左 → 下 → 上 的既有顺序；否则选遮挡面积最小、剩余空间更大的一侧。
+ * 最后把气泡夹进可见范围（留 margin）。gap、margin 是内容坐标。
  */
-export function placeCallout(target: Box, size: { w: number; h: number }, region: Box, opts: { side?: Side; placed?: Box[]; gap: number; margin: number }): CalloutPlacement {
+export function placeCallout(
+  target: Box,
+  size: { w: number; h: number },
+  region: Box,
+  opts: { side?: Side; placed?: Box[]; obstacles?: Box[]; gap: number; margin: number },
+): CalloutPlacement {
   const { gap, margin } = opts;
   const placed = opts.placed ?? [];
-  const at = (side: Side): Box => {
+  const obstacles = opts.obstacles ?? [];
+  const candidatesFor = (side: Side): Box[] => {
     const cx = target.x + target.w / 2 - size.w / 2;
     const cy = target.y + target.h / 2 - size.h / 2;
-    if (side === 'right') return { x: target.x + target.w + gap, y: cy, w: size.w, h: size.h };
-    if (side === 'left') return { x: target.x - gap - size.w, y: cy, w: size.w, h: size.h };
-    if (side === 'bottom') return { x: cx, y: target.y + target.h + gap, w: size.w, h: size.h };
-    return { x: cx, y: target.y - gap - size.h, w: size.w, h: size.h };
+    if (side === 'right') {
+      const x = target.x + target.w + gap;
+      return [
+        { x, y: cy, w: size.w, h: size.h },
+        { x, y: target.y, w: size.w, h: size.h },
+        { x, y: target.y + target.h - size.h, w: size.w, h: size.h },
+      ];
+    }
+    if (side === 'left') {
+      const x = target.x - gap - size.w;
+      return [
+        { x, y: cy, w: size.w, h: size.h },
+        { x, y: target.y, w: size.w, h: size.h },
+        { x, y: target.y + target.h - size.h, w: size.w, h: size.h },
+      ];
+    }
+    if (side === 'bottom') {
+      const y = target.y + target.h + gap;
+      return [
+        { x: cx, y, w: size.w, h: size.h },
+        { x: target.x, y, w: size.w, h: size.h },
+        { x: target.x + target.w - size.w, y, w: size.w, h: size.h },
+      ];
+    }
+    const y = target.y - gap - size.h;
+    return [
+      { x: cx, y, w: size.w, h: size.h },
+      { x: target.x, y, w: size.w, h: size.h },
+      { x: target.x + target.w - size.w, y, w: size.w, h: size.h },
+    ];
   };
   const inner = { x: region.x + margin, y: region.y + margin, w: region.w - 2 * margin, h: region.h - 2 * margin };
   const fits = (b: Box) => b.x >= inner.x && b.y >= inner.y && b.x + b.w <= inner.x + inner.w && b.y + b.h <= inner.y + inner.h;
@@ -91,12 +132,37 @@ export function placeCallout(target: Box, size: { w: number; h: number }, region
     top: target.y - inner.y,
   };
   let side: Side;
-  if (opts.side) side = opts.side;
-  else {
-    const clear = (s: Side) => { const b = clamp(at(s), inner, s); return fits(at(s)) && !placed.some((p) => overlaps(b, p)); };
-    side = SIDES_AUTO.find(clear) ?? [...SIDES_AUTO].sort((a, b) => room[b] / (b === 'left' || b === 'right' ? size.w : size.h) - room[a] / (a === 'left' || a === 'right' ? size.w : size.h))[0]!;
+  let box: Box;
+  if (opts.side) {
+    side = opts.side;
+    box = clamp(candidatesFor(side)[0]!, inner, side);
+  } else {
+    const scored = SIDES_AUTO.flatMap((s, sideIdx) => {
+      const span = s === 'left' || s === 'right' ? Math.max(1, size.w) : Math.max(1, size.h);
+      const ratio = room[s] / span;
+      return candidatesFor(s).map((raw, alignIdx) => {
+        const b = clamp(raw, inner, s);
+        const out = fits(raw) ? 0 : 1;
+        const hard = placed.reduce((acc, p) => acc + overlapArea(b, p), 0);
+        const soft = obstacles.reduce((acc, o) => acc + overlapArea(b, o), 0);
+        return { s, sideIdx, alignIdx, b, out, hard, soft, ratio };
+      });
+    });
+    scored.sort((a, b) => {
+      if (a.out !== b.out) return a.out - b.out;
+      if (a.hard !== b.hard) return a.hard - b.hard;
+      if (a.soft !== b.soft) return a.soft - b.soft;
+      if (a.out === 0 && a.hard === 0 && a.soft === 0) {
+        if (a.sideIdx !== b.sideIdx) return a.sideIdx - b.sideIdx;
+        return a.alignIdx - b.alignIdx;
+      }
+      if (b.ratio !== a.ratio) return b.ratio - a.ratio;
+      if (a.sideIdx !== b.sideIdx) return a.sideIdx - b.sideIdx;
+      return a.alignIdx - b.alignIdx;
+    });
+    side = scored[0]!.s;
+    box = scored[0]!.b;
   }
-  const box = clamp(at(side), inner, side);
   // 引线：气泡朝向目标的那条边的中点（夹在气泡边上）→ 目标对应边上离它最近的点
   const tcx = Math.max(target.x, Math.min(target.x + target.w, box.x + box.w / 2));
   const tcy = Math.max(target.y, Math.min(target.y + target.h, box.y + box.h / 2));

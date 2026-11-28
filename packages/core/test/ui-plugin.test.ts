@@ -24,7 +24,14 @@ describe('P2 declaration-driven semantics',()=>{
   expect(p.plugins?.ui?.components.Button?.interactive).toBe(true);
   // 显示名只给本地看板：dev IR 有，发布与评审版去掉
   expect(p.plugins?.ui?.components.Button?.label).toMatchObject({ en: expect.any(String), 'zh-CN': expect.any(String) });
-  for (const mode of ['publish','review'] as const) expect(compile(source(h('div',{children:[h(Button,{id:'go',unmodeled:true})]})),mode).project!.plugins?.ui?.components.Button).not.toHaveProperty('label');
+  expect(p.plugins?.ui?.components.Button?.role).toBe('control');
+  expect(p.plugins?.ui?.components.div?.intrinsic).toBe('div');
+  for (const mode of ['publish','review'] as const) {
+   const pub = compile(source(h('div',{children:[h(Button,{id:'go',unmodeled:true})]})),mode).project!.plugins?.ui?.components;
+   expect(pub?.Button).not.toHaveProperty('label');
+   expect(pub?.Button).not.toHaveProperty('role');
+   expect(pub?.div).not.toHaveProperty('intrinsic');
+  }
  });
  it('plays third-party input, choices, gating, inheritance and viewport declarations using JSON alone',()=>{
   const p = definePlugin({id:'probe',title:'Probe',runtime:'/probe.js',components:{
@@ -96,4 +103,15 @@ it('component inventory and translations follow each enabled plugin declaration'
  expect(componentDetails(['Label'],[plugin])).toContain('<Label headline="Run"/>');
  const overview=componentIndex([plugin]);
  expect(overview).toContain('probe:Label');expect(overview).not.toContain('- ui:Button:');
+ const { default: uiPlugin } = await import('../../../plugins/ui/src/plugin.ts');
+ const { default: diagramPlugin } = await import('../../../plugins/diagram/src/plugin.ts');
+ const grouped = componentIndex([uiPlugin, diagramPlugin]);
+ expect(grouped).toContain('### topology —');
+ expect(grouped).toContain('diagram:ArchNode');
+ expect(grouped).toContain('### comparison —');
+ expect(grouped).toContain('ui:Compare');
+ expect(grouped).toContain('HTML fallbacks');
+ expect(grouped).not.toContain('- ui:div:');
+ expect(grouped).toContain('Companion plugins not yet enabled');
+ expect(grouped).toContain('@joplo-app/plugin-viz');
 });

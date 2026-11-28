@@ -75,7 +75,10 @@ export async function loadPluginRuntimes(urls: Readonly<Record<string, string>> 
   const work:Promise<void>[]=[];
   for (const [id,url] of Object.entries(urls??{})) {
     if(loadedUrl.get(id)===url){const pending=loading.get(id);if(pending)work.push(pending);continue;}
-    loadedUrl.set(id,url);status.set(id,{state:'loading'});notify();
+    const prev=status.get(id);
+    loadedUrl.set(id,url);
+    // Keep an already-ready runtime mounted while fetching an updated bundle so hot reload never flashes placeholders.
+    if(prev?.state!=='ready'){status.set(id,{state:'loading'});notify();}
     const pending=import(/* @vite-ignore */ url).then(
       m=>{if(loadedUrl.get(id)===url)registerPluginRuntime(m,id);},
       e=>{if(loadedUrl.get(id)===url){status.set(id,{state:'error',message:e instanceof Error?e.message:String(e)});notify();}},

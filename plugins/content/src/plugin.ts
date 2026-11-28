@@ -1,6 +1,6 @@
 import packageInfo from './version.json' with { type: 'json' };
 import { z } from 'zod';
-import { definePlugin, pluginComponent, pluginEffect, type PluginIRNode } from '@joplo-app/kit/plugin';
+import { definePlugin, pluginComponent, pluginEffect, type PluginIRNode, type PluginState } from '@joplo-app/kit/plugin';
 import { studio } from './theme.ts';
 import { skill, patterns } from './guide.ts';
 import { DEFAULT_MOVE_MS, FRAMING } from './camera-framing.ts';
@@ -41,13 +41,49 @@ export const cameraSequence = (points: CameraWaypoint[]) => pluginEffect('conten
 const Frame = z.strictObject({ scenes: z.record(z.string(), z.strictObject({ camera: Camera })) });
 export type ContentFrame = z.infer<typeof Frame>;
 const all = (n: PluginIRNode): PluginIRNode[] => [n, ...(n.children ?? []).flatMap(all)];
+function sameAuthorState(a: PluginState | undefined, b: PluginState): boolean {
+  if (!a) return false;
+  const clean = (ui: Readonly<Record<string, unknown>>) => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(ui)) if (k !== '__plugins') out[k] = v;
+    return out;
+  };
+  return JSON.stringify(clean(a.ui)) === JSON.stringify(clean(b.ui))
+    && JSON.stringify(a.data) === JSON.stringify(b.data)
+    && JSON.stringify(a.inputs) === JSON.stringify(b.inputs);
+}
+const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+function isCosmeticCameraShift(prev: z.infer<typeof Camera> | undefined, cur: z.infer<typeof Camera>): boolean {
+  if (cur.sequence && cur.sequence.length >= 2) {
+    const first = cur.sequence[0]!;
+    if (cur.sequence.some((w) => !sameIds(w.targets, first.targets))) return false;
+    const zooms = cur.sequence.map((w) => w.zoom ?? 1);
+    const pads = cur.sequence.map((w) => w.pad ?? 48);
+    return (Math.max(...zooms) - Math.min(...zooms)) <= 0.15 && (Math.max(...pads) - Math.min(...pads)) <= 48;
+  }
+  if (!prev || prev.sequence || !sameIds(prev.targets, cur.targets)) return false;
+  // Explicitly turning drift off to keep the frame steady is always intentional.
+  if (cur.drift === false && prev.drift !== false) return false;
+  if (cur.drift !== undefined && cur.drift !== false) return true;
+  const zoomDelta = Math.abs((cur.zoom ?? prev.zoom ?? 1) - (prev.zoom ?? 1));
+  const padDelta = Math.abs((cur.pad ?? prev.pad ?? 48) - (prev.pad ?? 48));
+  return zoomDelta <= 0.15 && padDelta <= 48;
+}
 const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes and individual pitfalls', body: patterns } }, packageName: '@joplo-app/plugin-content',
   id: 'content', title: 'Visual explainers', version: packageInfo.version,
+  bestFor: 'Continuous spatial Canvas worlds, smooth camera moves/sequences, FLIP object flights (motion), fixed slot tracks (ItemTrack), and kinetic headlines (Split)',
+  pairsWith: [
+    { with: 'diagram', packageName: '@joplo-app/plugin-diagram', how: 'Mount diagram BoardZones (ArchNode + FlowEdge + ClusterBox + Sequence) as distinct islands on one Canvas world and steer camera() across them.' },
+    { with: 'ui', packageName: '@joplo-app/plugin-ui', how: 'Place ui Compare, Stat, RingProgress, Terminal, Code, or BrowserWindow inside Canvas zones and reuse motion keys to fly objects between zones.' },
+    { with: 'viz', packageName: '@joplo-app/plugin-viz', how: 'Give quantitative data its own Canvas zone rendered with viz charts instead of hand-drawn bar divs, with silent hold() observation beats.' },
+    { with: 'alda', packageName: '@joplo-app/plugin-alda', how: 'Cue alda music.play/stop J-cut crossfades on chapter camera transitions.' },
+    { with: 'media', packageName: '@joplo-app/plugin-av', how: 'Embed engine-clock Video/Lottie clips inside a Canvas zone and trigger sfx.play() accents on key state flips.' },
+  ],
   runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
   components: {
-    ItemTrack: { doc: 'capacity, items (array or binding), keyField="id", labelField="label", accentField="accent", direction="row"|"column", emptyLabel; fixed slots with keyed item flights', example: '<ItemTrack id="cache" capacity={4} items={$.data.entries} />', traits: { text: ['emptyLabel'], textPaths: [['items', '*', 'label']] }, selfEvident: true },
-    Canvas: { doc: 'w, h, view=[1280,800], drift?, safe?=[top,right,bottom,left]; scaled design world with fixed screen children; drift = default camera drift; safe = the view area not covered by screen chrome, where targeted camera() frames land', selfEvident: true },
-    Split: { doc: 'text, by="word"|"char"; text that enters piece by piece: enter / enterMs / enterEase apply to each piece, enterStagger (default word 70, char 30 ms) spaces them; screen readers get the whole text', example: '<Split text="It is not typing, it is guessing" enter="rise" enterEase="spring" />', traits: { text: ['text'] }, selfEvident: true },
+    ItemTrack: { role: 'dsa', doc: 'capacity, items (array or binding), keyField="id", labelField="label", accentField="accent", direction="row"|"column", emptyLabel; fixed slots with keyed item flights', example: '<ItemTrack id="cache" capacity={4} items={$.data.entries} />', traits: { text: ['emptyLabel'], textPaths: [['items', '*', 'label']] }, selfEvident: true },
+    Canvas: { role: 'stage', doc: 'w, h, view=[1280,800], drift?, safe?=[top,right,bottom,left]; scaled design world with fixed screen children; drift = default camera drift; safe = the view area not covered by screen chrome, where targeted camera() frames land', selfEvident: true },
+    Split: { role: 'annotation', doc: 'text, by="word"|"char"; text that enters piece by piece: enter / enterMs / enterEase apply to each piece, enterStagger (default word 70, char 30 ms) spaces them; screen readers get the whole text', example: '<Split text="It is not typing, it is guessing" enter="rise" enterEase="spring" />', traits: { text: ['text'] }, selfEvident: true },
   },
   properties: {
     motion: { type: 'string', nonempty: true, attribute: 'data-jp-content-motion' },
@@ -132,7 +168,14 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
           if (node && !ctx.isVisible(scene.id, id)) ctx.report('CAMERA_TARGET_HIDDEN', `Camera target "${id}" is hidden at position ${ctx.position}; its bounds cannot be measured and framing may fall back to the whole canvas. Aim camera() at an always-visible anchor, switch to a visible target, or reset with camera().`, node.source, 'warning');
         }
       }
-      return { scenes: Object.fromEntries(scenes.map(s => [s.id, { camera: { ...parsed.data, ...(parsed.data.sequence ? { sequenceId: ctx.position === 0 ? 0 : (ctx.data as {cameraIssued?: boolean})?.cameraIssued ? ctx.position : (ctx.previousData as ContentFrame | undefined)?.scenes[s.id]?.camera.sequenceId ?? 0 } : {}), targets: parsed.data.targets.filter(id => s.nodes.some(n => n.id === id)) } }])) };
+      const nextScenes = Object.fromEntries(scenes.map(s => [s.id, { camera: { ...parsed.data, ...(parsed.data.sequence ? { sequenceId: ctx.position === 0 ? 0 : (ctx.data as {cameraIssued?: boolean})?.cameraIssued ? ctx.position : (ctx.previousData as ContentFrame | undefined)?.scenes[s.id]?.camera.sequenceId ?? 0 } : {}), targets: parsed.data.targets.filter(id => s.nodes.some(n => n.id === id)) } }]));
+      if (ctx.position >= 1 && (ctx.data as { cameraIssued?: boolean } | undefined)?.cameraIssued && sameAuthorState(ctx.previousState, ctx.state)) {
+        const prevScenes = (ctx.previousData as ContentFrame | undefined)?.scenes;
+        if (scenes.some((s) => isCosmeticCameraShift(prevScenes?.[s.id]?.camera, nextScenes[s.id]!.camera))) {
+          ctx.report('CAMERA_DRIFT_ONLY', `camera() at step ${ctx.position} keeps the same target(s) without changing stage state and only adds drift or a subtle micro-shift. Do not use subtle camera movement to work around STILL while narration plays; instead enrich the stage with progressive content (reveal a detail, highlight/callout, pulse an edge, or update visible state), or keep the frame calm with drift={false}.`, undefined, 'warning');
+        }
+      }
+      return { scenes: nextScenes };
     },
   },
 });

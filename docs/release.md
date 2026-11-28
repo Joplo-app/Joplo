@@ -1,6 +1,6 @@
 # npm 发布流程
 
-十二个包统一版本、按依赖顺序发布：
+十三个包统一版本、按依赖顺序发布：
 
 | 包 | 内容 |
 | --- | --- |
@@ -11,13 +11,14 @@
 | `@joplo-app/plugin-content` | 默认讲解内容插件、设计画布、取景、FLIP、studio 主题与技能 |
 | `@joplo-app/plugin-ui` | 默认 UI 与 HTML 词汇、绘制及组件指南 |
 | `@joplo-app/plugin-av` | 本地一次性音效、视频片段、Lottie 与媒体技能 |
+| `@joplo-app/plugin-viz` | 叙事数据可视化插件（DeltaBar / BarChart / RatioBar / LineChart / TimeLanes / ScatterPlot / Heatmap / Sankey / Waterfall / Radar）与技能 |
 | `@joplo-app/core` | 编译、校验与播放器 |
 | `@joplo-app/web` | 预构建看板、发布站、字体与 OFL 许可证 |
 | `@joplo-app/server` | 本地看板、构建、截图与导出 |
 | `@joplo-app/cli` | 命令实现 |
 | `joplo` | Node 版本检查与命令转发入口 |
 
-默认模板不安装 3D 插件，项目按需显式安装并启用。十二份公开 tarball（含 `@joplo-app/plugin-3d` 与 `@joplo-app/plugin-av`）必须使用相同版本；上表顺序与 `scripts/release.mjs` 的 `PACKAGES` 一致。
+默认模板不安装 3D 插件，项目按需显式安装并启用。十三份公开 tarball（含 `@joplo-app/plugin-3d`、`@joplo-app/plugin-av` 与 `@joplo-app/plugin-viz`）必须使用相同版本；上表顺序与 `scripts/release.mjs` 的 `PACKAGES` 一致。
 
 `release:version` 同步插件的轻量 `src/version.json`，运行时只读取版本，避免把整个开发 manifest 带进浏览器。
 

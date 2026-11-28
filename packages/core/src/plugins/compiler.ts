@@ -7,7 +7,7 @@ import type { MediaCommand, MediaSnapshot, ResourceRequest, LocalResourceInfo } 
 import { jsonData, snapshot, object, strings, syncResult, authoringData, materialize, errorMessage } from './data.ts';
 /** Node-side plugin host. Callbacks never enter IR or the player. */
 import { isNode, type JNode } from '@joplo-app/kit/node';
-import { pluginEntryProblem, type PluginDef, type PluginEffectDef, type PluginReport } from '@joplo-app/kit/plugin';
+import { COMPONENT_ROLES, pluginEntryProblem, type ComponentRole, type PluginDef, type PluginEffectDef, type PluginReport } from '@joplo-app/kit/plugin';
 import { initialState, applyStep, resolveProps, isNodeVisible, type PlayState } from '../player.ts';
 import type { Scene, SceneNode, Project, Scenario } from '../schema.ts';
 import type { PluginInfo } from '../catalog.ts';
@@ -136,15 +136,17 @@ export class PluginCompiler {
         else this.themes[`${p.id}:${name}`] = css;
       }
       const checked: Record<string, import('@joplo-app/kit/plugin').ElementTraits> = {};
-      const shown: Record<string, Pick<import('../catalog.ts').ComponentInfo, 'label' | 'inspect'>> = {};
+      const shown: Record<string, Pick<import('../catalog.ts').ComponentInfo, 'label' | 'inspect' | 'role' | 'intrinsic'>> = {};
       for (const [name, c] of Object.entries(p.components)) {
         const type = `${p.id}:${name}`;
         // 看板里给人看的名字与检查抽屉的信息行：纯数据，校验后进 dev IR（发布与评审版在编译末尾去掉）
-        if (c.label !== undefined || c.inspect !== undefined) {
+        const role = c.role !== undefined && (COMPONENT_ROLES as readonly string[]).includes(c.role) ? c.role as ComponentRole : undefined;
+        if (c.role !== undefined && !role) report('PLUGIN_INVALID', `Plugin ${p.id}: invalid role "${String(c.role)}" for ${name}`, source);
+        if (c.label !== undefined || c.inspect !== undefined || role !== undefined || typeof c.intrinsic === 'string') {
           const label = c.label === undefined ? undefined : PluginTextSchema.safeParse(this.envelope(p, c.label, source));
           const inspect = c.inspect === undefined ? undefined : PluginInspectFieldSchema.array().safeParse(this.envelope(p, c.inspect, source));
           if (label && !label.success || inspect && !inspect.success) report('PLUGIN_INVALID', `Plugin ${p.id}: invalid label or inspect declaration for ${name}`, source);
-          else shown[name] = { ...(label?.success ? { label: label.data as import('@joplo-app/kit/plugin').PluginText } : {}), ...(inspect?.success ? { inspect: inspect.data as import('@joplo-app/kit/plugin').PluginInspectField[] } : {}) };
+          else shown[name] = { ...(label?.success ? { label: label.data as import('@joplo-app/kit/plugin').PluginText } : {}), ...(inspect?.success ? { inspect: inspect.data as import('@joplo-app/kit/plugin').PluginInspectField[] } : {}), ...(role ? { role } : {}), ...(typeof c.intrinsic === 'string' && /^[a-z][a-z0-9]*$/.test(c.intrinsic) ? { intrinsic: c.intrinsic } : {}) };
         }
         if (c.traits !== undefined) {
           const parsed = ElementTraitsSchema.safeParse(this.envelope(p, c.traits, source));
@@ -348,7 +350,7 @@ export class PluginCompiler {
         const frozenState = snapshot(state), frozenPrevious = snapshot(previousState);
         for (const p of this.defs.values()) {
           if (p.compile?.frame) {
-            const value = this.run(p, 'frame', target.source, () => this.output(p, p.compile!.frame!({ roots, scenes, state: frozenState, previousState: frozenPrevious, resolveProps: (node, previous) => resolveProps(node, previous && frozenPrevious ? frozenPrevious : frozenState), isVisible: (sceneId, nodeId) => scenes.some(s => s.id === sceneId) && isNodeVisible(project.scenes[sceneId]!, nodeId, frozenState), data: snapshot(target.ext?.[p.id]), previousData: snapshot(previousData[p.id]), position: i, report: this.report }), target.source));
+            const value = this.run(p, 'frame', target.source, () => this.output(p, p.compile!.frame!({ roots, scenes, state: frozenState, previousState: frozenPrevious, resolveProps: (node, previous) => resolveProps(node, previous && frozenPrevious ? frozenPrevious : frozenState), isVisible: (sceneId, nodeId) => scenes.some(s => s.id === sceneId) && isNodeVisible(project.scenes[sceneId]!, nodeId, frozenState), data: snapshot(target.ext?.[p.id]), previousData: snapshot(previousData[p.id]), position: i, report: (code, msg, at, sev) => this.report(code, msg, at ?? target.source, sev) }), target.source));
             if (value !== undefined) ext[p.id] = value;
           }
         }

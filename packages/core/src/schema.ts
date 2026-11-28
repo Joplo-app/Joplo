@@ -1,5 +1,5 @@
 import { ElementTraitsSchema, PluginInspectFieldSchema, PluginTextSchema } from './traits.ts';
-import type { ElementTraits } from '@joplo-app/kit/plugin';
+import { COMPONENT_ROLES, type ElementTraits } from '@joplo-app/kit/plugin';
 /**
  * Joplo IR（schemaVersion 3）：由 TSX 源文件编译得到的中间表示，不是作者直接编辑的格式。
  * 权威源是项目文件夹里的 TSX/TS 文件（ADR-0002）；渲染器、播放器、校验器、构建只消费这里的 IR。
@@ -432,7 +432,7 @@ export const Project = z.strictObject({
     id: z.string().min(1),
     title: z.string(),
     version: z.string().optional(),
-    components: z.record(z.string(), z.strictObject({ label: PluginTextSchema.optional(), inspect: z.array(PluginInspectFieldSchema).optional(), interactive: z.boolean().optional(), parent: z.string().optional(), needsId: z.boolean().optional(), selfEvident: z.boolean().optional(), traits: ElementTraitsSchema.optional() })),
+    components: z.record(z.string(), z.strictObject({ label: PluginTextSchema.optional(), inspect: z.array(PluginInspectFieldSchema).optional(), role: z.enum(COMPONENT_ROLES).optional(), intrinsic: z.string().min(1).optional(), interactive: z.boolean().optional(), parent: z.string().optional(), needsId: z.boolean().optional(), selfEvident: z.boolean().optional(), traits: ElementTraitsSchema.optional() })),
   })).optional(),
   /** 作者主题（D51）：主题名 → CSS 原文（themes/<name>.css）；渲染时自动限定在舞台范围内。发布站同样打包。 */
   themes: z.record(z.string(), z.string()).default({}),

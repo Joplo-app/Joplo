@@ -197,6 +197,9 @@ it('HTTP review endpoints enforce token, origin, project ownership, and revision
   expect(localReviewStatus((await saved.json() as any).session)).toBe('approved');
   const malformed = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ type: 'feedback' }) });
   expect(malformed.status).toBe(400);
+  const ir = await (await fetch(`${dev.url}__joplo/p/${dev.projectId}/ir`)).json() as { instanceId?: string; version: number };
+  expect(typeof ir.instanceId).toBe('string');
+  expect(ir.instanceId!.length).toBeGreaterThan(8);
 });
 
 it('独立作品评审保留空功能归属，反馈、revision 与关闭均使用作品身份', () => {

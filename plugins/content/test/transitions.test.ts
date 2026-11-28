@@ -8,7 +8,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import { Canvas, camera, TRANSITIONS } from '../src/plugin.ts';
 import { cameraAt, canvasFrame, drifted, driftOf, bezier, safeOf, DEFAULT_DRIFT, jumpedSince, AWAY, type CameraSegment } from '../src/runtime.tsx';
-import { $, feature, flow, work, page, type Flow } from '@joplo-app/kit';
+import { $, feature, flow, work, page, set, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '@joplo-app/core';
 
@@ -65,6 +65,40 @@ describe('drift', () => {
     expect(driftOf(false, 1.05)).toBeNull();
     expect(driftOf({ x: 30, ms: 4000 }, false)).toEqual({ zoom: 1, x: 30, y: 0, ms: 4000 });
     expect(driftOf(1, undefined)).toBeNull();
+  });
+  it('CAMERA_DRIFT_ONLY warns on cosmetic same-target drift/micro-shift without stage changes, and allows state updates, real zooms, or drift: false', () => {
+    const checkDrift = (steps: Flow) => build(canvas({}), { one: steps }).diagnostics.filter((d) => d.code === 'CAMERA_DRIFT_ONLY');
+
+    // Same target + no stage state change + subtle drift => warns
+    const driftHack = checkDrift(flow('One', { start: '/' })
+      .system('Show A', camera('a', { drift: false }))
+      .system('Keep talking', camera('a', { drift: { x: 16, zoom: 1.04 } })));
+    expect(driftHack).toHaveLength(1);
+    expect(driftHack[0]!.severity).toBe('warning');
+
+    // Same target + micro pad/zoom nudge without state change => warns
+    const microNudge = checkDrift(flow('One', { start: '/' })
+      .system('Show A', camera('a', { pad: 48 }))
+      .system('Nudge', camera('a', { pad: 36 })));
+    expect(microNudge).toHaveLength(1);
+
+    // Same target + real stage state change => clean
+    const withState = checkDrift(flow('One', { start: '/' })
+      .system('Show A', camera('a'))
+      .system('Reveal detail', set($.ui.on, false), camera('a', { drift: 1.03 })));
+    expect(withState).toEqual([]);
+
+    // Same target + explicit drift: false to settle the frame => clean
+    const stopDrift = checkDrift(flow('One', { start: '/' })
+      .system('Show A', camera('a', { drift: 1.04 }))
+      .system('Settle for reading', camera('a', { drift: false })));
+    expect(stopDrift).toEqual([]);
+
+    // Intentional strong zoom-in (delta > 0.15) => clean
+    const realZoom = checkDrift(flow('One', { start: '/' })
+      .system('Wide', camera('a', { zoom: 1 }))
+      .system('Close up', camera('a', { zoom: 2 })));
+    expect(realZoom).toEqual([]);
   });
 });
 

@@ -78,12 +78,43 @@ export type PluginText = string | Record<string, string>;
  */
 export type PluginInspectField = { label: PluginText; props: string[]; join?: string; values?: Record<string, PluginText>; flags?: Record<string, PluginText>; fallback?: string };
 
+/** Author-facing expression roles used to group components by narrative intent and detect raw-HTML-only stages. */
+export const COMPONENT_ROLES = [
+  'stage',
+  'topology',
+  'sequence',
+  'state',
+  'chart',
+  'metric',
+  'comparison',
+  'code',
+  'conversation',
+  'dsa',
+  'annotation',
+  'media',
+  'control',
+  'layout',
+] as const;
+export type ComponentRole = (typeof COMPONENT_ROLES)[number];
+
+/** Declarative cross-plugin pairing recipe exposed in joplo-plugins/SKILL.md and joplo components. */
+export type PluginPairHint = {
+  /** Companion plugin id (for example 'content', 'diagram', 'ui', 'viz', 'code', 'alda', 'media'). */
+  with: string;
+  /** Optional npm package name so uninstalled companion plugins show how to add them. */
+  packageName?: string;
+  /** Concrete one-line recipe showing how the two plugins combine on stage. */
+  how: string;
+};
+
 /** 插件组件的声明：编译、检查、技能都只读这里，不执行运行时代码。 */
 export type PluginComponentSpec = {
   /** 看板里给人看的组件名（检查抽屉）。只进 dev IR，发布与评审版不带。 */
   label?: PluginText;
   /** 检查抽屉里的专属信息行。只进 dev IR。 */
   inspect?: PluginInspectField[];
+  /** Author-facing expression role for grouped discovery and dev-only stage diagnostics (stripped on publish/review). */
+  role?: ComponentRole;
   /** 一行用法（`npx joplo skill <插件>` 列出），例如 'focus, height; root of a 3D scene'。 */
   doc: string;
   example?: string;
@@ -210,6 +241,10 @@ export type PluginDef = {
   apiVersion: typeof PLUGIN_API_VERSION;
   title: string;
   description?: string;
+  /** One-line guidance explaining when authors should reach for this plugin. */
+  bestFor?: string;
+  /** Declarative composition recipes with other plugins (enabled pairs become active recipes; missing ones become add-on hints). */
+  pairsWith?: readonly PluginPairHint[];
   /** 插件包的版本（展示用）。 */
   version?: string;
   components: Record<string, PluginComponentSpec>;
@@ -249,9 +284,20 @@ export function definePlugin(p: Omit<PluginDef, 'kind' | 'runtime' | 'apiVersion
     if (!/^[a-z][a-z0-9-]*$/.test(key) || !topic || typeof topic.description !== 'string' || !topic.description.trim() || typeof topic.body !== 'string' || !topic.body.trim()) throw new Error(`Plugin ${p.id}: invalid skill topic ${key}`);
   }
   if (p.packageName && !/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]+$/.test(p.packageName)) throw new Error(`Plugin ${p.id}: invalid author package name`);
+  if (p.bestFor !== undefined && (typeof p.bestFor !== 'string' || !p.bestFor.trim())) throw new Error(`Plugin ${p.id}: bestFor must be a nonempty string`);
+  if (p.pairsWith !== undefined) {
+    if (!Array.isArray(p.pairsWith)) throw new Error(`Plugin ${p.id}: pairsWith must be a list`);
+    for (const pair of p.pairsWith) {
+      if (!pair || typeof pair !== 'object' || !ID.test(pair.with) || typeof pair.how !== 'string' || !pair.how.trim()
+        || (pair.packageName !== undefined && !/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]+$/.test(pair.packageName))) {
+        throw new Error(`Plugin ${p.id}: invalid pairsWith entry`);
+      }
+    }
+  }
   for (const [name, spec] of Object.entries(p.components)) {
     if (!NAME.test(name) || /^[a-z]/.test(name) && spec.intrinsic !== name) throw new Error(`Joplo plugin ${p.id}: component name "${name}" must be PascalCase (dots for compound parts)`);
     if (spec.parent !== undefined && !p.components[spec.parent]) throw new Error(`Joplo plugin ${p.id}: ${name}.parent "${spec.parent}" is not a component of this plugin`);
+    if (spec.role !== undefined && !(COMPONENT_ROLES as readonly string[]).includes(spec.role)) throw new Error(`Joplo plugin ${p.id}: ${name}.role "${String(spec.role)}" must be one of ${COMPONENT_ROLES.join(', ')}`);
   }
   return { ...p, kind: 'plugin', apiVersion: PLUGIN_API_VERSION, runtime: fileOf(p.runtime), local: p.local ? fileOf(p.local) : undefined };
 }

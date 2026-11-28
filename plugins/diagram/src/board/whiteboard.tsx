@@ -217,6 +217,19 @@ export function SpeechBubble({ ctx }: { ctx: ComponentCtx }) {
   );
 }
 
+/** Protect CLI flags like --sheet or --film from splitting between hyphens. */
+function renderProtectedDetail(detail: string) {
+  const parts = detail.split(/(--[a-zA-Z0-9-]+)/g);
+  if (parts.length === 1) return detail;
+  return parts.map((part, idx) =>
+    part.startsWith('--') ? (
+      <span key={idx} style={{ whiteSpace: 'nowrap' }}>{part}</span>
+    ) : (
+      part
+    ),
+  );
+}
+
 export function Callout({ ctx }: { ctx: ComponentCtx }) {
   const p = ctx.node.props;
   const label = str(p.label, 'Note');
@@ -226,17 +239,20 @@ export function Callout({ ctx }: { ctx: ComponentCtx }) {
   const col = toneColor(tone);
   const { label: _l, detail: _d, kind: _k, tone: _t, ...rest } = p;
   const isStamp = kind === 'stamp';
+  const keepLabelSingle = label.length <= 16;
   const root = useRoot(ctx.model, rest, {
     style: {
       display: 'inline-flex',
+      flexWrap: 'wrap',
       alignItems: 'center',
-      gap: 8,
-      padding: isStamp ? '6px 14px' : '7px 13px',
-      borderRadius: isStamp ? 8 : 999,
+      columnGap: 10,
+      rowGap: 4,
+      padding: isStamp ? '7px 14px' : detail ? '8px 14px' : '7px 13px',
+      borderRadius: isStamp ? 8 : detail ? 14 : 999,
       background: isStamp ? 'transparent' : tonalWash(col, 16),
       border: isStamp ? `2.5px double ${col}` : `1.5px solid color-mix(in srgb, ${col} 42%, transparent)`,
       color: col,
-      transform: isStamp ? 'rotate(-4deg)' : undefined,
+      transform: isStamp ? 'rotate(-3deg)' : undefined,
       fontWeight: 750,
       fontSize: isStamp ? 13 : 12.5,
       letterSpacing: isStamp ? '0.08em' : '-0.01em',
@@ -244,9 +260,24 @@ export function Callout({ ctx }: { ctx: ComponentCtx }) {
     },
   });
   return (
-    <div {...root} data-bd-root="">
-      <span>{label}</span>
-      {detail ? <span style={{ fontWeight: 500, color: BT.soft, textTransform: 'none', letterSpacing: 0 }}>{detail}</span> : null}
+    <div {...root} data-bd-root="" data-bd-callout="">
+      <span style={{ whiteSpace: keepLabelSingle ? 'nowrap' : undefined, flexShrink: 0 }}>{label}</span>
+      {detail ? (
+        <span
+          style={{
+            fontWeight: 500,
+            color: BT.soft,
+            textTransform: 'none',
+            letterSpacing: 0,
+            lineHeight: 1.4,
+            minWidth: 0,
+            flex: '1 1 150px',
+            overflowWrap: 'break-word',
+          }}
+        >
+          {renderProtectedDetail(detail)}
+        </span>
+      ) : null}
     </div>
   );
 }

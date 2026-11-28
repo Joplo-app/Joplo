@@ -30,10 +30,16 @@ const startOf = (node: PluginIRNode) => (typeof node.props?.start === 'number' &
 const media = definePlugin({
   packageName: '@joplo-app/plugin-av',
   id: 'media', title: 'Media', version: packageInfo.version,
+  bestFor: 'Engine-clock muted Video clips, Lottie vector animations (playClip), and one-shot WAV sound effects (withSoundEffects + sfx.play)',
+  pairsWith: [
+    { with: 'content', packageName: '@joplo-app/plugin-content', how: 'Place Video or Lottie inside a content:Canvas zone and coordinate camera() with playClip().' },
+    { with: 'ui', packageName: '@joplo-app/plugin-ui', how: 'Embed Video or Lottie inside ui BrowserWindow, Phone, or Card frames for realistic motion.' },
+    { with: 'alda', packageName: '@joplo-app/plugin-alda', how: 'Layer one-shot sfx.play() accents over alda background music with automatic narration ducking.' },
+  ],
   runtime: new URL(new URL(import.meta.url).pathname.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
   components: {
-    Video: { doc: 'src={asset(\'./clip.mp4\')} (mp4 / webm), w?, h?, fit?=\'cover\'|\'contain\', start? (seconds shown before the first play); a muted video clip played by playClip', needsId: true, selfEvident: true },
-    Lottie: { doc: 'src={asset(\'./anim.json\')} (Lottie JSON), w?, h?, start?; a vector animation played by playClip', needsId: true, selfEvident: true },
+    Video: { role: 'media', doc: 'src={asset(\'./clip.mp4\')} (mp4 / webm), w?, h?, fit?=\'cover\'|\'contain\', start? (seconds shown before the first play); a muted video clip played by playClip', needsId: true, selfEvident: true },
+    Lottie: { role: 'media', doc: 'src={asset(\'./anim.json\')} (Lottie JSON), w?, h?, start?; a vector animation played by playClip', needsId: true, selfEvident: true },
   },
   skill,
   schemas: { step: StepS },

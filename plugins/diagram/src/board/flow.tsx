@@ -18,7 +18,7 @@ export function FlowNode({ ctx }: { ctx: ComponentCtx }) {
       style: { position: 'relative', width: 146, height: 86, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
     });
     return (
-      <div {...root} data-bd-root="">
+      <div {...root} data-bd-root="" data-bd-node="" data-bd-shape="decision">
         <svg width="146" height="86" viewBox="0 0 146 86" style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
           <polygon points="73,3 143,43 73,83 3,43" fill={tonalWash(col, 16)} stroke={col} strokeWidth="2" strokeLinejoin="round" />
         </svg>
@@ -35,7 +35,7 @@ export function FlowNode({ ctx }: { ctx: ComponentCtx }) {
       style: { position: 'relative', minWidth: 148, padding: '11px 24px', display: 'inline-flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' },
     });
     return (
-      <div {...root} data-bd-root="">
+      <div {...root} data-bd-root="" data-bd-node="">
         <div style={{ position: 'absolute', inset: 0, transform: 'skewX(-14deg)', borderRadius: 10, background: tonalWash(col, 14), border: `1.8px solid ${col}` }} />
         <span style={{ position: 'relative', fontSize: 12.5, fontWeight: 700, color: BT.on }}>{label}</span>
         {sub ? <span style={{ position: 'relative', fontSize: 10.5, color: BT.mute }}>{sub}</span> : null}
@@ -57,7 +57,7 @@ export function FlowNode({ ctx }: { ctx: ComponentCtx }) {
     },
   });
   return (
-    <div {...root} data-bd-root="" data-bd-slab="" data-bd-fill={fill === 'solid' || isPill ? 'solid' : undefined}>
+    <div {...root} data-bd-root="" data-bd-node="" data-bd-slab="" data-bd-fill={fill === 'solid' || isPill ? 'solid' : undefined}>
       <span style={{ fontSize: 13, fontWeight: 700, color: BT.on }}>{label}</span>
       {sub ? <span style={{ fontSize: 11, color: BT.mute }}>{sub}</span> : null}
     </div>

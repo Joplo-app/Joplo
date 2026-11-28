@@ -10,6 +10,7 @@ import {
   bool,
   clamp01,
   num,
+  pulseLapDurationMs,
   statusTone,
   str,
   tonalWash,
@@ -18,6 +19,18 @@ import {
 } from './tokens.ts';
 import { BBadge, BDot, BHeader, BKbd, Glyph, SLAB_STYLE, SURFACE_STYLE, type GlyphName } from './ui.tsx';
 import { resolveTechIcon } from './icons.tsx';
+import {
+  polylineLength,
+  routeBoardEdges,
+  samplePolyline,
+  sampleQuad,
+  type BoardNode,
+  type EdgeSpec,
+  type Rect,
+  type RouteKind,
+  type RoutedEdge,
+  type SoftObstacle,
+} from './edge-routing.ts';
 
 type DiagramFrame = z.infer<typeof FrameData>;
 
@@ -119,17 +132,19 @@ export function ArchNode({ ctx }: { ctx: ComponentCtx }) {
   const glyph = KIND_GLYPHS[kind] ?? 'server';
 
   const { label: _l, sub: _sb, kind: _k, icon: _ic, tech: _tc, status: _st, replicas: _rp, metric: _mt, fill: _fl, ...rest } = p;
+  const statusRing =
+    status === 'down'
+      ? `0 0 0 2px ${BT.danger}`
+      : status === 'hot' || status === 'degraded'
+        ? `0 0 0 2px ${BT.warn}`
+        : undefined;
   const root = useRoot(ctx.model, rest, {
     style: {
       ...SLAB_STYLE,
       minWidth: 182,
       gap: 8,
       padding: '11px 13px',
-      boxShadow: status === 'down'
-        ? `0 0 0 2px ${BT.danger}, var(--bd-slab-shadow)`
-        : status === 'hot' || status === 'degraded'
-          ? `0 0 0 2px ${BT.warn}, var(--bd-slab-shadow)`
-          : undefined,
+      ...(statusRing ? ({ '--bd-status-ring': statusRing } as Record<string, string>) : {}),
     },
   });
 
@@ -137,7 +152,7 @@ export function ArchNode({ ctx }: { ctx: ComponentCtx }) {
   return (
     <div {...root} data-bd-root="" data-bd-slab="" data-bd-fill={fill === 'solid' ? 'solid' : undefined} data-bd-status={status}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, flex: 1 }}>
           <div
             style={{
               width: 34,
@@ -153,9 +168,33 @@ export function ArchNode({ ctx }: { ctx: ComponentCtx }) {
           >
             {Mark ? <Mark size={20} /> : <Glyph name={glyph} size={17} />}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-            <span style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: '-0.015em', color: BT.on, whiteSpace: 'nowrap' }}>{label}</span>
-            {sub ? <span style={{ fontSize: 11, color: BT.mute, whiteSpace: 'nowrap' }}>{sub}</span> : null}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
+            <span
+              title={label}
+              style={{
+                fontSize: 13.5,
+                fontWeight: 700,
+                letterSpacing: '-0.015em',
+                color: BT.on,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {label}
+            </span>
+            {sub ? (
+              <span
+                style={{
+                  fontSize: 11,
+                  lineHeight: 1.35,
+                  color: BT.mute,
+                  overflowWrap: 'anywhere',
+                }}
+              >
+                {sub}
+              </span>
+            ) : null}
           </div>
         </div>
         <BDot tone={sTone} pulse={status === 'active' || status === 'hot'} />
@@ -202,8 +241,8 @@ export function Database({ ctx }: { ctx: ComponentCtx }) {
             </span>
           ) : null}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-          <span style={{ fontSize: 13.5, fontWeight: 700, color: BT.on, whiteSpace: 'nowrap' }}>{label}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0, flex: 1 }}>
+          <span title={label} style={{ fontSize: 13.5, fontWeight: 700, color: BT.on, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
             <BBadge tone={role === 'primary' ? 'accent' : role === 'sharded' ? 'violet' : 'ok'} size="xs">{role}</BBadge>
             {storage ? <BKbd>{storage}</BKbd> : null}
@@ -304,8 +343,8 @@ export function ClusterBox({ ctx }: { ctx: ComponentCtx }) {
   });
 
   return (
-    <div {...root} data-bd-root="">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+    <div {...root} data-bd-root="" data-bd-cluster="">
+      <div data-bd-cluster-header="" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 700, color: col }}>
           {Mark ? <Mark size={16} /> : <Glyph name="cloud" size={15} />}
           <span>{label}</span>
@@ -319,8 +358,7 @@ export function ClusterBox({ ctx }: { ctx: ComponentCtx }) {
   );
 }
 
-/* ---- DOM-Anchored FlowEdge Vector Connector (Rough.js aware + EngineClock pulse) ---- */
-type Rect = { x: number; y: number; w: number; h: number };
+/* ---- DOM-Anchored FlowEdge Vector Connector (Board-Wide Programmatic Router + Rough.js + EngineClock pulse) ---- */
 function relativeRect(el: HTMLElement, ancestor: HTMLElement): Rect | null {
   let x = 0;
   let y = 0;
@@ -330,24 +368,99 @@ function relativeRect(el: HTMLElement, ancestor: HTMLElement): Rect | null {
     y += cur.offsetTop;
     cur = cur.offsetParent as HTMLElement | null;
   }
-  if (cur !== ancestor) return null;
-  return { x, y, w: el.offsetWidth, h: el.offsetHeight };
+  if (cur === ancestor) return { x, y, w: el.offsetWidth, h: el.offsetHeight };
+  // Fallback when offsetParent chain skips host (e.g. non-positioned wrapper)
+  const hr = ancestor.getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+  const scale = hr.width / (ancestor.offsetWidth || 1);
+  if (scale <= 0) return null;
+  return {
+    x: (er.left - hr.left) / scale,
+    y: (er.top - hr.top) / scale,
+    w: er.width / scale,
+    h: er.height / scale,
+  };
 }
 
-function anchorOf(r: Rect, side: AnchorSide, other: Rect): [number, number] {
-  let s = side;
-  if (s === 'auto') {
-    const dx = other.x + other.w / 2 - (r.x + r.w / 2);
-    const dy = other.y + other.h / 2 - (r.y + r.h / 2);
-    s = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'right' : 'left') : (dy >= 0 ? 'bottom' : 'top');
+const VALID_ROUTES = new Set<RouteKind>(['curve', 'straight', 'elbow', 'ortho', 'arc', 'auto']);
+const boardRouteCache = new WeakMap<HTMLElement, { sig: string; routes: Map<string, RoutedEdge> }>();
+
+function solveBoardEdges(host: HTMLElement): Map<string, RoutedEdge> {
+  const edgeEls = [...host.querySelectorAll<SVGSVGElement>('svg[data-fe-edge]')].filter(
+    (el) => el.parentElement === host,
+  );
+  const specs: EdgeSpec[] = [];
+  const referencedIds = new Set<string>();
+  for (const el of edgeEls) {
+    const id = el.dataset.feId ?? '';
+    const from = el.dataset.feFrom ?? '';
+    const to = el.dataset.feTo ?? '';
+    if (!id || !from || !to) continue;
+    const rawRoute = (el.dataset.feRoute ?? 'curve') as RouteKind;
+    const route: RouteKind = VALID_ROUTES.has(rawRoute) ? rawRoute : 'curve';
+    const fromSide = (el.dataset.feFromSide ?? 'auto') as AnchorSide;
+    const toSide = (el.dataset.feToSide ?? 'auto') as AnchorSide;
+    const bendStr = el.dataset.feBend;
+    const bend = bendStr !== undefined && bendStr !== '' && Number.isFinite(Number(bendStr)) ? Number(bendStr) : undefined;
+    const label = el.dataset.feLabel ?? '';
+    specs.push({ id, from, to, route, fromSide, toSide, bend, label });
+    referencedIds.add(from);
+    referencedIds.add(to);
   }
-  switch (s) {
-    case 'left': return [r.x, r.y + r.h / 2];
-    case 'right': return [r.x + r.w, r.y + r.h / 2];
-    case 'top': return [r.x + r.w / 2, r.y];
-    case 'bottom': return [r.x + r.w / 2, r.y + r.h];
-    default: return [r.x + r.w / 2, r.y + r.h / 2];
+  if (specs.length === 0) return new Map();
+
+  // Collect node boxes: all referenced endpoints + all visual node slabs/shapes inside host
+  const nodes: BoardNode[] = [];
+  const seenNodeEl = new Set<HTMLElement>();
+  const seenNodeId = new Set<string>();
+  const addNode = (id: string, el: HTMLElement) => {
+    if (seenNodeEl.has(el) || seenNodeId.has(id)) return;
+    const rect = relativeRect(el, host);
+    if (!rect || rect.w <= 0 || rect.h <= 0) return;
+    seenNodeEl.add(el);
+    seenNodeId.add(id);
+    const shape = el.dataset.bdShape === 'decision' ? 'decision' : 'box';
+    nodes.push({ id, rect, shape });
+  };
+
+  for (const id of referencedIds) {
+    const el = host.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`);
+    if (el) addNode(id, el);
   }
+  let anonIdx = 0;
+  for (const el of host.querySelectorAll<HTMLElement>('[data-bd-slab], [data-bd-node]')) {
+    if (seenNodeEl.has(el)) continue;
+    const id = el.getAttribute('data-jid') ?? `__obs_${anonIdx++}`;
+    addNode(id, el);
+  }
+
+  // Collect ClusterBox headers/badges (strong avoid), cluster perimeters (mild crossing penalty), and whiteboard Callouts
+  const softObstacles: SoftObstacle[] = [];
+  for (const hdr of host.querySelectorAll<HTMLElement>('[data-bd-cluster-header]')) {
+    const rect = relativeRect(hdr, host);
+    if (rect && rect.w > 0 && rect.h > 0) softObstacles.push({ rect, kind: 'header' });
+  }
+  for (const cl of host.querySelectorAll<HTMLElement>('[data-bd-cluster]')) {
+    const rect = relativeRect(cl, host);
+    if (rect && rect.w > 0 && rect.h > 0) softObstacles.push({ rect, kind: 'border' });
+  }
+  for (const co of host.querySelectorAll<HTMLElement>('[data-bd-callout]')) {
+    const rect = relativeRect(co, host);
+    if (rect && rect.w > 0 && rect.h > 0) softObstacles.push({ rect, kind: 'callout' });
+  }
+
+  const sig = JSON.stringify([
+    nodes.map((n) => [n.id, Math.round(n.rect.x), Math.round(n.rect.y), Math.round(n.rect.w), Math.round(n.rect.h), n.shape]),
+    softObstacles.map((o) => [o.kind, Math.round(o.rect.x), Math.round(o.rect.y), Math.round(o.rect.w), Math.round(o.rect.h)]),
+    specs.map((s) => [s.id, s.from, s.to, s.route, s.fromSide, s.toSide, s.bend ?? null, s.label]),
+  ]);
+
+  const cached = boardRouteCache.get(host);
+  if (cached && cached.sig === sig) return cached.routes;
+
+  const routes = routeBoardEdges({ nodes, edges: specs, softObstacles });
+  boardRouteCache.set(host, { sig, routes });
+  return routes;
 }
 
 export function FlowEdge({ ctx }: { ctx: ComponentCtx }) {
@@ -357,6 +470,7 @@ export function FlowEdge({ ctx }: { ctx: ComponentCtx }) {
   const route = str(p.route, 'curve');
   const fromSide = str(p.fromSide, 'auto') as AnchorSide;
   const toSide = str(p.toSide, 'auto') as AnchorSide;
+  const explicitBend = p.bend !== undefined ? num(p.bend, 0) : undefined;
   const state = str(p.state, 'idle');
   const dashed = bool(p.dashed, state === 'blocked' || p.protocol === 'async');
   const bidirectional = bool(p.bidirectional, false);
@@ -371,34 +485,43 @@ export function FlowEdge({ ctx }: { ctx: ComponentCtx }) {
   const markerId = `bd-arr-${ctx.model.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [geom, setGeom] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [routed, setRouted] = useState<RoutedEdge | null>(null);
 
   useLayoutEffect(() => {
     const svg = svgRef.current;
     const host = svg?.parentElement;
     if (!host || !from || !to) return;
     const measure = () => {
-      const a = host.querySelector(`[data-jid="${CSS.escape(from)}"]`) as HTMLElement | null;
-      const b = host.querySelector(`[data-jid="${CSS.escape(to)}"]`) as HTMLElement | null;
-      if (!a || !b) return;
-      const ra = relativeRect(a, host);
-      const rb = relativeRect(b, host);
-      if (!ra || !rb) return;
-      const [x1, y1] = anchorOf(ra, fromSide, rb);
-      const [x2, y2] = anchorOf(rb, toSide, ra);
-      setGeom((prev) => (prev && prev.x1 === x1 && prev.y1 === y1 && prev.x2 === x2 && prev.y2 === y2 ? prev : { x1, y1, x2, y2 }));
+      const next = solveBoardEdges(host).get(ctx.model.id) ?? null;
+      setRouted((prev) => {
+        if (!prev && !next) return prev;
+        if (
+          prev &&
+          next &&
+          prev.d === next.d &&
+          prev.pillW === next.pillW &&
+          prev.pillH === next.pillH &&
+          prev.hasCrossing === next.hasCrossing &&
+          prev.labelLines.join('\n') === next.labelLines.join('\n') &&
+          Math.abs(prev.labelPos.x - next.labelPos.x) < 0.25 &&
+          Math.abs(prev.labelPos.y - next.labelPos.y) < 0.25 &&
+          JSON.stringify(prev.labelTick ?? null) === JSON.stringify(next.labelTick ?? null)
+        ) {
+          return prev;
+        }
+        return next;
+      });
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(host);
+    // Also watch endpoints so height changes from wrapping subtitles immediately re-anchor edges
+    const a = host.querySelector<HTMLElement>(`[data-jid="${CSS.escape(from)}"]`);
+    const b = host.querySelector<HTMLElement>(`[data-jid="${CSS.escape(to)}"]`);
+    if (a) ro.observe(a);
+    if (b) ro.observe(b);
     return () => ro.disconnect();
-  }, [from, to, fromSide, toSide, ctx.frame.position]);
-
-  const pulseT = pulse?.active
-    ? live && ctx.frame.clock
-      ? clamp01((ctx.frame.clock.elapsedMs % pulse.durationMs) / pulse.durationMs)
-      : 0.54
-    : -1;
+  }, [ctx.model.id, from, to, route, fromSide, toSide, explicitBend, label, ctx.frame.position]);
 
   const stroke = pulse?.tone
     ? toneColor(pulse.tone)
@@ -413,51 +536,52 @@ export function FlowEdge({ ctx }: { ctx: ComponentCtx }) {
             : BT.faint;
 
   const isHot = state === 'active' || Boolean(pulse?.active);
-  const { from: _f, to: _t, route: _r, fromSide: _fs, toSide: _ts, state: _s, dashed: _d, bidirectional: _b, label: _l, protocol: _pr, tone: _tn, ...rest } = p;
+  const { from: _f, to: _t, route: _r, fromSide: _fs, toSide: _ts, bend: _bn, state: _s, dashed: _d, bidirectional: _b, label: _l, protocol: _pr, tone: _tn, ...rest } = p;
   const root = useRoot(ctx.model, rest, {
-    style: { position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none', zIndex: 4 },
+    style: { position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none', zIndex: isHot ? 6 : 4 },
   });
 
-  if (!geom) return <svg {...root} ref={svgRef} data-bd-root="" />;
+  const dataAttrs = {
+    'data-bd-root': '',
+    'data-fe-edge': '',
+    'data-fe-id': ctx.model.id,
+    'data-fe-from': from,
+    'data-fe-to': to,
+    'data-fe-route': route,
+    'data-fe-from-side': fromSide,
+    'data-fe-to-side': toSide,
+    'data-fe-bend': explicitBend !== undefined ? String(explicitBend) : '',
+    'data-fe-label': label,
+  };
 
-  const { x1, y1, x2, y2 } = geom;
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const dist = Math.hypot(dx, dy) || 1;
-  const bend = num(p.bend, route === 'arc' ? Math.min(72, dist * 0.34) : Math.min(34, dist * 0.2));
+  if (!routed) return <svg {...root} {...dataAttrs} ref={svgRef} />;
 
-  let d: string;
-  let ptAt: (t: number) => [number, number];
-  if (route === 'straight') {
-    d = `M ${x1} ${y1} L ${x2} ${y2}`;
-    ptAt = (t) => [x1 + dx * t, y1 + dy * t];
-  } else if (route === 'elbow') {
-    const mx = (x1 + x2) / 2;
-    d = `M ${x1} ${y1} L ${mx} ${y1} L ${mx} ${y2} L ${x2} ${y2}`;
-    ptAt = (t) => (t < 0.33 ? [x1 + (mx - x1) * (t / 0.33), y1] : t < 0.66 ? [mx, y1 + dy * ((t - 0.33) / 0.33)] : [mx + (x2 - mx) * ((t - 0.66) / 0.34), y2]);
-  } else {
-    const cx = (x1 + x2) / 2 - (dy / dist) * bend;
-    const cy = (y1 + y2) / 2 + (dx / dist) * bend;
-    d = `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
-    ptAt = (t) => {
-      const mt = 1 - t;
-      return [mt * mt * x1 + 2 * mt * t * cx + t * t * x2, mt * mt * y1 + 2 * mt * t * cy + t * t * y2];
-    };
-  }
+  const lapMs = pulse?.active
+    ? pulseLapDurationMs(polylineLength(routed.points), pulse.explicitDuration ? pulse.durationMs : undefined)
+    : 0;
+  const pulseT = pulse?.active
+    ? live && ctx.frame.clock && lapMs > 0
+      ? clamp01((ctx.frame.clock.elapsedMs % lapMs) / lapMs)
+      : 0.54
+    : -1;
 
-  const [mx, my] = ptAt(0.5);
+  const ptAt = (t: number): [number, number] => {
+    const pt = routed.kind === 'quad' && routed.quad ? sampleQuad(routed.quad, t) : samplePolyline(routed.points, t);
+    return [pt.x, pt.y];
+  };
+
   const tEff = pulse?.reverse ? 1 - pulseT : pulseT;
   const [px, py] = pulseT >= 0 ? ptAt(tEff) : [0, 0];
-  const pillW = Math.max(46, Math.round(label.length * 7.5 + 16));
+  const { x: mx, y: my } = routed.labelPos;
+  const pillW = routed.pillW;
 
   // Hand-drawn arrowhead triangle at endpoint when rough mode is active
-  const [tx, ty] = ptAt(0.92);
-  const ang = Math.atan2(y2 - ty, x2 - tx);
+  const ang = Math.atan2(routed.headTo.y - routed.headFrom.y, routed.headTo.x - routed.headFrom.x);
   const ah = 9;
-  const headD = `M ${x2} ${y2} L ${x2 - ah * Math.cos(ang - 0.45)} ${y2 - ah * Math.sin(ang - 0.45)} L ${x2 - ah * Math.cos(ang + 0.45)} ${y2 - ah * Math.sin(ang + 0.45)} Z`;
+  const headD = `M ${routed.headTo.x} ${routed.headTo.y} L ${routed.headTo.x - ah * Math.cos(ang - 0.45)} ${routed.headTo.y - ah * Math.sin(ang - 0.45)} L ${routed.headTo.x - ah * Math.cos(ang + 0.45)} ${routed.headTo.y - ah * Math.sin(ang + 0.45)} Z`;
 
   return (
-    <svg {...root} ref={svgRef} data-bd-root="">
+    <svg {...root} {...dataAttrs} ref={svgRef}>
       <defs>
         <marker id={markerId} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
           <path d="M 1 1.5 L 8.5 5 L 1 8.5 z" fill={stroke} />
@@ -465,35 +589,81 @@ export function FlowEdge({ ctx }: { ctx: ComponentCtx }) {
       </defs>
       {strokeMode === 'rough' ? (
         <>
-          <RoughPath seedKey={`${ctx.model.id}:edge`} d={d} stroke={stroke} strokeWidth={isHot ? 2.4 : 1.75} dashed={dashed} roughness={0.85} />
+          <RoughPath seedKey={`${ctx.model.id}:edge`} d={routed.d} stroke={stroke} strokeWidth={isHot ? 2.4 : 1.75} dashed={dashed} roughness={0.85} />
           <RoughPath seedKey={`${ctx.model.id}:head`} d={headD} stroke={stroke} fill={stroke} strokeWidth={1.2} roughness={0.4} />
         </>
       ) : (
-        <path
-          d={d}
-          fill="none"
-          stroke={stroke}
-          strokeWidth={isHot ? 2.4 : 1.75}
-          strokeDasharray={dashed ? '5 4' : undefined}
-          strokeLinecap="round"
-          markerEnd={`url(#${markerId})`}
-          markerStart={bidirectional ? `url(#${markerId})` : undefined}
-        />
+        <>
+          {routed.hasCrossing ? (
+            <path
+              d={routed.d}
+              fill="none"
+              stroke={BT.bg}
+              strokeWidth={isHot ? 6.5 : 5.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={0.86}
+            />
+          ) : null}
+          <path
+            d={routed.d}
+            fill="none"
+            stroke={stroke}
+            strokeWidth={isHot ? 2.4 : 1.75}
+            strokeDasharray={dashed ? '5 4' : undefined}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            markerEnd={`url(#${markerId})`}
+            markerStart={bidirectional ? `url(#${markerId})` : undefined}
+          />
+        </>
       )}
       {pulseT >= 0 ? (
         <circle cx={px} cy={py} r={5.5} fill={stroke} stroke={BT.slab} strokeWidth={2} />
       ) : null}
-      {label ? (
+      {routed.labelTick ? (
+        <line
+          x1={routed.labelTick.x1}
+          y1={routed.labelTick.y1}
+          x2={routed.labelTick.x2}
+          y2={routed.labelTick.y2}
+          stroke={stroke}
+          strokeWidth={1.1}
+          strokeDasharray="2 2"
+          opacity={0.75}
+        />
+      ) : null}
+      {label && routed.labelLines.length > 0 ? (
         <g transform={`translate(${mx}, ${my})`}>
-          <rect x={-pillW / 2} y={-10.5} width={pillW} height={21} rx={999} fill={BT.slab} stroke={BT.edge} strokeWidth={1} />
-          <text
-            x={0}
-            y={3.5}
-            textAnchor="middle"
-            style={{ fontSize: 10.5, fontFamily: BT.fontMono, fontWeight: 700, fill: stroke }}
-          >
-            {label}
-          </text>
+          <rect
+            x={-pillW / 2}
+            y={-routed.pillH / 2}
+            width={pillW}
+            height={routed.pillH}
+            rx={routed.labelLines.length > 1 ? 11 : 999}
+            fill={BT.slab}
+            stroke={BT.edge}
+            strokeWidth={1}
+          />
+          {routed.labelLines.length === 1 ? (
+            <text
+              x={0}
+              y={3.8}
+              textAnchor="middle"
+              style={{ fontSize: 10.5, fontFamily: BT.fontMono, fontWeight: 700, fill: stroke }}
+            >
+              {routed.labelLines[0]}
+            </text>
+          ) : (
+            <text
+              x={0}
+              textAnchor="middle"
+              style={{ fontSize: 10.5, fontFamily: BT.fontMono, fontWeight: 700, fill: stroke }}
+            >
+              <tspan x={0} y={-3}>{routed.labelLines[0]}</tspan>
+              <tspan x={0} y={11}>{routed.labelLines[1]}</tspan>
+            </text>
+          )}
         </g>
       ) : null}
     </svg>

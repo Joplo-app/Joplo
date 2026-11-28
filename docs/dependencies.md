@@ -33,6 +33,7 @@ Joplo 六个发行包使用 PolyForm Shield 1.0.0（可免费商用，禁止做�
 | lucide-react | 1.66.0 | ISC | 界面图标 |
 | clsx | 2.1.1 | MIT | 条件 className 组合 |
 | tailwind-merge | 3.7.0 | MIT | 合并 Tailwind 类名 |
+| d3-array / d3-scale / d3-shape / d3-sankey | 3.2.4 / 4.0.2 / 3.2.0 / 0.12.3 | ISC | `@joplo-app/plugin-viz` 纯数学比例尺、路径与桑基流向布局 |
 
 ## 开发与测试
 

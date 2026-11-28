@@ -1,5 +1,4 @@
 export const docs: Record<string, string> = {
-  TimeLanes: 'domain=[start,end], spans=[{id,lane,start,end,label?,status?}], unit="ms". Interval lengths and offsets share a real time scale. Use spanIds to register focus targets when spans is a state binding.',
   Diagram: "h (height, default 420; h=\"100%\" fills a layer), layout: 'tala'|'elk' (default 'tala': D2 TALA 2D architecture layout and orthogonal routing), direction: 'right'|'down' (omit it: chosen to fit the stage), aspect (target width/height), scale (requested native diagram size, default 1, shrinks to fit); architecture / relationship diagram. Layout is computed at compile time, deterministic, and identical in every step: state, when and trace never move nodes. Group nodes by business domain with Diagram.Group. Details: npx joplo skill diagram",
   'Diagram.Group': "id (required when referenced), label, icon (preset: client|service|model|database|queue|storage|external|tool|user|cloud|gateway|lock|network|device|box|brain), tone: gray|blue|green|orange|red|purple|teal, group (parent group id, instead of nesting), pin: 'start'|'end'; nestable; edges may connect to a group; a trace through its nodes highlights it",
   'Diagram.Node': "id (required for edges and trace), label, description (small second line), kind: 'client'|'service'|'model'|'database'|'queue'|'storage'|'external'|'tool'|'user', group (group id, instead of nesting), pin: 'start'|'end' (first / last layer within its group); optional state: 'idle'|'active'|'ok'|'error'|'dim' (omit it: trace() derives state)",
@@ -23,7 +22,7 @@ export const docs: Record<string, string> = {
   QueuePipe: 'label, engine?=kafka|rabbitmq|aws-sqs, partitions?, lag?, messages?; partitioned message queue conveyor',
   CacheNode: 'label, engine?=redis, hitRate?, ttl?; in-memory cache node with hit-rate gauge',
   ClusterBox: 'label, cloud?, badge?, tone?=info|accent|ok|warn|violet; dashed VPC/Region/K8s Namespace boundary container',
-  FlowEdge: 'from, to (data-jid ids), route?=curve|straight|elbow|arc, fromSide?, toSide?, bend?, dashed?, bidirectional?, protocol?, label?, state?=idle|active|blocked|cached|error, tone?; DOM-anchored vector connector (supports Rough.js in sketch mode and pulse() animation)',
+  FlowEdge: 'from, to (data-jid ids), route?=curve|straight|elbow|ortho|arc|auto, fromSide?, toSide?, bend?, dashed?, bidirectional?, protocol?, label?, state?=idle|active|blocked|cached|error, tone?; DOM-anchored vector connector with board-wide port spreading, obstacle/header-aware orthogonal routing, parallel lane separation, and collision-free label placement (supports Rough.js in sketch mode and pulse() animation)',
   StickFigure: 'pose?=standing|coding|thinking|pointing|happy|confused|running|presenting|admin|team, label?, role?, tone?, size?; Excalidraw-style hand-drawn stick figure actor',
   StickyNote: 'title?, text?, author?, color?=yellow|pink|mint|sky|lavender|peach, tilt?, pin?, w?; tactile tilted Post-it sticky note',
   SpeechBubble: 'text?, speaker?, kind?=speech|thought|shout, tail?=left|right|bottom|top, tone?; directional speech or thought bubble',
@@ -42,11 +41,6 @@ export const docs: Record<string, string> = {
   SwimLane: 'label, tone?; actor or phase swimlane container',
 };
 export const examples: Record<string, string> = {
-  TimeLanes: `<TimeLanes id="waterfall" domain={[0, 300]} spans={[
-  { id: 'auth', lane: 'Gateway', start: 0, end: 40, label: 'Auth', status: 'ok' },
-  { id: 'fetch', lane: 'Storage', start: 20, end: 220, label: 'Read' },
-]} />
-// In a step: highlight('auth'), callout('auth', '40 ms'), or shot('auth')`,
   // 关系类图表（D69）：npx joplo components Diagram / Sequence / StateMachine 也给一个能直接用的例子；分组、布局、取景的细节在 npx joplo skill diagram
   Diagram: `<Diagram id="arch" direction="right" h={420}>
   <Diagram.Group id="g_gw" label="Gateway" icon="gateway" tone="blue">

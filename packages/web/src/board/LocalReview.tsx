@@ -16,8 +16,8 @@ import { Popover } from '../player/popover';
 import { useBoardI18n } from '../i18n/board/context';
 import { LocalText } from '../i18n/LocalText';
 import type { Text } from '../i18n/messages';
-import { fetchLocalReview, writeLocalReviewEvent } from '../runtime/dev-client';
-import { captureReviewDraft, localReviewCommand, localReviewTitle, localReviewUpdates, readReviewDraft, reviewDraftKey, saveReviewDraft, type ReviewDraft } from './review-model';
+import { fetchLocalReview, refreshLocalToken, subscribeReview, writeLocalReviewEvent } from '../runtime/dev-client';
+import { captureReviewDraft, localReviewCommand, localReviewTitle, localReviewUpdates, readReviewDraft, reconcileReviewDraft, reviewDraftKey, saveReviewDraft, type ReviewDraft } from './review-model';
 import { readReviewPosition, saveReviewPosition } from './review-position';
 
 /** 跨页面保留草稿的位置；基于 Juice v0.2.0 CornerSnapOrb（自由边界拖拽 + 触觉音效）、Textarea、CopySnippet 与舒展 Collapsible。 */
@@ -50,8 +50,10 @@ export function LocalReview({ projectId, project, workId, context, version, enab
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     let running = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
     const refresh = async () => {
       if (running || submitting.current) return;
       running = true;
@@ -66,32 +68,70 @@ export function LocalReview({ projectId, project, workId, context, version, enab
         if (d?.requestId && result.state.session.events.some(e => e.requestId === d.requestId)) {
           // 请求响应丢失、刷新或切换方案后，已落盘的同一请求视为成功，不能再次发送。
           setError(null);
-          updateDraft(null);
+          const next = latest.current.context ? captureReviewDraft(result.state.session, latest.current.project, latest.current.context) : null;
+          updateDraft(next);
           pending.current = null;
+        } else {
+          // 热更新产生新一轮评审时：空草稿自动绑定当前页面，有文字且位置仍有效的草稿无感切到新版继续提交。
+          const reconciled = reconcileReviewDraft(d, result.state.session, latest.current.project, latest.current.context);
+          if (reconciled && (
+            !d
+            || reconciled.sessionId !== d.sessionId
+            || reconciled.context.sceneId !== d.context.sceneId
+            || reconciled.context.scenarioId !== d.context.scenarioId
+            || reconciled.context.position !== d.context.position
+          )) {
+            updateDraft(reconciled);
+            pending.current = null;
+            setError(null);
+          }
         }
-        // 空草稿在首次打开时捕获；已有草稿永不因后台刷新而改绑页面。
-        if (open && (!latest.current.draft || !latest.current.draft.text && latest.current.draft.sessionId !== result.state.session.id) && latest.current.context) {
-          const next = captureReviewDraft(result.state.session, latest.current.project, latest.current.context);
-          setDraft(next);
-        }
+      } else if (result.code === 'REVISION_CONFLICT' || result.status === 409) {
+        // 源码刚保存、服务端正在 60ms 内重编译：不弹红错阻断审阅，短延迟自动重拉。
+        if (!retryTimer) retryTimer = setTimeout(() => { retryTimer = null; void refresh(); }, 250);
       } else setLoadError(result.message);
     };
     void refresh();
-    const timer = setInterval(() => void refresh(), open ? 1500 : 5000);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [projectId, workId, version, open]);
+    let connected = true;
+    const offReview = subscribeReview(
+      projectId,
+      (u) => {
+        if (!u.workId || u.workId === workId) {
+          if (u.reconnected) void refreshLocalToken().finally(() => { if (!cancelled) void refresh(); });
+          else void refresh();
+        }
+      },
+      (live) => { connected = live; },
+    );
+    const timer = setInterval(() => { if (connected) void refresh(); }, open ? 1500 : 5000);
+    return () => {
+      cancelled = true;
+      offReview();
+      clearInterval(timer);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [projectId, workId, version, open, enabled]);
+
+  // 空草稿时切步骤/切画面自动跟随当前位置，无需关掉重开浮层。
+  useEffect(() => {
+    const s = latest.current.state?.session;
+    const d = latest.current.draft;
+    if (!s || !context || d?.text.trim()) return;
+    if (d && d.sessionId === s.id && d.context.sceneId === context.sceneId && d.context.scenarioId === context.scenarioId && d.context.position === context.position) return;
+    setDraft(captureReviewDraft(s, project, context));
+  }, [state?.session.id, context?.sceneId, context?.scenarioId, context?.position, project]);
 
   const session = state?.session;
   const status = session ? localReviewStatus(session) : null;
   const stale = !!(draft?.text.trim() && session && draft.sessionId !== session.id);
-  const shifted = !!(draft && context && (draft.context.sceneId !== context.sceneId || draft.context.scenarioId !== context.scenarioId || draft.context.position !== context.position));
+  const shifted = !!(draft?.text.trim() && context && (draft.context.sceneId !== context.sceneId || draft.context.scenarioId !== context.scenarioId || draft.context.position !== context.position));
   const feedback = session?.events.filter(e => e.type === 'feedback') ?? [];
   const canWrite = enabled && !!session && status === 'open' && !stale && !busy && !loadError;
   const show = () => {
     playJuiceSound('tap');
     if (open) { setOpen(false); return; }
     onOpen();
-    if (!draft?.text && session && context) updateDraft(captureReviewDraft(session, project, context));
+    if (!draft?.text.trim() && session && context) updateDraft(captureReviewDraft(session, project, context));
     setOpen(true);
   };
   const send = async (type: 'feedback' | 'approved') => {
@@ -103,13 +143,36 @@ export function LocalReview({ projectId, project, workId, context, version, enab
       : { sessionId: session.id, type } as const;
     const signature = JSON.stringify(data);
     if (pending.current?.signature !== signature) pending.current = { signature, input: { ...data, requestId: type === 'feedback' && draft?.requestId ? draft.requestId : crypto.randomUUID() } };
-    const input = pending.current.input;
+    let input = pending.current.input;
     if (type === 'feedback' && draft) updateDraft({ ...draft, requestId: input.requestId });
     submitting.current = true;
     ++requestOrder.current; // 丢弃提交前发出的旧状态响应。
     setBusy(true);
     setError(null);
-    const result = await writeLocalReviewEvent(projectId, input);
+    let result = await writeLocalReviewEvent(projectId, input);
+    // 若提交瞬间恰好遇到 Agent 热更新（409 REVISION_CONFLICT）：自动拉取新轮次；feedback 位置仍有效时无感重试一次（approved 绝不静默重发）。
+    if (!result.ok && (result.code === 'REVISION_CONFLICT' || result.status === 409) && mounted.current) {
+      let latestReview: LocalReviewState | null = null;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const synced = await fetchLocalReview(projectId, workId);
+        if (synced.ok) { latestReview = synced.state; break; }
+        if (synced.code !== 'REVISION_CONFLICT' && synced.status !== 409) break;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      if (latestReview && mounted.current) {
+        setState(latestReview);
+        if (type === 'feedback' && draft && localReviewStatus(latestReview.session) === 'open') {
+          const reconciled = reconcileReviewDraft(draft, latestReview.session, latest.current.project, latest.current.context);
+          if (reconciled && reconciled.sessionId === latestReview.session.id) {
+            const retryData = { sessionId: latestReview.session.id, type: 'feedback' as const, body: reconciled.text.trim(), context: reconciled.context };
+            input = { ...retryData, requestId: crypto.randomUUID() };
+            pending.current = { signature: JSON.stringify(retryData), input };
+            updateDraft({ ...reconciled, requestId: input.requestId });
+            result = await writeLocalReviewEvent(projectId, input);
+          }
+        }
+      }
+    }
     submitting.current = false;
     if (result.ok && type === 'feedback' && readReviewDraft(key)?.requestId === input.requestId) saveReviewDraft(key, null);
     if (!mounted.current) return;

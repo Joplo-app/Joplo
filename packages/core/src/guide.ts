@@ -1,9 +1,25 @@
 import { MENTAL_MODEL, SKILL_TOPICS, START_ORDER } from './agent-skill.ts';
 import { JoploError } from './result.ts';
-import type { PluginDef, PluginComponentSpec } from '@joplo-app/kit/plugin';
+import { COMPONENT_ROLES, type ComponentRole, type PluginDef, type PluginComponentSpec } from '@joplo-app/kit/plugin';
 export { SKILL_TOPICS };
 export type SkillTopic = (typeof SKILL_TOPICS)[number]['name'];
-export type PluginSkillSource = Pick<PluginDef, 'id' | 'title' | 'version' | 'description' | 'components' | 'skill' | 'skillTopics' | 'packageName'>;
+export type PluginSkillSource = Pick<PluginDef, 'id' | 'title' | 'version' | 'description' | 'bestFor' | 'pairsWith' | 'components' | 'skill' | 'skillTopics' | 'packageName'>;
+const ROLE_HEADINGS: Record<ComponentRole, string> = {
+  stage: 'spatial worlds, camera zones, and outer frames',
+  topology: 'architecture topologies, services, storage, and connectors',
+  sequence: 'time-ordered request/reply lifelines',
+  state: 'lifecycles, state transitions, and multi-step flows',
+  chart: 'data charts, ratios, and timeline lanes',
+  metric: 'key metrics, gauges, and structured data',
+  comparison: 'before/after and side-by-side comparisons',
+  code: 'source snippets and command-line surfaces',
+  conversation: 'chat threads, tool runs, and agent outputs',
+  dsa: 'data structures, slot tracks, flowcharts, and schemas',
+  annotation: 'actors, sticky callouts, bubbles, and status banners',
+  media: 'images, clips, animations, and 3D worlds',
+  control: 'interactive inputs, triggers, navigation, and overlays',
+  layout: 'layout containers and typography',
+};
 const related: Record<SkillTopic, readonly SkillTopic[]> = {
   authoring:['story','plugins','cases','demo','check'], story:['authoring','cases','demo','focus'],
   demo:['authoring','plugins','focus','review','publish'],focus:['demo','plugins','check'],
@@ -25,9 +41,9 @@ export function skillTopic(topic: string): string {
 }
 export function pluginSkillIndex(plugins: readonly PluginSkillSource[]): string {
   return ['Plugins enabled in config.plugins:',...plugins.flatMap(p=>[
-    `  ${p.id} — ${p.title}${p.version?` (${p.version})`:''}${p.packageName?` · ${p.packageName}`:''}`,
+    `  ${p.id} — ${p.title}${p.version?` (${p.version})`:''}${p.packageName?` · ${p.packageName}`:''}${p.bestFor?` — ${p.bestFor}`:''}`,
     ...Object.entries(p.skillTopics??{}).map(([key,t])=>`    ${p.id}/${key} — ${t.description}`),
-  ]),...(!plugins.length?['  None. Install an author package, add it to config.plugins, then read npx joplo skill <plugin-id>.']:[]),''].join('\n');
+  ]),...(plugins.length?['','Component palette by intent: npx joplo components; cross-plugin matrix: .claude/skills/joplo-plugins/SKILL.md']:['  None. Install an author package, add it to config.plugins, then read npx joplo skill <plugin-id>.']),''].join('\n');
 }
 export function findPluginTopic(topic: string, plugins: readonly PluginSkillSource[]): PluginSkillSource|null {
   const [id]=topic.replace(/^(?:plugin:|joplo-plugin-)/,'').split('/');
@@ -38,12 +54,99 @@ export function findPluginTopic(topic: string, plugins: readonly PluginSkillSour
 }
 export function pluginSkillTopic(p: PluginSkillSource, topic?: string): string {
   if(topic){const guide=p.skillTopics?.[topic];if(!guide)throw new JoploError('USAGE',`Plugin ${p.id} has no topic ${topic}. Available: ${Object.keys(p.skillTopics??{}).join(', ')||'(entry only)'}`);return guide.body.trimEnd()+'\n';}
-  return [`# Joplo plugin ${p.id}: ${p.title}${p.version?` ${p.version}`:''}`,p.description??'',p.packageName?`Author package: ${p.packageName}`:'',p.skill?.trim()??'Read the package documentation before using it.',
+  return [`# Joplo plugin ${p.id}: ${p.title}${p.version?` ${p.version}`:''}`,p.bestFor?`Best for: ${p.bestFor}`:'',p.description??'',p.packageName?`Author package: ${p.packageName}`:'',p.skill?.trim()??'Read the package documentation before using it.',
     '',...Object.entries(p.skillTopics??{}).map(([key,g])=>`- npx joplo skill ${p.id}/${key}: ${g.description}`),'','General engine contracts: npx joplo skill plugins',''].filter((s,i,a)=>s||a[i-1]).join('\n');
 }
 function inventory(plugins:readonly PluginSkillSource[]):Record<string,PluginComponentSpec>{return Object.fromEntries(plugins.flatMap(p=>Object.entries(p.components).map(([n,c])=>[`${p.id}:${n}`,c])));}
+function companionHints(plugins: readonly PluginSkillSource[]): { active: { left: string; right: string; how: string }[]; missing: { id: string; packageName?: string; how: string }[] } {
+  const enabled = new Set(plugins.map(p => p.id));
+  const activeByPair = new Map<string, { left: string; right: string; how: string }>();
+  const missingById = new Map<string, { id: string; packageName?: string; how: string }>();
+  for (const p of plugins) {
+    for (const pair of p.pairsWith ?? []) {
+      if (pair.with === p.id) continue;
+      if (enabled.has(pair.with)) {
+        const key = [p.id, pair.with].sort().join('::');
+        const prev = activeByPair.get(key);
+        if (!prev || pair.how.length > prev.how.length) activeByPair.set(key, { left: p.id, right: pair.with, how: pair.how });
+      } else {
+        const prev = missingById.get(pair.with);
+        if (!prev || (!prev.packageName && pair.packageName) || pair.how.length > prev.how.length) {
+          missingById.set(pair.with, { id: pair.with, ...(pair.packageName ? { packageName: pair.packageName } : prev?.packageName ? { packageName: prev.packageName } : {}), how: pair.how });
+        }
+      }
+    }
+  }
+  return { active: [...activeByPair.values()], missing: [...missingById.values()] };
+}
+/** Synthesize a cross-plugin intent matrix and composition sheet for joplo-plugins/SKILL.md from enabled plugin manifests. */
+export function pluginCompositionGuide(plugins: readonly PluginSkillSource[]): string[] {
+  const out: string[] = [];
+  const byRole = new Map<ComponentRole, string[]>();
+  const uncategorized: string[] = [];
+  const intrinsics: string[] = [];
+  for (const p of plugins) {
+    const names = new Set(Object.keys(p.components));
+    for (const [name, c] of Object.entries(p.components)) {
+      const full = `${p.id}:${name}`;
+      if (c.intrinsic) { intrinsics.push(full); continue; }
+      const dot = name.indexOf('.');
+      const root = dot > 0 ? name.slice(0, dot) : null;
+      if (root && names.has(root) && p.components[root]?.role === c.role) continue;
+      if (c.role && (COMPONENT_ROLES as readonly string[]).includes(c.role)) {
+        const list = byRole.get(c.role) ?? [];
+        list.push(full);
+        byRole.set(c.role, list);
+      } else uncategorized.push(full);
+    }
+  }
+  const hasRichRoles = COMPONENT_ROLES.some(r => r !== 'layout' && (byRole.get(r)?.length ?? 0) > 0);
+  if (hasRichRoles || uncategorized.length) {
+    out.push('', '## Visual palette by expression intent (enabled plugins)', '', 'Before writing TSX, map each chapter or scenario beat to one or more specialized roles below instead of hand-building raw HTML boxes or plain text panels. Run `npx joplo components <Name>` for exact props and runnable examples.', '');
+    for (const role of COMPONENT_ROLES) {
+      if (role === 'layout') continue;
+      const items = byRole.get(role);
+      if (!items?.length) continue;
+      out.push(`- **${role}** (${ROLE_HEADINGS[role]}): ${items.map(x => `\`${x}\``).join(', ')}`);
+    }
+    if (uncategorized.length) out.push(`- **other**: ${uncategorized.map(x => `\`${x}\``).join(', ')}`);
+    const layoutItems = byRole.get('layout');
+    if (layoutItems?.length) out.push(`- **layout** (${ROLE_HEADINGS.layout}): ${layoutItems.map(x => `\`${x}\``).join(', ')}`);
+    if (intrinsics.length) out.push(`- **html fallbacks**: ${intrinsics.map(x => `\`${x}\``).join(', ')} (use only for lightweight layout wrappers or custom kinetic geometry, never to replace the specialized components above).`);
+  }
+  const { active, missing } = companionHints(plugins);
+  if (active.length) {
+    out.push('', '## How your enabled plugins compose', '', ...active.map(a => `- **${a.left} + ${a.right}**: ${a.how}`));
+  }
+  if (missing.length) {
+    out.push('', '## Optional companion plugins (not enabled yet)', '', 'If a beat needs a visual form that your currently enabled plugins do not cover, install the matching package at this project\'s Joplo version, add it to `config({ plugins: [...] })` in `joplo.config.ts`, and rerun `npx joplo skill install`:', '', ...missing.map(m => `- **${m.id}**${m.packageName ? ` (\`${m.packageName}\`)` : ''}: ${m.how}`));
+  }
+  return out;
+}
 export function componentIndex(plugins:readonly PluginSkillSource[]):string{
- const all=inventory(plugins);return ['Enabled plugin components:',...Object.entries(all).map(([n,c])=>`- ${n}: ${c.doc}`),...(!Object.keys(all).length?['None. Enable plugins in config.plugins and read npx joplo skill.']:[]),''].join('\n');
+  const all=inventory(plugins),entries=Object.entries(all);
+  if(!entries.length)return ['Enabled plugin components:','None. Enable plugins in config.plugins and read npx joplo skill.',''].join('\n');
+  const hasRoles=entries.some(([,c])=>c.role!==undefined);
+  if(!hasRoles)return ['Enabled plugin components:',...entries.map(([n,c])=>`- ${n}: ${c.doc}`),''].join('\n');
+  const lines:string[]=['Enabled plugin components (grouped by expression role; run npx joplo components <Name> for props & examples):'];
+  const intrinsics:string[]=[];
+  const grouped=new Map<string,[string,PluginComponentSpec][]>();
+  for(const [n,c] of entries){
+    if(c.intrinsic){intrinsics.push(n);continue;}
+    const key=c.role&&Object.hasOwn(ROLE_HEADINGS,c.role)?c.role:'other';
+    const list=grouped.get(key)??[];list.push([n,c]);grouped.set(key,list);
+  }
+  for(const role of COMPONENT_ROLES){
+    const items=grouped.get(role);if(!items?.length)continue;
+    lines.push('',`### ${role} — ${ROLE_HEADINGS[role]}`,...items.map(([n,c])=>`- ${n}: ${c.doc}`));
+  }
+  const other=grouped.get('other');
+  if(other?.length)lines.push('','### other',...other.map(([n,c])=>`- ${n}: ${c.doc}`));
+  if(intrinsics.length)lines.push('',`- HTML fallbacks (use only for lightweight layout or custom geometry): ${intrinsics.join(', ')}`);
+  const {missing}=companionHints(plugins);
+  if(missing.length)lines.push('','Companion plugins not yet enabled in config.plugins:',...missing.map(m=>`- ${m.id}${m.packageName?` (${m.packageName})`:''}: ${m.how}`));
+  lines.push('');
+  return lines.join('\n');
 }
 export function componentDetails(names:readonly string[],plugins:readonly PluginSkillSource[]):string{
  const all=inventory(plugins),keys=Object.keys(all),out:string[]=[];
@@ -277,6 +380,7 @@ Backend behind the same feature: put a diagram layer alongside the UI (prefer in
 - Scenario list, one line per scenario: Given (who, where, starting state) → When (the user's actions) → Then (the visible result), plus how it opens and how it ends.
 - Length: a scenario is usually 5–12 steps, about 20–60 s at 1×. check flags one over 90 s; npx joplo outline prints every estimate. An estimate is the sum of each step's time plan: the action demonstration (cursor travel, press, typing or a 0.9 s system pause) plus the longer of its stay and its estimated narration, the same plan autoplay runs.
 - Minimal Decision Recipe (first reviewable draft in minutes): for a feature decision, do not build every screen, edge case, or voice track up front. Start with **1 thin happy path + 1 failure/recovery path + 1 contested boundary** on the smallest screen that proves the state change; add Option B only when a genuine trade-off needs comparing, and expand the remaining cases only after the reviewer checks the first round in the board.
+- Visual role mapping before TSX (compose plugins, avoid raw-HTML decks): inspect .claude/skills/joplo-plugins/SKILL.md and npx joplo components first, then assign each chapter or scenario beat a concrete visual carrier (spatial camera world, system topology, request sequence, lifecycle, statistical chart, key metrics, side-by-side comparison, live source/terminal, or interactive UI). Combine multiple enabled plugins across beats — and install missing companion plugins when needed — rather than repeating plain text panels or hand-built raw HTML boxes. Ground abstract mechanics on one concrete running specimen (one real request, order, or sentence), introduce new structure progressively (one causal change per beat), contrast stillness against motion to show reuse, and keep one visual subject per camera shot.
 - Unsure how to frame it? Offer two or three one-line framings and let the user pick.
 - Recreating an existing video, GIF or screen recording: read it before planning. Extract frames into contact sheets (for example ffmpeg -i ref.gif -vf "fps=1,tile=3x3" sheet%02d.png, written outside the project) and list its chapters, the states each chapter passes through and every on-screen sentence; those become slices, steps and narration (shared cases only for feature review). Map the reference's own chrome to the player's instead of redrawing it: its chapter label → chapter title (case title in feature review) and the player's step title, its bottom progress → the player's chapter list, its key badge → the host key record after .press(), its spoken captions → narrate()/say(). Ask about anything the reference does not show (chapters cut off, unseen states) instead of inventing it; replace third-party logos with neutral shapes.
 
@@ -346,7 +450,7 @@ Check: read every line aloud in order without looking at the screen. It should s
 When the demo explains a topic (an election, a policy, a market move) instead of a product, the rules above still hold: every claim becomes a graphic that changes on screen, never a slide of bullets. The full method (package, hook, a continuous world, morphing objects, work()/chapter() default continuation, review): the installed explainer plugin skill.
 - Arc: a hook naming what happened and who it happened to → the rule in about 30 seconds → the reveal (numbers change on screen) → a twist or context (history, base rates) → why it matters to the viewer → a short closing card. Write one chapter() slice per question under work().scenarios; the published site plays continuing chapters back to back without a countdown, like one video.
 - Chapter titles are what viewers read in the sidebar: write a question ('What is on the ballot?'), with expected describing what the viewer can now explain. The UI adds chapter numbers; standalone works need no option or cases.
-- Graphics that carry the story: a seat chart filling up, a tile map recoloring, bars growing or flipping, a document flying between two sides and getting stamped. Build them from divs with style bound to state (demo: Custom motion) and real photos (components: Real images).
+- Graphics that carry the story: pick specialized primitives from your enabled plugins first (check .claude/skills/joplo-plugins/SKILL.md and npx joplo components for topology, sequence, lifecycle, chart, metric, comparison, code/terminal, and spatial camera capabilities); drop down to styled raw elements only for custom kinetic geometry (such as a seat chart filling up or tokens flying) that no enabled plugin covers, plus real licensed photos where evidence matters.
 - Facts: keep every number in one data module with its source and as-of time, show a source line on each graphic, separate called or projected results from final ones, and leave out what you cannot verify rather than hedging on screen.
 - Collect assets before drawing complex visuals: list the needed interface primitives, fonts, icons and sounds; prefer suitable reusable libraries or licensed assets over hand-built SVG or models. Keep redistributable files in assets/ and record each source URL, author, license and modifications in assets/SOURCES.md; retain license files and show attribution where required. A library license does not automatically establish the license of its bundled fonts, logos or samples. Scope third-party styles and embed required assets for offline playback.
 - Photos: use public-domain or properly licensed images, credit them on stage when the license asks, keep a CREDITS file next to them, and strip EXIF / GPS metadata before embedding.
@@ -377,7 +481,7 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - Blank/noninteractive clicks only pause, with no local-change notice. Covers/transition cards remain inert. Hover never pauses; while paused it matches normally. Touch tap completing hover follows the click rule.
 - Pointerdown pauses immediately and the same drag continues. A declared element drag owns its pointer before stage pan or plugin orbit: the source follows the pointer (also inside scaled pictures) and is transparent to hit tests while dragged. On release the engine picks the destination under the pointer, else the one the dragged element overlaps most, else the nearest within about 48 stage px; with none it snaps back and changes nothing. Esc, a cancelled pointer, a window blur or a hidden page also snap back; a second finger or pointer never takes over a drag in progress. Known limit (0.3.0): that 48 px is measured in the outer stage scale, not the scale of a picture plugin inside it, so the "nearby" tolerance is larger in a shrunk picture and smaller in a magnified one — make endpoints big enough and keep unrelated endpoints apart. The first wheel event pauses and scrolls; keep the burst/inertia in its scroll container before stage zoom.
 - Playback controls stay outside stage input. Editing keys stay with a focused editable control. Plugin actions enter the same arbiter; never independently advance the timeline.
-- Sequential playback is the default everywhere (board, published site, embed, render --chain): when a scenario finishes during playback, the next scenario starts at once — no countdown, no end card. The order follows from chains first (a chapter that continues another plays right after it, wherever it is declared), then declaration order. A from chapter continues in the same shot; a scenario marked flow('Slice title', { autoplay: false }) is skipped together with the chapters that continue it, and playing such a branch stops at its end. Pausing, exploring, a pending scenario switch or stepping manually never jumps ahead; the replay / next-case controls appear only when the whole sequence has finished. Declare scenarios in viewing order.
+- Sequential playback is the default everywhere (board, published site, embed, render --chain): when a scenario finishes during playback, the next scenario starts at once — no countdown, no end card. The order follows from chains first (a chapter that continues another plays right after it, wherever it is declared), then declaration order. A from chapter continues in the same shot; a scenario marked flow('Slice title', { autoplay: false }) is skipped together with the chapters that continue it, and playing such a branch stops at its end. Pausing, exploring, a pending scenario switch or stepping manually onto the last step never jumps ahead automatically, while pressing Next / → again once already at the end (or fast-forwarding through the final dwell) advances directly into the next scenario; the replay / next-case controls appear only when the whole sequence has finished. Declare scenarios in viewing order.
 - Play, jump, scenario change and reset discard local effects. Screenshots, video, deep links and __JOPLO_STATE__ always read the timeline. Frozen in-flight previews must not paint over accepted local edits; preserve their original anchor for reset/resume.
 - Use native controls from installed plugins and read their skills for supported edits. Give clickable elements onClick so they work after takeover; use work.free for other declared secondary reactions; keep lasting results in scripted effects. Test actual inputs, not only autoplay.
 
@@ -412,7 +516,7 @@ Start playback before testing stage gestures: covers and transition cards intent
 ## Make it play like a film, not slides (Required for video-like pieces)
 Viewers call a piece "a slide deck" when pictures swap in one frame and then sit still. The static storyboard cannot show either problem, so it never proves the piece moves well.
 - No hard cuts. Every chapter/era/scene seam needs a transition the viewer can follow: carry one object across (a match cut through the subject: push in until it fills the frame, swap the world behind it, pull back), morph a shared object, crossfade layers, or move the camera over the swap. One deliberate cut is a signature move; more than that is a deck. A scene change must not reset all visual context.
-- No dead frames. Nothing on screen may be completely still for more than about 1.5 s; a still composition lasts at most about 3.5 s, and something changes at element level every 2–2.5 s. During reading holds keep a slow, eased camera drift with an end point (constant-speed motion reads as a screensaver). Use the installed visual plugin's drift and enter/exit transitions; read its recipes.
+- Prefer progressive stage content over cosmetic camera creep. When narration continues for several seconds on the same screen, enrich the stage with real visual progression (reveal a supporting detail, highlight or call out an element, update visible state, animate a trace/connector, or split the narration across visual sub-beats) rather than adding a subtle camera drift or tiny pan/zoom nudge just to keep pixels moving. A calm, steady frame while viewers read or listen is far better than restless micro-movement; reserve slow camera drift only for deliberate establishing shots, and turn drift off on diagrams, code, numbers, and dense comparisons.
 - Verify real layout after fonts and transforms, not only check: npx joplo render . --scenario-id film.open --out still.png --audit-layout --audit-content '[data-jid="frame"]' --audit-important '[data-jid="quote"]' --audit-safe-area '0,920,1920,160' --audit-exclude '[data-jid="stamp"]'. Areas use actual page CSS pixels relative to the export root, or a selector inside it; importance and intentional decoration are explicit, never guessed from text meaning. The sibling .layout.json reports Range text-line bounds, clipping/safe-area warnings, source/element/work/scenario/step and evidence. A static result is final-state only (atMs:null), not animation proof.
 - For motion use --film --audit-layout (fresh run; --sample-ms at most 50). The audit consumes the same export clock and JPEG frames: post-commit, entry finish and plugin-declared camera/drift/waypoint deadlines are sampled within the report's sampleToleranceMs; intervening intervals are sampled with --audit-every-ms (20–1000, default 250). A later step may interrupt a motion phase. Inspect evidence before editing: overlap is a geometry heuristic warning, masks/rotation/nonrectangular clipping or hidden importance remain unknown, and unmeasured intervals can contain issues. --audit-layout supports static or film, not sheet/video/frames/resume. It never changes layout or generates paid narration/resources.
 - One main motion per beat; most beats 2–3 s. hold(seconds) is the author's pacing: a step with hold no longer gets the 3 s reading floor (caption reading time per character and narration still extend it). A step takes its pre-commit lead plus its post-commit dwell (the larger of visual dwell and narration). hold(seconds) only sets post-commit dwell, so summing holds alone underestimates runtime. System steps default to a 0.9 s pre-commit lead; use work({ pace: { systemLead: 0 }, ... }) for narration-led films or a finite 0–30 seconds to choose it. The work setting applies to every system step, including continuing chapters, and preserves explicit timing in reduced-motion mode. Cards still commit directly; narration waits keep the engine clock (and therefore drift and transitions) running.
@@ -421,7 +525,7 @@ Viewers call a piece "a slide deck" when pictures swap in one frame and then sit
 - Anti-deck gate: before building, write one line per beat — the main moving object, its start → end state, and the verb (push, morph, rise, swap…). If most beats are only fades or panels appearing, redesign them. A contact sheet that reads like slide thumbnails fails.
 - Chapters: use chapter() default continuation; sequential playback of a continuing chapter continues in the same shot (no countdown, no reset, music keeps playing). Bring the next chapter's music in on the beat before the visual swap (play the next score with fadeMs; the old track fades out under it — a J-cut). Play the same score again to keep it going. Stop music only at the real ending.
 - Film sampling has a 50 ms default observation tolerance: identical source can cross a step/chapter boundary one sample apart; pixel equality across browsers is not guaranteed. It freezes the browser clock before loading, advances on a fixed 16 ms loading grid and waits for DOM commits to settle before each sample. Loading time does not become playback time. Repeat the same command when checking timing; compare scenario/position timelines separately from pixel differences (fonts, browser and platform can still affect rasterization).
-- Required review: run npx joplo render <dir> --scenario-id <first chapter> --film --chain --out film.png and read every page (one per chapter; red = one-frame full-screen change, grey = nothing visible changed for ≥ 1.5 s). The CLI prints every CUT and STILL with time and step; film.json beside it has the largest adjacent-frame change around every step. Fix every CUT that is not a deliberate signature and every STILL, then film again. Also record --video (real time) and watch it once start to end. Cells are samples on the engine clock; check a suspicious moment with --frames <dir> at full size before changing code — fine textures (1-px checkers, hairlines) shimmer as moiré under zoom or drift and show up as cuts. The opposite also happens: in a product-recording piece the real change is a few characters, a caret or a timer, below the STILL threshold, so a typing sequence can be reported as one long STILL. Crop the changing area across consecutive --frames before adding motion only to satisfy the detector.
+- Required review: run npx joplo render <dir> --scenario-id <first chapter> --film --chain --out film.png and read every page (one per chapter; red = one-frame full-screen change, grey = nothing visible changed for ≥ 3.0 s). The CLI prints every CUT and STILL with time and step; film.json beside it has the largest adjacent-frame change around every step. Fix every unintended CUT. For a long STILL while narration keeps speaking, enrich the stage with progressive content (split into visual sub-beats, reveal a detail, highlight/call out, or update state) rather than adding subtle camera drift or micro-shifts merely to silence the STILL detector; keep deliberate reading, comparison, or silent observation holds still. Also record --video (real time) and watch it once start to end. Cells are samples on the engine clock; check a suspicious moment with --frames <dir> at full size before changing code — fine textures (1-px checkers, hairlines) shimmer as moiré under zoom or drift and show up as cuts. The opposite also happens: in a product-recording piece the real change is a few characters, a caret or a timer, below the STILL threshold, so a typing sequence can be reported as one long STILL. Crop the changing area across consecutive --frames before adding motion only to satisfy the detector.
 - Review as a picky viewer, not the author: list issues with time code, evidence (frame/metric), impact, severity (blocker / major / minor / note) and verdict (APPROVE / APPROVE_WITH_NOTES / REVISE). Check mechanics first (cuts, stills, overlaps, cropped text), then meaning, then taste; "not cinematic enough" without evidence is not a finding. Do at least two rounds of film → issues → fix, and finish one chapter seam to delivery quality before copying the technique to the others.
 - Static frames (render, --sheet, thumbnails, deep links) show settled pictures: no drift, no half-finished transitions. That is deliberate and is why the film strip is the motion check.
 - Boundary (D94): "like a video" is a quality bar, not a motion-graphics engine. Joplo's timeline is made of real, interactive states (steps), not frames. Reach the bar with the small set of glue tools above — transitions between states (enter/exit, match cuts), camera (framing, drift, safe area), media continuity, and the film/video review. There are no keyframe timelines, compositions, per-frame drawing APIs or particle effects; when a piece needs showy motion graphics, render that clip with another tool and embed it as an asset through a plugin. Ask of any new idea: does it describe how states change and are seen (fine), or how pixels are drawn over time (out of scope)?
@@ -484,7 +588,7 @@ Read the relevant installed plugin skill for the visual component, its props and
 - Look closer at a small or dense area: shot('id', …). The camera zooms; the rest fades. What the frame keeps (a node's group title, a card's container): diagram.
 - One block on a busy screen, keep the layout visible: spotlight('id'). No zoom; everything else is washed out.
 - "Notice this changed / this matters": highlight('id'). No zoom; a ring that pulses once.
-- One short reason next to an element: callout('id', 'Share after generation', { side? }). A note with a leader line; side is top / right / bottom / left, or omitted to pick the free side.
+- One short reason next to an element: callout('id', 'Share after generation', { side? }) (or shorthand callout('id', '…', 'bottom')). A note with a leader line; omitting side automatically scores all four sides to stay inside the viewport and avoid overlapping neighboring cards, text blocks, and other cues.
 - What a screen is made of, or an order of parts: numbered('input', 'preview', 'send'). Badges 1, 2, 3 (keep it to 5 or fewer).
 - Use an existing clip to determine dwell: hold('voice', { pad: 0.4 }) for this step's narration or hold('audio', asset('./cue.wav'), { pad: 0 }) for a separate clip. This replaces caption reading floors, never required action/plugin-effect time; measured versus estimated is visible in check/outline. See demo for the max rule, preparation and timing sources.
 - Give viewers time to look (a chart, a comparison, a long result): hold(5). Autoplay stays at least 5 seconds (0.5–30, scaled by speed).
@@ -690,6 +794,8 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - CHAPTER_TITLE_GENERIC (info): two or more chapters in a linear work use bare placeholder titles ('Intro', 'Principles', 'Summary', or equivalent bare placeholders). Name each chapter after its concrete question, outcome, or stage.
 - SCENARIO_TOO_LONG (info): the scenario plays over 90 s at 1×. One scenario tells one thing: split it (happy path, then each recovery) or branch with fork(). npx joplo outline shows the pacing.
 - HAPPY_PATH_ONLY (info): every case is a main-flow case and every scenario succeeds. Ask about input, permission, async, and lifecycle cases (see cases), then add an error-and-recovery scenario. Do not invent behavior. This applies only to feature review; standalone explainers use work()/chapter() and have no cases.
+- STAGE_RAW_HTML_HEAVY (info): a stage renders mostly raw HTML fallback tags with no expressive plugin components or kinetic plugin properties, even though richer roles are already enabled. Run npx joplo components or read .claude/skills/joplo-plugins/SKILL.md and replace static HTML boxes with specialized primitives from your enabled plugins.
+- WORK_TEXT_ONLY_STAGE (info): a multi-step work builds its stages exclusively from layout and text containers with no expressive or interactive plugin components, plugin step effects, kinetic properties, or media tracks. Inspect .claude/skills/joplo-plugins/SKILL.md and combine richer visual carriers (topology, charts, metrics, comparisons, code/terminal, or interactive screens) instead of text-only panels.
 - ROLE_UNKNOWN: A layer, card or say() role is not in the work or feature roles. Declare roles as { key: role('Name') }; see demo.
 - ICON_UNKNOWN: A layer icon is not a preset. Use one of window, browser, mobile, desktop, terminal, chat, agent, server, data, email, doc, flow; see demo.
 - FORK_UNKNOWN: fork must target another scenario key in the same work; it cannot reference itself.
@@ -699,7 +805,8 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - FOCUS_OFF_LAYER (warning): a spotlight / highlight / numbered / callout / mark target is not in the layer the director shows after this step, so nobody sees it. Add shot('<id>') to switch there, or point at an element in the shown layer. See focus.
 - FOCUS_CONFLICT (warning): the step's shot frames one thing while a cue points outside it. Point both at the same thing, add the id to the shot, or split the step.
 - CALLOUT_TOO_LONG (warning): callout text over about 24 units (same count as captions). Say the reason in a few words; move the rest to explain().
-- FOCUS_IDLE (info): three or more system steps in a row change nothing on stage. Merge them, or show what happens (set() visible state, highlight, callout, shot).
+- FOCUS_IDLE (info): three or more system steps in a row change nothing on stage. Merge them, or enrich the stage with real visual progression (set() visible state, highlight, callout, shot) rather than adding subtle camera drift to mask an idle stage.
+- NARRATION_STATIC_BEAT (info): a system step narrates for about 4.5 s or longer while nothing changes on stage. Enrich the stage with progressive content (reveal a detail, highlight or call out an element, update visible state, or split into visual sub-beats) instead of leaving it static or adding cosmetic camera drift.
 - INVALID_REDACT / AUTOFOCUS_INVALID: redact takes true/false or a condition (redact={not($.ui.revealed)}); config({ autoFocus }) takes true or false.
 - FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED: from must name another scenario key in the same work, the dependency must not loop, and the preceding scenario must replay successfully. Fix that scenario first.
 - FROM_WITH_START: from already determines the starting route; remove start or start a separate story.
@@ -790,11 +897,11 @@ A successful initial compilation registers local review rounds before dev return
 - Source changes close the old round (closed, source_changed) and start a new one after compilation. The follower moves on by itself; an exact-session watch exits 1, never 0, and you list again to select the new session. A stopped process without an approval also fails.
 - Records live under the real project path in .joplo/reviews/ and remain local. Distinct instances and worktrees never share session identities. Local feedback is never uploaded automatically.
 - Scripted writes use the same running-board API and revision checks: npx joplo feedback submit [dir] --local --work <qualified-id> --scenario <id> --position <n> --body <text>, and npx joplo feedback approve [dir] --local [--session <id>]. Supply an explicit reviewed position; the CLI does not know or pretend to control the reviewer's browser. --scene is optional, --request-id <uuid> makes retries idempotent, and approval never edits pick or publishes.
-- Feedback receipts and jump-to-step re-review: after editing source for local feedback (which closes the old round with source_changed and opens a new round), record how each item was handled in the current open round: npx joplo feedback reply [dir] --local --event <rv_...:seq> --status <addressed|deferred|declined> [--scenario <id> --position <n>] [--note <text>] [--request-id <uuid>]. Omitting --work/--session infers the work from --event and targets its active round; --scenario and --position must be passed together when targeting a step. The board shows receipts (and unaddressed previous-round items) in the native review popover with a direct jump button to that step (pausing on arrival for quick verification). Receipts never wake --follow --once and never preserve approvals across source changes.
+- Feedback receipts and jump-to-step re-review: after editing source for local feedback (which closes the old round with source_changed and opens a new round), record how each item was handled in the current open round: npx joplo feedback reply [dir] --local --event <rv_...:seq> --status <addressed|deferred|declined> [--scenario <id> --position <n>] [--note <text>] [--request-id <uuid>]. Omitting --work/--session infers the work from --event and targets its active round; --scenario and --position must be passed together when targeting a step. The board hot-reloads the stage, review rounds, and agent receipts live over WebSocket (and auto-rebinds valid in-progress drafts across source edits or dev-server restarts), so reviewers can keep submitting feedback without manually refreshing the page; receipts appear in the native review popover with a direct jump button to that step (pausing on arrival for quick verification). Receipts never wake --follow --once and never preserve approvals across source changes.
 - Manage the board without simulating playback: board projects/add/remove, board appearance [dir], and board open [dir] --at <file:line[:column]>. Remove deletes only the registry entry, never project files; non-interactive removal requires --yes. Fullscreen, playback, clicks and drags remain native browser interactions.
 
 ## Before a video-like piece goes to reviewers
-Required: run the film strip check from npx joplo skill demo ("Make it play like a film, not slides") — npx joplo render <dir> --scenario-id <first chapter> --film --chain — and fix every unexplained CUT and STILL first. Reviewers judge motion; a storyboard that looks fine can still play like a slide deck. Report the remaining cuts/stills you kept on purpose and what you could not verify (sound, real devices).
+Required: run the film strip check from npx joplo skill demo ("Make it play like a film, not slides") — npx joplo render <dir> --scenario-id <first chapter> --film --chain — fix unintended CUTs, and for long STILL spans while narration keeps speaking add progressive stage content rather than subtle camera drift/nudges. Reviewers judge motion; a storyboard that looks fine can still play like a slide deck. Report the remaining cuts/stills you kept on purpose and what you could not verify (sound, real devices).
 
 ## Respond to events before doing the work
 | Event / outcome | Agent behavior |
@@ -1055,6 +1162,9 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 
 ## Optional 3D
 The starter does not include 3D or its large browser dependency. To add it: npm install @joplo-app/plugin-3d@0.8.2; default-import scene3d from that package in joplo.config.ts, add scene3d to config.plugins, then run npx joplo skill install. Read npx joplo skill scene3d, scene3d/models and scene3d/generation for rendering, existing assets and optional local generation. A key is unnecessary for existing assets; dry-run before approving any generation.
+
+## Optional Data Visualization
+For narrative quantitative charts, before/after comparisons, part-to-whole ratios, trends, multi-lane timelines, Pareto frontiers, heatmaps, Sankey flows, attribution waterfalls, and radar profiles: npm install @joplo-app/plugin-viz@0.8.2; default-import viz from that package in joplo.config.ts, add viz to config.plugins, then run npx joplo skill install. Read npx joplo skill viz, viz/components and viz/recipes before hand-rolling chart bars or abusing RatioBar for before/after deltas.
 
 ## Errors and trust
 - UNKNOWN_PLUGIN: the element's author package is not enabled. Use its package provenance in the diagnostic to install/import it and add it to config.plugins. UNKNOWN_COMPONENT: no enabled manifest declares that element or intrinsic tag; read the installed catalogs.

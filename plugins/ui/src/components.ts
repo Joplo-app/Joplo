@@ -80,7 +80,6 @@ export const Burger = c('Burger');
 export const Alert = c('Alert');
 export const Loader = c('Loader');
 export const Progress = c('Progress');
-export const RatioBar = c('RatioBar');
 export const RingProgress = c('RingProgress');
 export const Skeleton = c('Skeleton');
 export const Notification = c('Notification');
@@ -124,9 +123,6 @@ export const ListRow = c('ListRow');
 export const Stat = c('Stat');
 /** 键值清单：`<KeyValue items={[{ label: '席位', value: '5 个' }, { label: '合计', value: '¥ 450' }]} total />`。 */
 export const KeyValue = c('KeyValue');
-/** 低保真图表（对齐 @mantine/charts）：`<BarChart data={$.data.weeks} dataKey="week" series={[{ name: 'signups', label: '注册' }]} />`。 */
-export const BarChart = c('BarChart');
-export const LineChart = c('LineChart');
 /**
  * 菜单（对齐 Mantine）：opened 写在 Menu 上，下拉只在为真时出现。
  * `<Menu opened={$.ui.rowMenu}><Menu.Target><ActionIcon id="row_more" aria-label="更多">⋯</ActionIcon></Menu.Target>

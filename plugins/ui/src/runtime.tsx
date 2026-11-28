@@ -9,7 +9,6 @@ import { useCtx, useI18n as useHostI18n, useRoot, useRootAttrs, RenderNode, rect
 import { useR, useStroke, useLook, RendererContextProvider, Rough, RoughPath, roundRectPath, resolveValue, atWidth, childWidth, choicesOf, layoutRegions, styleOf } from '@joplo-app/kit/renderer-internal';
 import { ACCENT, BG, DANGER, onFill, DIMMED, FONT, INFO, INK, INK2, LINE, LINE_STRONG, MONO, OK, SOFT, SPACING, SUBTLE, SURFACE, TITLE_SIZE, WARN, color, dim, fontSize, light, radius, space, spaceNum, tint } from '@joplo-app/kit/renderer-style';
 import { boardArrow, type BoardRect } from './board-arrow.ts';
-import { RatioBar } from './ratio-bar.tsx';
 import { ImageRegion, RegionImage } from './image-region.tsx';
 import { changeFor, dataRows, displayData, stateFlowItems } from './story-data.ts';
 import type { ComponentType } from './catalog.ts';
@@ -2134,95 +2133,6 @@ function KeyValue({ node, p }: NodeProps) {
   );
 }
 
-// ---------- 图表（BarChart / LineChart，对齐 @mantine/charts 的 data / dataKey / series） ----------
-
-const SERIES_COLORS = [INFO, ACCENT, OK, DANGER, '#7048e8', '#0ca678'];
-export type ChartModel = { labels: string[]; series: { name: string; label: string; color: string; values: number[] }[]; max: number; ticks: number[] };
-
-/** 图表的纯数据部分：每个系列取 data[i][name]（不是数字的当作 0），刻度取“好看”的整数步长。 */
-export function chartModel(data: unknown, dataKey: unknown, series: unknown): ChartModel {
-  const rows = arr(data).filter((r): r is Record<string, unknown> => !!r && typeof r === 'object');
-  const key = str(dataKey);
-  const list = arr(series)
-    .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object' && typeof (s as Record<string, unknown>).name === 'string')
-    .map((s, i) => ({ name: String(s.name), label: s.label !== undefined ? str(s.label) : String(s.name), color: color(s.color) ?? SERIES_COLORS[i % SERIES_COLORS.length]!, values: rows.map((r) => (typeof r[String(s.name)] === 'number' && Number.isFinite(r[String(s.name)]) ? (r[String(s.name)] as number) : 0)) }));
-  const peak = Math.max(0, ...list.flatMap((s) => s.values));
-  const step = niceStep(peak / 4);
-  const max = Math.max(step, Math.ceil(peak / step) * step);
-  const ticks = Array.from({ length: Math.round(max / step) + 1 }, (_, i) => i * step);
-  return { labels: rows.map((r) => str(r[key])), series: list, max, ticks };
-}
-function niceStep(raw: number): number {
-  if (!(raw > 0)) return 1;
-  const pow = 10 ** Math.floor(Math.log10(raw));
-  const f = raw / pow;
-  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow;
-}
-
-function Chart({ node, p, kind }: NodeProps & { kind: 'bar' | 'line' }) {
-  const { animate } = useCtx();
-  const r = useR(p);
-  const m = chartModel(p.data, p.dataKey, p.series);
-  const H = typeof r('h') === 'number' ? (r('h') as number) : 220;
-  const W = 600;
-  const pad = { l: 40, r: 12, t: 12, b: 28 };
-  const iw = W - pad.l - pad.r;
-  const legend = (m.series.length > 1 && p.withLegend !== false) || p.withLegend === true;
-  // h 是整张图（含图例）的高度：图例占 22px，其余给 SVG
-  const svgH = Math.max(80, H - (legend ? 22 : 0));
-  const ih = svgH - pad.t - pad.b;
-  const unit = p.unit !== undefined ? str(p.unit) : '';
-  const n = Math.max(1, m.labels.length);
-  const band = iw / n;
-  const y = (v: number) => pad.t + ih - (v / m.max) * ih;
-  const root = useRoot(node, p, { style: { width: '100%', position: 'relative' } });
-  return (
-    <div {...root} style={{ ...root.style, height: 'auto', minHeight: H }} role="img" aria-label={m.series.map((s) => s.label).join(', ')}>
-      <svg viewBox={`0 0 ${W} ${svgH}`} width="100%" height={svgH} preserveAspectRatio="none" style={{ display: 'block', overflow: 'visible' }}>
-        {m.ticks.map((t) => (
-          <g key={t}>
-            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} style={{ stroke: LINE }} strokeDasharray={t === 0 ? undefined : '3 4'} />
-            <text x={pad.l - 6} y={y(t) + 4} textAnchor="end" style={{ fill: DIMMED, fontSize: 11 }}>{`${t}${unit}`}</text>
-          </g>
-        ))}
-        {m.labels.map((l, i) => (
-          <text key={i} x={pad.l + band * (i + 0.5)} y={pad.t + ih + 18} textAnchor="middle" style={{ fill: DIMMED, fontSize: 11 }}>{l}</text>
-        ))}
-        {kind === 'bar'
-          ? m.series.map((s, si) => {
-              const bw = Math.max(4, (band * 0.7) / m.series.length);
-              return s.values.map((v, i) => {
-                const x = pad.l + band * i + band * 0.15 + bw * si;
-                return <motion.rect key={`${si}:${i}`} x={x} width={bw - 2} rx={2} style={{ fill: s.color }} initial={false} animate={{ y: y(v), height: Math.max(0, pad.t + ih - y(v)) }} transition={animate ? { duration: 0.5, ease: [0.16, 1, 0.3, 1] } : { duration: 0 }} data-jbar={`${s.name}:${i}`} />;
-              });
-            })
-          : m.series.map((s, si) => {
-              const pts = s.values.map((v, i) => [pad.l + band * (i + 0.5), y(v)] as const);
-              const d = pts.map(([x, yy], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${yy.toFixed(1)}`).join(' ');
-              return (
-                <g key={si}>
-                  <motion.path d={d} fill="none" style={{ stroke: s.color }} strokeWidth={2.2} strokeLinejoin="round" initial={false} animate={{ d }} transition={animate ? { duration: 0.5 } : { duration: 0 }} />
-                  {pts.map(([x, yy], i) => <motion.circle key={i} r={3.5} cx={x} style={{ fill: SURFACE, stroke: s.color }} strokeWidth={2} initial={false} animate={{ cy: yy }} transition={animate ? { duration: 0.5 } : { duration: 0 }} data-jpoint={`${s.name}:${i}`} />)}
-                </g>
-              );
-            })}
-      </svg>
-      {legend ? (
-        <div style={{ display: 'flex', gap: 14, justifyContent: 'center', alignItems: 'center', height: 22, fontSize: 12, color: DIMMED }}>
-          {m.series.map((s) => (
-            <span key={s.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span aria-hidden style={{ width: 10, height: 10, borderRadius: 2, background: s.color }} />
-              {s.label}
-            </span>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-const BarChart = (props: NodeProps) => <Chart {...props} kind="bar" />;
-const LineChart = (props: NodeProps) => <Chart {...props} kind="line" />;
-
 // ---------- Menu（对齐 Mantine）：opened 写在 Menu 上，编译器抄给 Menu.Dropdown（core 门控） ----------
 
 const MenuContext = createContext<{ anchor: { current: HTMLElement | null }; position: string } | null>(null);
@@ -2460,7 +2370,6 @@ const IMPL: Record<ComponentType, (props: NodeProps & { hold?: () => () => void 
   Avatar,
   Image: ImageBox,
   'Image.Region': ImageRegion,
-  RatioBar,
   Compare,
   'Compare.Side': CompareSide,
   ThemeIcon,
@@ -2511,8 +2420,6 @@ const IMPL: Record<ComponentType, (props: NodeProps & { hold?: () => () => void 
   ListRow,
   Stat,
   KeyValue,
-  BarChart,
-  LineChart,
   Menu,
   'Menu.Target': MenuTarget,
   'Menu.Dropdown': MenuDropdown,

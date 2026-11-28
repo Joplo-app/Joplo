@@ -201,7 +201,7 @@ async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScal
   if (opts.width !== undefined && ![opts.width, opts.height].every(n => Number.isInteger(n) && n! > 0 && n! <= 8192)) throw new JoploError('USAGE', 'Film dimensions must be integers from 1 to 8192');
   const sampleMs = Math.max(20, Math.min(250, Math.round(opts.sampleMs ?? 50)));
   const every = Math.max(sampleMs, Math.round((opts.every ?? 250) / sampleMs) * sampleMs);
-  const stillMs = opts.stillMs ?? 1500;
+  const stillMs = opts.stillMs ?? 3000;
   const columns = Math.max(1, Math.min(16, Math.round(opts.columns ?? 8)));
   const cellWidth = Math.max(120, Math.min(640, Math.round(opts.cellWidth ?? 224)));
   const playwright = await loadPlaywright({ home: joploHome(), projectDir });
@@ -353,7 +353,7 @@ async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScal
         .meta{padding:2px 1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} b{color:#ffb020} em{color:#ff6b6b;font-style:normal;font-weight:700} u{color:#c0c4cf;text-decoration:none}
         .bar{display:inline-block;width:40px;height:5px;background:#2c2f38;vertical-align:middle}.bar i{display:block;height:100%;background:#5b8cff}
         .cap{color:#c9ccd4;overflow:hidden;text-overflow:ellipsis}
-      </style><h1>${esc(name(sid))} · ${esc(sid)}</h1><p>${esc(summary)}. Red = one-frame full-screen change (hard cut); grey = no visible change for ≥ ${(stillMs / 1000).toFixed(1)}s; blue bar = largest adjacent-frame change in the cell.</p><div class="grid">${body}</div>`;
+      </style><h1>${esc(name(sid))} · ${esc(sid)}</h1><p>${esc(summary)}. Red = one-frame full-screen change (hard cut); grey = no visible change for ≥ ${(stillMs / 1000).toFixed(1)}s (during long narration, prefer progressive stage content over cosmetic camera drift; deliberate reading holds are fine); blue bar = largest adjacent-frame change in the cell.</p><div class="grid">${body}</div>`;
       const sheet = await ctx.newPage();
       await sheet.setViewportSize({ width: columns * cellWidth + (columns - 1) * 8 + 36, height: 600 });
       await sheet.setContent(html, { waitUntil: 'load' });

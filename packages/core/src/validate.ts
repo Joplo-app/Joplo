@@ -139,21 +139,70 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
         if (hit && (!hit.from || hit.from === work.id)) bound.add(identity(hit));
       }
     }
+    const availableRoles = new Set<string>();
+    const kineticProps = new Set<string>();
+    for (const pl of Object.values(p.plugins ?? {})) {
+      for (const [k, prop] of Object.entries(pl.properties ?? {})) {
+        if (prop.type === 'string' || prop.type === 'number') kineticProps.add(k);
+      }
+      for (const spec of Object.values(pl.components)) {
+        if (spec.role && spec.role !== 'layout' && spec.role !== 'stage' && !spec.intrinsic) availableRoles.add(spec.role);
+      }
+    }
+    const rawHtmlWorks = new Set<string>();
+    const workStageTotals = new Map<string, { total: number; expressive: number; kinetic: number }>();
     for (const s of Object.values(p.scenes).filter(s => included(s.workId))) {
       const value = { id: s.id, workId: s.workId ?? undefined, source: s.root.source ?? (s.workId ? p.works[s.workId]?.source : undefined) };
       ref(p.scenes[s.id] === s, `Stage key does not match ID: ${s.id}`, value, 'scene');
       if (s.workId) ref(p.works[s.workId], `Stage work does not exist: ${s.workId}`, value, 'scene');
       ref(p.routes[s.route], `Stage route does not exist: ${s.route}`, value, 'scene');
       const ids = new Set<string>();
+      let total = 0, intrinsic = 0, expressive = 0, kinetic = 0;
       walkNodes(s.root, n => {
-        if (pluginSpec(p.plugins, n.type)?.needsId && n.id.startsWith('_')) emit('error', 'MISSING_ID', `<${n.type}> requires an author id; recompile after adding id`, n.source, { kind: 'element', id: n.id });
+        const spec = pluginSpec(p.plugins, n.type);
+        if (spec?.needsId && n.id.startsWith('_')) emit('error', 'MISSING_ID', `<${n.type}> requires an author id; recompile after adding id`, n.source, { kind: 'element', id: n.id });
         const r = { kind: 'element', id: n.id, workId: n.from ?? s.workId ?? undefined };
         if (ids.has(n.id)) emit('error', 'DUPLICATE_ELEMENT', `Duplicate element ID in stage: ${n.id}`, n.source, r, 'reference');
         ids.add(n.id);
         // Plugins may declare disabled as presentation-only, which requires no unavailability reason.
         if (n.disabled !== undefined && n.disabled !== false && !n.disabledReason?.trim() && !n.traits?.disabledPresentation) emit('warning', 'DISABLED_WITHOUT_REASON', `Disabled element has no reason: ${n.id}. Add disabledReason="…" (for example disabledReason="Only admins can invite"), or bind it to state like disabled: disabledReason={$.ui.sendHint}`, n.source, r);
         if (isInteractiveType(n.type, project.plugins) && !bound.has(identity(n)) && !(n.disabled === true && n.disabledReason?.trim()) && !n.unmodeled) emit('warning', 'UNBOUND_INTERACTIVE', `Interactive element has no demo step: ${n.id}; bind a step, disable with a reason, or mark unmodeled`, n.source, r);
+        if (n.type !== '#text' && n.type !== '#fragment') {
+          total++;
+          if (spec?.intrinsic) intrinsic++;
+          else if ((spec?.role && spec.role !== 'layout' && spec.role !== 'stage') || (spec && spec.role === undefined) || spec?.interactive || (n.ext && Object.keys(n.ext).length > 0)) expressive++;
+          if (n.props && Object.keys(n.props).some(k => kineticProps.has(k))) kinetic++;
+        }
       });
+      if (p.mode === 'dev' && availableRoles.size > 0 && total >= 16 && intrinsic / total >= 0.75 && expressive === 0 && kinetic === 0) {
+        if (s.workId) rawHtmlWorks.add(s.workId);
+        const roleList = [...availableRoles].slice(0, 8).join(', ');
+        emit('info', 'STAGE_RAW_HTML_HEAVY', `Stage "${s.name}" renders ${intrinsic}/${total} elements as raw HTML fallback tags with no expressive plugin components (enabled roles: ${roleList}). Run npx joplo components or read .claude/skills/joplo-plugins/SKILL.md to combine richer primitives from your enabled plugins`, value.source, { kind: 'scene', id: s.id, workId: s.workId ?? undefined });
+      }
+      if (s.workId) {
+        const cur = workStageTotals.get(s.workId) ?? { total: 0, expressive: 0, kinetic: 0 };
+        cur.total += total; cur.expressive += expressive; cur.kinetic += kinetic;
+        workStageTotals.set(s.workId, cur);
+      }
+    }
+    if (p.mode === 'dev' && availableRoles.size > 0) {
+      const roleList = [...availableRoles].slice(0, 8).join(', ');
+      for (const o of works) {
+        if (o.draft || rawHtmlWorks.has(o.id)) continue;
+        const own = scenarios.filter(sc => sc.workId === o.id);
+        const stepCount = own.reduce((sum, sc) => sum + sc.steps.length, 0);
+        if (own.length < 2 && stepCount < 4) continue;
+        const hasDynamicEffects = own.some(sc =>
+          (sc.ext && Object.keys(sc.ext).length > 0)
+          || (sc.media && Object.keys(sc.media).length > 0)
+          || sc.steps.some(st => (st.ext && Object.keys(st.ext).length > 0) || (st.media && Object.keys(st.media).length > 0)),
+        );
+        if (hasDynamicEffects) continue;
+        const totals = workStageTotals.get(o.id);
+        if (totals && totals.total >= 12 && totals.expressive === 0 && totals.kinetic === 0) {
+          emit('info', 'WORK_TEXT_ONLY_STAGE', `Work "${o.title}" builds its stages solely from layout and text containers with no expressive or interactive plugin components (enabled roles: ${roleList}). Run npx joplo components or read .claude/skills/joplo-plugins/SKILL.md to use specialized visuals instead of text cards`, o.source, { kind: 'work', id: o.id, workId: o.id });
+        }
+      }
     }
     const stepIds = new Set<string>();
     for (const sc of scenarios) {

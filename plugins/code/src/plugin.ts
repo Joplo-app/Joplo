@@ -41,9 +41,15 @@ type Frame = { editors: Record<string, EditorFrame> };
 const code = definePlugin({
   packageName: '@joplo-app/plugin-code',
   id: 'code', title: 'Code', version: packageInfo.version,
+  bestFor: 'Live syntax-highlighted code editor with engine-clock typing (typeCode), animated line diffs (editCode), and line highlights (highlightLines)',
+  pairsWith: [
+    { with: 'ui', packageName: '@joplo-app/plugin-ui', how: 'Place Editor beside ui Terminal, BrowserWindow, or DataCard so code changes visibly drive output.' },
+    { with: 'diagram', packageName: '@joplo-app/plugin-diagram', how: 'Pair Editor diffs or highlighted lines with diagram FlowEdge pulses or Sequence traces.' },
+    { with: 'content', packageName: '@joplo-app/plugin-content', how: 'Mount Editor inside a content:Canvas zone with drift={false} during close code reading.' },
+  ],
   runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
   components: {
-    Editor: { doc: `file?, lang?=${LANGS.join('|')}, code (initial text), h?=360, w?; a code editor window. Change it with typeCode / editCode / highlightLines`, needsId: true, selfEvident: true, traits: { frame: true, text: ['file'] } },
+    Editor: { role: 'code', doc: `file?, lang?=${LANGS.join('|')}, code (initial text), h?=360, w?; a code editor window. Change it with typeCode / editCode / highlightLines`, needsId: true, selfEvident: true, traits: { frame: true, text: ['file'] } },
   },
   skill,
   schemas: { step: StepS },

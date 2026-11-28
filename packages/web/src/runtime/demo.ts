@@ -492,13 +492,28 @@ export class DemoController {
     if (message) this.autoClear();
   }
 
+  /** 当前场景已到结尾时，切换到顺序里的下一个场景；没有下一个时返回 false。 */
+  private advanceToNextScenario(sc: Scenario, continuePlay: boolean, fast?: ((index: number) => boolean) | null): boolean {
+    const nextId = this.autoNext?.(sc.id) ?? null;
+    const following = nextId ? this.snap.project?.scenarios[nextId] : undefined;
+    if (!nextId || !following) return false;
+    if (following.from === sc.id && this.continueInto(following)) {
+      if (continuePlay) void this.play({ fast: fast ?? undefined });
+      else if (following.steps.length > 0) void this.next();
+      return true;
+    }
+    this.setScenario(nextId, 0, { quiet: true });
+    if (continuePlay) void this.play({ fromStart: true, fast: fast ?? undefined });
+    return true;
+  }
+
   async next() {
     const sc = this.scenario();
     const st = this.snap.state;
     if (!sc || !st || this.snap.view !== 'stage') return;
     if (this.snap.playing && !this.snap.paused) {
       // 像视频：播放中快进一步后接着播。动画进行中 = 立即完成这一步并停留；停留中 = 跳过剩余停留，开始下一步。
-      // 最后一步的停留中快进 = 播完（不从头重播）。
+      // 最后一步的停留中快进 = 若有下一场景则直接切入并继续播，否则播完停下（不从头重播）。
       const fast = this.fast;
       if (this.inflight) {
         this.finishInflight(sc);
@@ -506,7 +521,10 @@ export class DemoController {
         return;
       }
       this.stop();
-      if (st.completed || st.position >= sc.steps.length) return;
+      if (st.completed || st.position >= sc.steps.length) {
+        this.advanceToNextScenario(sc, true, fast);
+        return;
+      }
       void this.play({ fast: fast ?? undefined });
       return;
     }
@@ -516,7 +534,10 @@ export class DemoController {
       return;
     }
     this.stop();
-    if (st.completed || st.position >= sc.steps.length) return this.info(sc.steps.length === 0 ? m.player.thisScenarioHasNoStepsAndOnlyShowsIts2 : m.player.scenarioCompleteResetOrSwitchScenarios);
+    if (st.completed || st.position >= sc.steps.length) {
+      if (this.advanceToNextScenario(sc, false)) return;
+      return this.info(sc.steps.length === 0 ? m.player.thisScenarioHasNoStepsAndOnlyShowsIts2 : m.player.scenarioCompleteResetOrSwitchScenarios);
+    }
     const gen = this.gen;
     this.set({ busy: true });
     await this.runStep(sc, gen, { moveCursor: true });
