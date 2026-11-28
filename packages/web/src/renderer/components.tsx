@@ -162,9 +162,12 @@ function StreamText({ attrs, text, plan, voice }: { attrs: Record<string, unknow
   );
 }
 
-class PluginRenderBoundary extends Component<{ children: ReactNode; id: string }, { error: string | null }> {
-  state: { error: string | null } = { error: null };
+class PluginRenderBoundary extends Component<{ children: ReactNode; id: string; runtime: unknown }, { error: string | null; runtime: unknown }> {
+  state: { error: string | null; runtime: unknown } = { error: null, runtime: this.props.runtime };
   static getDerivedStateFromError(error: unknown) { return { error: error instanceof Error ? error.message : String(error) }; }
+  static getDerivedStateFromProps(props: { runtime: unknown }, state: { error: string | null; runtime: unknown }) {
+    return props.runtime !== state.runtime ? { error: null, runtime: props.runtime } : null;
+  }
   render() { return this.state.error ? <div data-jplugin-error={this.props.id}>{this.state.error}</div> : this.props.children; }
 }
 
@@ -272,7 +275,7 @@ function PluginHost({ node, p }: NodeProps) {
   });
 
   const problem = crash ?? (status.state === 'error' ? status.message : status.state === 'ready' && !comp ? `${split.name} cannot be shown on its own` : null);
-  if (comp?.react && !problem) { const ReactImpl = comp.react; return <PluginRenderBoundary key={split.plugin + node.id} id={split.plugin}><ReactImpl ctx={pctx} /></PluginRenderBoundary>; }
+  if (comp?.react && !problem) { const ReactImpl = comp.react; return <PluginRenderBoundary key={split.plugin + node.id} id={split.plugin} runtime={status.state === 'ready' ? status.runtime : null}><ReactImpl ctx={pctx} /></PluginRenderBoundary>; }
   if (comp && !problem) return <div {...root} ref={elRef} data-jplugin={split.plugin} />;
   return (
     <div {...root} data-jplugin={split.plugin} data-dashed="">

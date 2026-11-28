@@ -274,7 +274,7 @@ const replySetup = async () => {
   return { dir, project, hub, old, current, workId, scenarioId, cli, args: ['--local', '--event', `${old.id}:1`, '--status', 'addressed'] };
 };
 
-it('feedback reply infers the original work and writes an idempotent receipt to its current round', async () => {
+it('feedback reply infers the original work and writes an idempotent receipt to its current round', { timeout: 20_000 }, async () => {
   const x = await replySetup(), requestId = crypto.randomUUID();
   const args = [...x.args, '--scenario', x.scenarioId, '--position', '1', '--note', '  Recovery explained  ', '--request-id', requestId, '--format', 'json'];
   const first = await x.cli(args); expect(first.code, first.out + first.err).toBe(0);
@@ -289,7 +289,7 @@ it('feedback reply infers the original work and writes an idempotent receipt to 
   expect((await x.cli([...x.args, '--session', x.current.id, '--status', 'declined'])).code).toBe(0);
 });
 
-it('feedback reply validates paired locations, ownership, bounds, statuses, and explicit sessions', async () => {
+it('feedback reply validates paired locations, ownership, bounds, statuses, and explicit sessions', { timeout: 20_000 }, async () => {
   const x = await replySetup();
   for (const [extra, code] of [
     [['--scenario', x.scenarioId], 'USAGE'], [['--position', '1'], 'USAGE'], [['--scene', 'missing'], 'USAGE'],

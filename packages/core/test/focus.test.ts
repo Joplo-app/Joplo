@@ -12,7 +12,7 @@ import { tsImport } from 'tsx/esm/api';
 import { describe, expect, it } from 'vitest';
 import { loadAuthoring } from '../src/load.ts';
 import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
-import { $, callout, feature, flow, go, highlight, hold, layer, mark, not, numbered, work, page, set, shot, spotlight, toast, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
+import { $, callout, feature, flow, go, highlight, hold, layer, mark, narrate, not, numbered, work, page, set, shot, spotlight, toast, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { applyStep, cameraAt, compile, explainClick, findNode, focusAt, initialState, isNodeVisible, replay, stateAt, validate, visibleIds, walkNodes, type AuthoringProject, type Project } from '../src/index.ts';
 
@@ -64,7 +64,7 @@ describe('编译：焦点原语写进 IR', () => {
     const { dev } = build({
       steps: (f) => f
         .system('只看提示', set($.ui.warn, true), spotlight('alert'), highlight('badge'), callout('alert', '  额度不足时先拦下  ', { side: 'left' }), hold(4))
-        .system('三部分', numbered('msg', 'send', 'badge', 'send'))
+        .system('三部分', numbered('msg', 'send', 'badge', 'send'), callout('msg', '方向简写', 'bottom'))
         .system('普通一步'),
     });
     expect(errors(dev)).toEqual([]);
@@ -73,6 +73,7 @@ describe('编译：焦点原语写进 IR', () => {
     expect(a!.callouts).toEqual([{ target: 'alert', text: '额度不足时先拦下', side: 'left' }]);
     expect(a!.hold).toBe(4000);
     expect(b!.cues).toEqual([{ kind: 'number', targets: ['msg', 'send', 'badge'] }]);
+    expect(b!.callouts).toEqual([{ target: 'msg', text: '方向简写', side: 'bottom' }]);
     for (const k of ['cues', 'callouts', 'hold'] as const) expect(k in c!).toBe(false);
     // 焦点原语不是状态变化
     expect(a!.effects.map((e) => e.type)).toEqual(['set']);
@@ -302,6 +303,18 @@ describe('check：焦点提示（少而准）', () => {
     expect(idle[0]!.severity).toBe('info');
     expect(codes(build({ steps: (f) => f.system('一').system('二').card('卡').system('三') }).dev).map((d) => d.code)).not.toContain('FOCUS_IDLE');
     expect(codes(build({ steps: (f) => f.system('一').system('二', set($.ui.warn, true)).system('三') }).dev).map((d) => d.code)).not.toContain('FOCUS_IDLE');
+  });
+  it('较长旁白但舞台无任何变化：NARRATION_STATIC_BEAT（info）；补充视觉变化或高亮后消失', () => {
+    const longSpeech = '这是一段持续播报超过五秒的完整解释旁白，用来验证画面完全静止时是否会提醒补充阶段性视觉内容。';
+    const staticBeat = codes(build({ steps: (f) => f.system('持续讲解', narrate(longSpeech)) }).dev).filter((d) => d.code === 'NARRATION_STATIC_BEAT');
+    expect(staticBeat).toHaveLength(1);
+    expect(staticBeat[0]!.severity).toBe('info');
+    expect(staticBeat[0]!.message).toContain('progressive content');
+    // Adding a real stage update or highlight/callout clears NARRATION_STATIC_BEAT
+    expect(codes(build({ steps: (f) => f.system('补充内容', set($.ui.warn, true), narrate(longSpeech)) }).dev).map((d) => d.code)).not.toContain('NARRATION_STATIC_BEAT');
+    expect(codes(build({ steps: (f) => f.system('高亮提示', highlight('msg'), narrate(longSpeech)) }).dev).map((d) => d.code)).not.toContain('NARRATION_STATIC_BEAT');
+    // Short narration stays clean
+    expect(codes(build({ steps: (f) => f.system('短句', narrate('这里稍停一下。')) }).dev).map((d) => d.code)).not.toContain('NARRATION_STATIC_BEAT');
   });
   it('气泡太长：CALLOUT_TOO_LONG（warning，与字幕同一口径）', () => {
     const d = codes(build({ steps: (f) => f.system('x', callout('msg', '这是一句非常非常长的说明文字，超过了二十四个字的建议上限了吧')) }).dev).find((x) => x.code === 'CALLOUT_TOO_LONG');

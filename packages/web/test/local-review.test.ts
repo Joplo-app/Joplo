@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { compile, type LocalReviewLocation, type LocalReviewSession, type LocalReviewState } from '@joplo-app/core';
 import { reviewSource } from '../../core/test/fixtures/review';
-import { captureReviewDraft, localReviewCommand, localReviewTitle, localReviewJump, localReviewUpdates, readReviewDraft, reviewDraftKey, saveReviewDraft } from '../src/board/review-model';
+import { captureReviewDraft, isReviewLocationValid, localReviewCommand, localReviewTitle, localReviewJump, localReviewUpdates, readReviewDraft, reconcileReviewDraft, reviewDraftKey, saveReviewDraft } from '../src/board/review-model';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nProvider } from '../src/i18n/context';
@@ -109,4 +109,30 @@ it('offers no jump for deleted, out of range, or other-work positions and accept
   const html = renderToStaticMarkup(createElement(LocalReviewUpdates, { project: p, workId: 'f.a', state, onJump: () => {} }));
   expect(html).not.toContain('local-review-jump'); expect(html).toContain('Still waiting');
   expect(localReviewUpdates(p, 'f.a', { session: { ...session, events: [] }, watchers: 0 })).toEqual([]);
+});
+
+it('hot-reload draft reconciliation seamlessly rebinds empty and still-valid drafts while flagging deleted targets', () => {
+  const p = compile(reviewSource(), 'dev').project!;
+  const loc = { scenarioId: 'f.a.main', position: 1, sceneId: p.scenarios['f.a.main']!.initial.sceneId };
+  const s1 = { ...session, id: 'rv_' + '1'.repeat(32), workId: 'f.a' } as LocalReviewSession;
+  const s2 = { ...session, id: 'rv_' + '2'.repeat(32), workId: 'f.a' } as LocalReviewSession;
+
+  // Empty draft automatically follows the new session and current step
+  const empty = captureReviewDraft(s1, p, { ...loc, position: 0 }, '');
+  const emptyNext = reconcileReviewDraft(empty, s2, p, loc);
+  expect(emptyNext).toMatchObject({ sessionId: s2.id, text: '', context: loc });
+
+  // Non-empty draft whose target still exists after hot reload rebinds smoothly without blocking submission
+  const typing = { ...captureReviewDraft(s1, p, loc, 'Still typing my second note'), requestId: 'old-req' };
+  const rebound = reconcileReviewDraft(typing, s2, p, { ...loc, position: 0 });
+  expect(rebound).toMatchObject({ sessionId: s2.id, text: 'Still typing my second note', context: loc });
+  expect(rebound?.requestId).toBeUndefined();
+  expect(isReviewLocationValid(p, 'f.a', loc)).toBe(true);
+
+  // Non-empty draft whose scenario was removed stays stale so the reviewer sees the explicit rebase prompt
+  const deleted = structuredClone(p);
+  delete deleted.scenarios['f.a.main'];
+  const keptStale = reconcileReviewDraft(typing, s2, deleted, null);
+  expect(keptStale?.sessionId).toBe(s1.id);
+  expect(isReviewLocationValid(deleted, 'f.a', loc)).toBe(false);
 });

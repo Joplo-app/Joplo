@@ -33,7 +33,7 @@ import { Registry, clearServerInfo, joploHome, normalizeSettings, pidAlive, proj
 import { compileProject, invalidateProjectModules } from './project.ts';
 import { SelectionBody, readSelection, resolveSelection, writeSelection } from './selection.ts';
 import { cssSourcePlugin, isProjectSource, joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
-import type { DistWeb, WebAssets } from './web-assets.ts';
+import { cssEntry, type DistWeb, type WebAssets } from './web-assets.ts';
 
 /** 文件绝对路径 → Vite 的 /@fs/ 地址。 */
 const fsUrl = (abs: string) => `/@fs${abs.split(path.sep).join('/').replace(/^(?!\/)/, '/')}`;
@@ -69,10 +69,94 @@ export type ProjectSummary = {
 
 export const IR_EVENT = 'joplo:ir';
 export const PROJECTS_EVENT = 'joplo:projects';
+export const REVIEW_EVENT = 'joplo:review';
+export const PLUGINS_EVENT = 'joplo:plugins';
 /** 朗读状态变化（D74）：{ projectId, state }。 */
 export const VOICE_EVENT = 'joplo:voice';
 export { CLOUD_EVENT };
 const MAX_BODY = 64 * 1024;
+
+const VITE_DISCONNECT_RELOAD_RE = /(if\s*\(\s*payload\.event\s*===\s*["']vite:ws:disconnect["']\s*\)\s*\{\s*if\s*\(\s*hasDocument\s*&&\s*!willUnload\s*\)\s*\{)([\s\S]*?await\s+waitForSuccessfulPing\(url\.href\);\s*)location\.reload\(\);(\s*\}\s*\})/;
+const VITE_WS_TOKEN_RE = /\bconst\s+wsToken\s*=/;
+
+/**
+ * Patch Vite's client disconnect handler to reconnect the WebSocket in place instead of
+ * forcing a white-screen `location.reload()` on tab sleep/wake, transient socket drops,
+ * or same-version `joplo dev` restarts. Only reloads if `/__joplo/ping` reports a new boardBuild.
+ */
+export function patchViteClientReconnect(code: string): string {
+  const match = VITE_DISCONNECT_RELOAD_RE.exec(code);
+  if (!match) return code;
+  const [, head, body, tail] = match;
+  const soft = `${head}
+        if (globalThis.__JOPLO_RECONNECTING__) return;
+        globalThis.__JOPLO_RECONNECTING__ = true;
+        void (async () => {
+          try {
+            ${body}
+            const boardBuild = document.querySelector('meta[name="joplo-board-build"]')?.content || '';
+            while (!willUnload) {
+              try {
+                const ping = await fetch('/__joplo/ping', { cache: 'no-store' });
+                if (ping.ok) {
+                  const info = await ping.json();
+                  if (boardBuild && typeof info?.boardBuild === 'string' && info.boardBuild !== boardBuild) {
+                    location.reload();
+                    return;
+                  }
+                  if (typeof info?.wsToken === 'string' && info.wsToken) wsToken = info.wsToken;
+                }
+                try { transport.disconnect(); } catch {}
+                await transport.connect(createHMRHandler(handleMessage));
+                return;
+              } catch {
+                await new Promise((r) => setTimeout(r, 400));
+                await waitForSuccessfulPing(url.href);
+              }
+            }
+          } finally {
+            globalThis.__JOPLO_RECONNECTING__ = false;
+          }
+        })();
+      ${tail}`;
+  const replaced = code.slice(0, match.index) + soft + code.slice(match.index + match[0].length);
+  return replaced.replace(VITE_WS_TOKEN_RE, 'let wsToken =');
+}
+
+export type FullReloadContext = {
+  mode: 'dist' | 'source';
+  webDir: string;
+  projectDirs: readonly string[];
+  pluginRoots: readonly string[];
+  lastWatcherFile: string | null;
+};
+
+const withinDir = (dir: string, file: string) => file === dir || file.startsWith(dir + path.sep);
+
+/** Decide whether a Vite `full-reload` WS payload should be dropped to avoid white-screen refreshes. */
+export function shouldSuppressFullReload(payload: unknown, ctx: FullReloadContext): boolean {
+  if (!payload || typeof payload !== 'object' || (payload as { type?: unknown }).type !== 'full-reload') return false;
+  // Prebuilt dist board is static JS/CSS; IR, reviews, plugin bundles, and Tailwind CSS all hot-update without page reload.
+  if (ctx.mode === 'dist') return true;
+  const p = payload as { path?: unknown; triggeredBy?: unknown };
+  const triggeredBy = typeof p.triggeredBy === 'string' ? path.resolve(p.triggeredBy) : null;
+  if (triggeredBy) {
+    if (ctx.projectDirs.some((d) => withinDir(d, triggeredBy))) return true;
+    if (ctx.pluginRoots.some((d) => withinDir(d, triggeredBy)) && !withinDir(ctx.webDir, triggeredBy)) return true;
+  }
+  const reloadPath = typeof p.path === 'string' ? p.path : '';
+  if (reloadPath.endsWith('.html')) {
+    const resolved = path.resolve(ctx.webDir, reloadPath.replace(/^\/+/, ''));
+    if (resolved !== path.join(ctx.webDir, 'index.html')) return true;
+  }
+  if (ctx.lastWatcherFile) {
+    const f = path.resolve(ctx.lastWatcherFile);
+    if (ctx.projectDirs.some((d) => withinDir(d, f))) return true;
+    if (ctx.pluginRoots.some((d) => withinDir(d, f)) && !withinDir(ctx.webDir, f)) return true;
+    if (f.endsWith(`${path.sep}tsconfig.json`) && !withinDir(ctx.webDir, f)) return true;
+  }
+  return false;
+}
 
 const SECURITY_HEADERS: Record<string, string> = {
   'x-content-type-options': 'nosniff',
@@ -271,8 +355,29 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
   const reviewHub = new LocalReviewHub(baseUrl);
 
   const activeDirs = () => [...slots.values()].filter((s) => !s.closed).map((s) => s.dir);
+  const slotDirOf = (file: string) => {
+    const abs = path.resolve(file);
+    return [...slots.values()].find((s) => !s.closed && withinDir(s.dir, abs)) ?? null;
+  };
   const slotOfFile = (file: string) => [...slots.values()].find((s) => !s.closed && isProjectSource(s.dir, file, s.watchIgnore ?? [])) ?? null;
   const recordOf = (id: string) => registry.list().find((r) => projectIdOf(r.dir) === id) ?? null;
+  /** Stable identifier of the board frontend bundle; only changes on actual board upgrades. */
+  const boardBuild = (() => {
+    if (web.mode === 'dist') {
+      const html = fs.readFileSync(path.join(web.appDir, 'index.html'), 'utf8');
+      return `dist:${web.version}:${crypto.createHash('sha256').update(html).digest('hex').slice(0, 12)}`;
+    }
+    return `source:${serverVersion()}`;
+  })();
+  /** Active source-mode plugin runtime files & package roots (for zero-reload plugin HMR). */
+  const pluginEntries = new Map<string, { file: string; root: string }>();
+  const pluginRevisions = new Map<string, number>();
+  const pluginUrlFor = (id: string, file: string) => {
+    const rev = pluginRevisions.get(id) ?? 0;
+    return rev > 0 ? `${fsUrl(file)}?t=${rev}` : fsUrl(file);
+  };
+  let lastWatcherChange: { file: string; at: number } | null = null;
+  const recentWatcherFile = () => (lastWatcherChange && Date.now() - lastWatcherChange.at < 500 ? lastWatcherChange.file : null);
 
   const summaries = (): ProjectSummary[] =>
     registry.list().map((r) => {
@@ -353,7 +458,8 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       slot.runtimeModules=next;
     }else if(web.mode==='source'){
       allowPluginFiles(slot.dir,Object.values(plugins));
-      runtimeUrls=Object.fromEntries(Object.entries(plugins).map(([id,f])=>[id,fsUrl(f)]));
+      for (const [id, f] of Object.entries(plugins)) pluginEntries.set(id, { file: f, root: packageRootOf(f) });
+      runtimeUrls=Object.fromEntries(Object.entries(plugins).map(([id,f])=>[id,pluginUrlFor(id, f)]));
     }
     slot.payload = { version: prev.version + 1, ok: out.project !== null, project: out.project ?? prev.project, diagnostics: out.diagnostics, home: out.home ?? prev.home, plugins: out.project ? runtimeUrls : prev.plugins ?? runtimeUrls };
     const errors = out.diagnostics.filter((d) => d.severity === 'error');
@@ -361,7 +467,12 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     if (out.project && out.project.name) registry.rename(slot.dir, out.project.name);
     if (out.project && !errors.length) reviewHub.sync(slot.dir, slot.id, out.project);
     else reviewHub.invalidate(slot.dir, 'compile_error');
-    if (!closed) server?.ws.send({ type: 'custom', event: IR_EVENT, data: { projectId: slot.id, ...slot.payload } });
+    if (!slot.dirty) slot.compiling = false;
+    if (!closed) {
+      server?.ws.send({ type: 'custom', event: IR_EVENT, data: { projectId: slot.id, instanceId: reviewHub.instanceId, ...slot.payload } });
+      if (out.project && !errors.length)
+        server?.ws.send({ type: 'custom', event: REVIEW_EVENT, data: { projectId: slot.id, version: slot.payload.version } });
+    }
     broadcastProjects();
   }
 
@@ -376,6 +487,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     slot.running = (async () => {
       do {
         slot.dirty = false;
+        slot.compiling = true;
         try {
           await recompile(slot);
         } catch (e) {
@@ -547,7 +659,9 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       if (!body.ok) return;
       const input = LocalReviewWrite.safeParse(body.body);
       if (!input.success) throw new JoploError('USAGE', 'Invalid review request: include a sessionId, requestId, type, and page context for feedback (1–10000 characters)');
-      return sendJson(res, 200, reviewHub.write(slot.dir, slot.payload.project, input.data));
+      const next = reviewHub.write(slot.dir, slot.payload.project, input.data);
+      if (!closed) server?.ws.send({ type: 'custom', event: REVIEW_EVENT, data: { projectId: id, workId: next.session.workId, version: slot.payload.version } });
+      return sendJson(res, 200, next);
     }
     if(rest.startsWith('runtime/')&&method==='GET'){
       const slot=await ensure(id),code=slot.runtimeModules.get(rest.slice('runtime/'.length));
@@ -556,7 +670,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     }
     if (rest === 'ir' && method === 'GET') {
       const slot = await ensure(id);
-      return sendJson(res, 200, { projectId: id, ...slot.payload });
+      return sendJson(res, 200, { projectId: id, instanceId: reviewHub.instanceId, ...slot.payload });
     }
     if (rest === 'selection' && method === 'GET') {
       const slot = await ensure(id);
@@ -657,6 +771,30 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
   const boardPlugin: Plugin = {
     name: 'joplo:board',
     configureServer(srv) {
+      // Track watcher file before Vite's built-in listeners (e.g. reloadOnTsconfigChange) fire full-reload.
+      const recordWatcherFile = (file: string) => {
+        if (typeof file === 'string') lastWatcherChange = { file: path.resolve(file), at: Date.now() };
+      };
+      for (const ev of ['change', 'add', 'unlink'] as const) srv.watcher.prependListener(ev, recordWatcherFile);
+
+      // Guard client HMR channel against spurious full-page white-screen reloads.
+      const guardHot = (hot: { send: (...args: any[]) => unknown }) => {
+        const orig = hot.send.bind(hot);
+        hot.send = ((...args: any[]) => {
+          if (shouldSuppressFullReload(args[0], {
+            mode: web.mode,
+            webDir: web.webDir,
+            projectDirs: activeDirs(),
+            pluginRoots: [...new Set([...pluginEntries.values()].map((e) => e.root))],
+            lastWatcherFile: recentWatcherFile(),
+          })) return;
+          return orig(...args);
+        }) as typeof hot.send;
+      };
+      const clientHot = srv.environments.client?.hot;
+      if (clientHot) guardHot(clientHot);
+      if (srv.ws && srv.ws !== clientHot) guardHot(srv.ws);
+
       srv.middlewares.use(async (req, res, next) => {
         try {
           const host = req.headers.host ?? '';
@@ -667,7 +805,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
           if (url.pathname === '/__open-in-editor') return (req as { __joploOpen?: boolean }).__joploOpen ? next() : deny(res, 403, 'Use Open in editor in the board');
           if (!url.pathname.startsWith('/__joplo/')) return next();
           const method = req.method ?? 'GET';
-          if (url.pathname === '/__joplo/ping' && method === 'GET') return sendJson(res, 200, { joplo: true, pid: process.pid, version: serverVersion() });
+          if (url.pathname === '/__joplo/ping' && method === 'GET') return sendJson(res, 200, { joplo: true, pid: process.pid, version: serverVersion(), boardBuild, wsToken: srv.config.webSocketToken });
           if (url.pathname === '/__joplo/projects' && method === 'GET') return sendJson(res, 200, { projects: summaries() });
           // 看板设置（D51）：主题选择，存于 <JOPLO_HOME>/settings.json（没有 home 时只在内存里）
           if (url.pathname === '/__joplo/settings' && method === 'GET') return sendJson(res, 200, { settings: opts.home ? readSettings(opts.home) : memSettings });
@@ -724,16 +862,68 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
         }
       });
     },
+    transform(code, id) {
+      const clean = id.split('?')[0] ?? '';
+      if (clean.endsWith('/vite/dist/client/client.mjs') || clean.endsWith('\\vite\\dist\\client\\client.mjs')) {
+        const patched = patchViteClientReconnect(code);
+        if (patched !== code) return { code: patched, map: null };
+      }
+      return undefined;
+    },
     transformIndexHtml(html) {
-      const out = html.replace('__JOPLO_TOKEN__', token);
+      const meta = `<meta name="joplo-board-build" content="${boardBuild}" />`;
+      const withBuild = html.includes('</head>') ? html.replace('</head>', `    ${meta}\n  </head>`) : `${meta}\n${html}`;
+      const out = withBuild.replace('__JOPLO_TOKEN__', token);
       return web.mode === 'dist' ? injectDistBoot(out, web) : out;
     },
     // 项目源文件只在项目加载器里使用：它们的变化由下面的重新编译处理，不交给 Vite 的默认 HMR。
-    // client 环境里只保留非项目模块（例如以项目目录为 @source 的 index.css），新 className 照常热更新。
+    // client 环境里把受影响的项目监听节点映射到 Tailwind CSS 入口（index.css / project.css），
+    // 让新增 className 走 CSS 自接受热更新而绝不触发整页 full-reload。
+    // 源码模式下编辑插件运行时代码也走 joplo:plugins 无闪烁热替换，不整页白屏刷新。
     hotUpdate(ctx) {
-      if (!slotOfFile(ctx.file)) return;
-      if (this.environment.name !== 'client') return [];
-      return ctx.modules.filter((m) => !m.file || !slotOfFile(m.file));
+      const file = path.resolve(ctx.file);
+      const ownerSlot = slotDirOf(file);
+      if (ownerSlot) {
+        if (this.environment.name !== 'client') return [];
+        if (!isProjectSource(ownerSlot.dir, file, ownerSlot.watchIgnore ?? [])) return [];
+        const entry = cssEntry(web);
+        const cssMods = new Set(ctx.modules.filter((m) => m.file === entry));
+        for (const m of ctx.modules) {
+          for (const imp of m.importers) if (imp.file === entry) cssMods.add(imp);
+        }
+        if (cssMods.size === 0 && /\.(?:tsx|ts|jsx|js|mts|css|html)$/i.test(file)) {
+          const entryMods = this.environment.moduleGraph.getModulesByFile(entry);
+          if (entryMods) for (const m of entryMods) cssMods.add(m);
+        }
+        return [...cssMods];
+      }
+      if (web.mode === 'source' && !withinDir(web.webDir, file)) {
+        const hitIds = [...pluginEntries.entries()].filter(([, info]) => withinDir(info.root, file)).map(([id]) => id);
+        if (hitIds.length > 0) {
+          if (this.environment.name !== 'client') return [];
+          for (const m of ctx.modules) this.environment.moduleGraph.invalidateModule(m);
+          const updated: Record<string, string> = {};
+          for (const id of hitIds) {
+            const info = pluginEntries.get(id)!;
+            const entryMods = this.environment.moduleGraph.getModulesByFile(info.file);
+            if (entryMods) for (const m of entryMods) this.environment.moduleGraph.invalidateModule(m);
+            pluginRevisions.set(id, (pluginRevisions.get(id) ?? 0) + 1);
+            updated[id] = pluginUrlFor(id, info.file);
+          }
+          for (const s of slots.values()) {
+            if (s.closed || !s.payload.plugins) continue;
+            let touched = false;
+            const nextPlugins = { ...s.payload.plugins };
+            for (const [id, url] of Object.entries(updated)) {
+              if (id in nextPlugins) { nextPlugins[id] = url; touched = true; }
+            }
+            if (touched) s.payload = { ...s.payload, plugins: nextPlugins };
+          }
+          if (!closed) server?.ws.send({ type: 'custom', event: PLUGINS_EVENT, data: { plugins: updated } });
+          return [];
+        }
+      }
+      return undefined;
     },
   };
 

@@ -23,7 +23,7 @@ import { writeSkillReadingDemo, verifySkillReadingBrowser } from './skill-readin
 
 const REPO = path.resolve(import.meta.dirname, '..');
 /** 发布顺序（依赖在前）。目录名 → 包名见各自 package.json。 */
-export const PACKAGES = ['kit', 'plugin-diagram', 'plugin-alda', 'plugin-3d', 'plugin-content', 'plugin-ui', 'plugin-av', 'core', 'web', 'server', 'cli', 'joplo'];
+export const PACKAGES = ['kit', 'plugin-diagram', 'plugin-alda', 'plugin-3d', 'plugin-content', 'plugin-ui', 'plugin-av', 'plugin-viz', 'core', 'web', 'server', 'cli', 'joplo'];
 export const packageDir = (name, root = REPO) => path.join(root, name.startsWith('plugin-') ? `plugins/${name.slice(7)}` : `packages/${name}`);
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const LICENSE_PLACEHOLDER = 'UNLICENSED';
@@ -61,7 +61,7 @@ function version(root, v) {
     fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + '\n');
   }
   // Runtime version metadata must not pull the workspace manifest into browser bundles.
-  for (const name of ['plugin-diagram', 'plugin-alda', 'plugin-3d', 'plugin-content', 'plugin-ui', 'plugin-av']) {
+  for (const name of ['plugin-diagram', 'plugin-alda', 'plugin-3d', 'plugin-content', 'plugin-ui', 'plugin-av', 'plugin-viz']) {
   const pluginVersion = path.join(packageDir(name, root), 'src/version.json');
   fs.mkdirSync(path.dirname(pluginVersion), { recursive: true });
   fs.writeFileSync(pluginVersion, JSON.stringify({ version: v }, null, 2) + '\n');
@@ -384,12 +384,13 @@ async function smoke() {
     pkg.devDependencies = Object.fromEntries(Object.keys(pkg.devDependencies).map(name=>[name,tgz[name]??pkg.devDependencies[name]]));
     pkg.devDependencies['@joplo-app/plugin-3d'] = tgz['@joplo-app/plugin-3d'];
     pkg.devDependencies['@joplo-app/plugin-av'] = tgz['@joplo-app/plugin-av'];
+    pkg.devDependencies['@joplo-app/plugin-viz'] = tgz['@joplo-app/plugin-viz'];
     pkg.overrides = overrides;
     fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
     sh(npm, ['install', ...npmFlags], project);
     const joplo = path.join(project, 'node_modules/.bin/joplo');
     assert(fs.realpathSync(joplo) === fs.realpathSync(path.join(project, 'node_modules/joplo/bin/joplo.cjs')), '项目的 .bin/joplo 应指向 joplo 入口包');
-    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/plugin-alda', '@joplo-app/plugin-3d', '@joplo-app/plugin-content', '@joplo-app/plugin-ui', '@joplo-app/plugin-av', '@joplo-app/server', '@joplo-app/web']) {
+    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/plugin-alda', '@joplo-app/plugin-3d', '@joplo-app/plugin-content', '@joplo-app/plugin-ui', '@joplo-app/plugin-av', '@joplo-app/plugin-viz', '@joplo-app/server', '@joplo-app/web']) {
       const p = path.join(project, 'node_modules', n);
       assert(fs.existsSync(p) && !fs.lstatSync(p).isSymbolicLink(), `${n} 应从 tarball 安装（不是链接）`);
       assert(readJson(path.join(p, 'package.json')).version === v, `${n} 版本应为 ${v}`);
@@ -411,6 +412,21 @@ async function smoke() {
       if(!lowered.media[0].oneShot||lowered.media[0].durationMs!==100)throw new Error('Published SFX event failed');
     `], project);
     log('  ✓ installed media plugin: entrypoints, skill, local PCM WAV compiler and one-shot event');
+
+    sh(process.execPath, ['--input-type=module', '-e', `
+      import viz, { DeltaBar, focusDatum } from '@joplo-app/plugin-viz';
+      import runtime from '@joplo-app/plugin-viz/runtime';
+      import { COMPONENT_TYPES } from '@joplo-app/plugin-viz/catalog';
+      import { skill } from '@joplo-app/plugin-viz/guide';
+      import { config, work, chapter } from '@joplo-app/kit';
+      import { jsx } from '@joplo-app/kit/jsx-runtime';
+      import { compile } from '@joplo-app/core';
+      if (viz.id !== 'viz' || !viz.runtime.endsWith('/runtime.js') || !skill.includes('DeltaBar') || COMPONENT_TYPES.some(name => !runtime.components[name]?.react)) process.exit(1);
+      const file = '/smoke/viz.tsx';
+      const r = compile({ root: '/smoke', config: { ...config({ name: 'Viz smoke', plugins: [viz] }), file }, layouts: {}, routes: {}, features: {}, works: { d: { ...work({ title: 'V', summary: 'V', stage: jsx(DeltaBar, { id: 'db', items: [{ id: 'cpu', label: 'CPU', baseline: 100, value: 30 }] }), scenarios: { s: chapter('C').system('Focus', focusDatum('db', 'cpu')) } }), file } } }, 'publish');
+      if (!r.project || r.diagnostics.some(d => d.severity === 'error') || r.project.scenarios['d.s'].steps[0].ext.viz.charts.db.focus[0] !== 'cpu') process.exit(1);
+    `], project);
+    log('  ✓ installed viz plugin: entrypoints, 10 components, skill and compile-time viz snapshots');
 
     // Optional plugin is installed explicitly; its author/local/runtime exports must work without workspace tools.
     const probe = sh(process.execPath, ['--input-type=module', '-e', `

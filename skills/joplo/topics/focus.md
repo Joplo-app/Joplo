@@ -18,7 +18,7 @@ Read the relevant installed plugin skill for the visual component, its props and
 - Look closer at a small or dense area: shot('id', …). The camera zooms; the rest fades. What the frame keeps (a node's group title, a card's container): diagram.
 - One block on a busy screen, keep the layout visible: spotlight('id'). No zoom; everything else is washed out.
 - "Notice this changed / this matters": highlight('id'). No zoom; a ring that pulses once.
-- One short reason next to an element: callout('id', 'Share after generation', { side? }). A note with a leader line; side is top / right / bottom / left, or omitted to pick the free side.
+- One short reason next to an element: callout('id', 'Share after generation', { side? }) (or shorthand callout('id', '…', 'bottom')). A note with a leader line; omitting side automatically scores all four sides to stay inside the viewport and avoid overlapping neighboring cards, text blocks, and other cues.
 - What a screen is made of, or an order of parts: numbered('input', 'preview', 'send'). Badges 1, 2, 3 (keep it to 5 or fewer).
 - Use an existing clip to determine dwell: hold('voice', { pad: 0.4 }) for this step's narration or hold('audio', asset('./cue.wav'), { pad: 0 }) for a separate clip. This replaces caption reading floors, never required action/plugin-effect time; measured versus estimated is visible in check/outline. See demo for the max rule, preparation and timing sources.
 - Give viewers time to look (a chart, a comparison, a long result): hold(5). Autoplay stays at least 5 seconds (0.5–30, scaled by speed).
@@ -68,4 +68,4 @@ flow('Plan a weekend trip', { start: '/' })
 Full example: examples/camping.
 
 Related topics: demo, plugins, check
-<!-- joplo-skill 0.8.2 sha256:7b3c26e04d8a08c7835dddacf2b70d4cd02b66aaf9b2fc085394cc8cc73e5028 -->
+<!-- joplo-skill 0.8.2 sha256:61fd99ab5f2294beef6cf051370504031bd431f75e2d62ec9954b7e9217eca91 -->

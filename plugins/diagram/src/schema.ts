@@ -54,6 +54,7 @@ export const PulseSnapshotS = z.strictObject({
   reverse: z.boolean().optional(),
   tone: z.enum(['neutral', 'accent', 'info', 'violet', 'ok', 'warn', 'danger', 'muted']).optional(),
   durationMs: z.number().positive(),
+  explicitDuration: z.boolean().optional(),
 });
 export type PulseSnapshot = z.infer<typeof PulseSnapshotS>;
 export const NodeStatusS = z.enum(['idle', 'healthy', 'active', 'hot', 'degraded', 'down', 'cached']);

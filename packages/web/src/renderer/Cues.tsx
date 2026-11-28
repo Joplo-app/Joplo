@@ -14,7 +14,7 @@ import type { FocusState } from '@joplo-app/core/runtime';
 import type { Box } from './camera-math';
 import { ownershipEls } from './camera';
 import { markBox } from './marks-math';
-import { badgeCenter, placeCallout, spotlightHoles, spotlightPath, visibleRegion, SPOT_PAD, TransitionTracker, type CalloutPlacement, type Side } from './cue-math';
+import { badgeCenter, overlaps, placeCallout, spotlightHoles, spotlightPath, visibleRegion, SPOT_PAD, TransitionTracker, type CalloutPlacement, type Side } from './cue-math';
 import { Rough, RoughPath, ThemeContext, useStroke } from './rough';
 import { rectOf } from './rect';
 
@@ -51,15 +51,48 @@ function idsOf(f: FocusState, next: string | null): string[] {
 /** 归属元素（ownershipEls）测出的矩形记在这个前缀下：`^own:<目标 id>:<序号>`。 */
 const OWN = '^own:';
 
-function useBoxes(ids: string[], wrapRef: RefObject<HTMLDivElement | null>, contentRef: RefObject<HTMLDivElement | null>, deps: unknown[], animate: boolean, withOwnership: readonly string[] = []): Map<string, Box> {
-  const [boxes, setBoxes] = useState<Map<string, Box>>(new Map());
+type Measured = { boxes: Map<string, Box>; obstacles: Map<string, Box[]> };
+
+const EMPTY_MEASURED: Measured = { boxes: new Map(), obstacles: new Map() };
+const OBSTACLE_SELECTOR = '[data-jid], [data-bd-slab], h1, h2, h3, h4, h5, h6, p, pre, code, button, img, svg, table';
+const TEXT_BLOCK_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p']);
+const VISUAL_TAGS = new Set(['svg', 'img', 'canvas', 'video', 'pre', 'code', 'button', 'input', 'textarea', 'select', 'table']);
+
+function isTransparentContainer(el: Element, cs: CSSStyleDeclaration): boolean {
+  if (VISUAL_TAGS.has(el.tagName.toLowerCase())) return false;
+  const bg = cs.backgroundColor;
+  const noBg = !bg || bg === 'transparent' || bg === 'rgba(0, 0, 0, 0)';
+  const noBorder =
+    parseFloat(cs.borderTopWidth) === 0 &&
+    parseFloat(cs.borderRightWidth) === 0 &&
+    parseFloat(cs.borderBottomWidth) === 0 &&
+    parseFloat(cs.borderLeftWidth) === 0;
+  const noShadow = !cs.boxShadow || cs.boxShadow === 'none';
+  return noBg && noBorder && noShadow;
+}
+
+function isOverlaySvg(el: Element, cs: CSSStyleDeclaration): boolean {
+  return el.tagName.toLowerCase() === 'svg' && cs.pointerEvents === 'none' && cs.position === 'absolute';
+}
+
+function useBoxes(
+  ids: string[],
+  wrapRef: RefObject<HTMLDivElement | null>,
+  contentRef: RefObject<HTMLDivElement | null>,
+  deps: unknown[],
+  animate: boolean,
+  withOwnership: readonly string[] = [],
+  calloutTargets: readonly string[] = [],
+  region?: Box,
+): Measured {
+  const [measured, setMeasured] = useState<Measured>(EMPTY_MEASURED);
   const { registry } = useContext(ThemeContext);
-  const key = `${ids.join('|')}#${withOwnership.join('|')}`;
+  const key = `${ids.join('|')}#${withOwnership.join('|')}#${calloutTargets.join('|')}`;
   useLayoutEffect(() => {
     const wrap = wrapRef.current;
     const host = wrap?.parentElement;
     if (!wrap || !host || !ids.length) {
-      setBoxes((b) => (b.size ? new Map() : b));
+      setMeasured((m) => (m.boxes.size || m.obstacles.size ? EMPTY_MEASURED : m));
       return;
     }
     const token = {};
@@ -73,6 +106,7 @@ function useBoxes(ids: string[], wrapRef: RefObject<HTMLDivElement | null>, cont
       const wr = rectOf(wrap);
       const scale = wr.width / (wrap.offsetWidth || 1);
       const next = new Map<string, Box>();
+      const targetEls = new Map<string, HTMLElement>();
       const boxOf = (el: Element): Box | null => {
         const clips = [toBox(rectOf(host))];
         for (let p: Element | null = el; p && p !== wrap; p = p.parentElement) {
@@ -88,13 +122,71 @@ function useBoxes(ids: string[], wrapRef: RefObject<HTMLDivElement | null>, cont
         const box = boxOf(el);
         if (!box) continue;
         next.set(id, box);
+        targetEls.set(id, el);
         if (withOwnership.includes(id))
           ownershipEls(el).forEach((o, i) => { const b = boxOf(o); if (b) next.set(`${OWN}${id}:${i}`, b); });
       }
-      const sig = JSON.stringify([...next].map(([id, b]) => [id, round(b.x), round(b.y), round(b.w), round(b.h)]));
+      // 仅在存在 callout 时采集舞台障碍物，让自动选边避开相邻卡片、节点与文本块
+      const nextObs = new Map<string, Box[]>();
+      const content = contentRef.current;
+      if (calloutTargets.length && content && region) {
+        const regionArea = Math.max(1, region.w * region.h);
+        const seen = new Set<Element>();
+        const candidates: Array<{ el: Element; box: Box }> = [];
+        const consider = (el: Element, allowTransparentText: boolean) => {
+          if (seen.has(el)) return;
+          if (el.closest('[data-jlayer]')) { seen.add(el); return; }
+          const cs = getComputedStyle(el);
+          if (cs.opacity === '0' || isOverlaySvg(el, cs)) { seen.add(el); return; }
+          const b = boxOf(el);
+          if (!b || b.w < 4 || b.h < 4 || !overlaps(b, region)) { seen.add(el); return; }
+          if (b.w * b.h > regionArea * 0.42) { seen.add(el); return; }
+          const transparent = isTransparentContainer(el, cs);
+          if (transparent) {
+            if (el.querySelector('[data-jid], [data-bd-slab]')) { seen.add(el); return; }
+            if (!el.textContent?.trim()) { seen.add(el); return; }
+            // Do not mark skipped transparent text as seen when allowTransparentText is false,
+            // so sibling-chain pass can still admit it cleanly.
+            if (!allowTransparentText) return;
+          }
+          seen.add(el);
+          candidates.push({ el, box: b });
+        };
+        for (const el of content.querySelectorAll(OBSTACLE_SELECTOR)) {
+          consider(el, TEXT_BLOCK_TAGS.has(el.tagName.toLowerCase()));
+        }
+        for (const tid of calloutTargets) {
+          let cur: Element | null = targetEls.get(tid) ?? null;
+          for (let depth = 0; depth < 6 && cur && cur !== content && cur !== wrap; depth++) {
+            const parent: Element | null = cur.parentElement;
+            if (!parent || parent === wrap) break;
+            for (const sib of parent.children) {
+              if (sib === cur || sib.tagName === 'STYLE' || sib.tagName === 'SCRIPT') continue;
+              consider(sib, true);
+              // Also collect direct visual/text children inside sibling header or toolbar flex rows
+              if (sib.children.length > 0 && sib.children.length <= 6) {
+                for (const child of sib.children) consider(child, true);
+              }
+            }
+            cur = parent;
+          }
+        }
+        for (const tid of calloutTargets) {
+          const tel = targetEls.get(tid);
+          if (!tel) continue;
+          const list = candidates
+            .filter(({ el }) => el !== tel && !el.contains(tel) && !tel.contains(el))
+            .map(({ box }) => box);
+          nextObs.set(tid, list);
+        }
+      }
+      const sig = JSON.stringify([
+        [...next].map(([id, b]) => [id, round(b.x), round(b.y), round(b.w), round(b.h)]),
+        [...nextObs].map(([id, bs]) => [id, bs.map((b) => [Math.round(b.x / 4), Math.round(b.y / 4), Math.round(b.w / 4), Math.round(b.h / 4)])]),
+      ]);
       if (sig !== last) {
         last = sig;
-        setBoxes(next);
+        setMeasured({ boxes: next, obstacles: nextObs });
       }
     };
     const tick = () => {
@@ -151,14 +243,15 @@ function useBoxes(ids: string[], wrapRef: RefObject<HTMLDivElement | null>, cont
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, animate, ...deps]);
-  return boxes;
+  return measured;
 }
 
 export function Cues({ focus, wrapRef, contentRef, width, height, view, nextTargetId, cameraTargets, animate, pulseKey }: CuesProps) {
   const ids = useMemo(() => idsOf(focus, nextTargetId), [focus, nextTargetId]);
+  const calloutTargets = useMemo(() => [...new Set(focus.callouts.map((c) => c.target))], [focus.callouts]);
   const k = view && view.k > 0 ? view.k : 1;
-  const boxes = useBoxes(ids, wrapRef, contentRef, [pulseKey, view?.k, view?.tx, view?.ty, width, height], animate, focus.spotlight);
   const region = visibleRegion(width, height, view);
+  const { boxes, obstacles } = useBoxes(ids, wrapRef, contentRef, [pulseKey, view?.k, view?.tx, view?.ty, width, height], animate, focus.spotlight, calloutTargets, region);
   const has = (id: string) => boxes.has(id);
   const spot = focus.spotlight.filter(has);
   // 聚光图表元素时，洞口同时留出它的归属信息（父分组标题 / 时序图两端参与者的头部），与 D69 取景同一条规则
@@ -183,7 +276,7 @@ export function Cues({ focus, wrapRef, contentRef, width, height, view, nextTarg
         {rings.map((id) => <Ring key={`${pulseKey}:${id}`} id={id} box={boxes.get(id)!} k={k} animate={animate} />)}
         {reveal.map((box, i) => <Reveal key={`${pulseKey}:r:${i}`} box={box} k={k} />)}
         {numbered.map((id, i) => <Badge key={`${pulseKey}:n:${id}`} id={id} n={i + 1} box={boxes.get(id)!} k={k} region={region} animate={animate} delay={i * 0.12} />)}
-        <Callouts items={callouts.map((c) => ({ ...c, box: boxes.get(c.target)! }))} k={k} region={region} avoid={[...rings, ...numbered].map((id) => boxes.get(id)!)} animate={animate} pulseKey={pulseKey} />
+        <Callouts items={callouts.map((c) => ({ ...c, box: boxes.get(c.target)! }))} k={k} region={region} avoid={[...rings, ...numbered].map((id) => boxes.get(id)!)} obstacles={obstacles} animate={animate} pulseKey={pulseKey} />
       </div>
     </>
   );
@@ -239,7 +332,7 @@ type CalloutItem = { target: string; text: string; side?: Side; box: Box };
  * 标注气泡（便签式说明）：先按最大宽度排一次量出大小，再选边（cue-math.placeCallout，避开目标、其他气泡和已画的框），
  * 引线从气泡边连到目标边，目标端一个小圆点。
  */
-function Callouts({ items, k, region, avoid, animate, pulseKey }: { items: CalloutItem[]; k: number; region: Box; avoid: Box[]; animate: boolean; pulseKey: string }) {
+function Callouts({ items, k, region, avoid, obstacles, animate, pulseKey }: { items: CalloutItem[]; k: number; region: Box; avoid: Box[]; obstacles: Map<string, Box[]>; animate: boolean; pulseKey: string }) {
   const refs = useRef<(HTMLDivElement | null)[]>([]);
   const [sizes, setSizes] = useState<{ w: number; h: number }[]>([]);
   const sig = items.map((c) => `${c.target}:${c.text}`).join('|');
@@ -255,7 +348,7 @@ function Callouts({ items, k, region, avoid, animate, pulseKey }: { items: Callo
   const layout: (CalloutPlacement | null)[] = items.map((c, i) => {
     const s = sizes[i];
     if (!s || s.w <= 0) return null;
-    const p = placeCallout(c.box, s, region, { side: c.side, placed, gap: 16 / k, margin: 8 / k });
+    const p = placeCallout(c.box, s, region, { side: c.side, placed, obstacles: obstacles.get(c.target), gap: 16 / k, margin: 8 / k });
     placed.push(p.box);
     return p;
   });

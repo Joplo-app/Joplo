@@ -27,10 +27,36 @@ export function localReviewUpdates(project: Project, workId: string, state: Loca
   ];
 }
 
+export function isReviewLocationValid(project: Project, workId: string, location: LocalReviewLocation): boolean {
+  const work = project.works[workId];
+  const scene = project.scenes[location.sceneId];
+  if (!work || !scene) return false;
+  const layerScenes = Object.values(work.layers).map(l => l.sceneId);
+  if (location.scenarioId !== null) {
+    const scenario = project.scenarios[location.scenarioId];
+    if (!scenario || scenario.workId !== workId || !Number.isSafeInteger(location.position) || location.position < 0 || location.position > scenario.steps.length) return false;
+    try {
+      return stateAt(project, scenario.id, location.position).sceneId === scene.id || layerScenes.includes(scene.id);
+    } catch { return false; }
+  }
+  return location.position === 0 && (scene.workId === workId || layerScenes.includes(scene.id));
+}
+
 export type ReviewDraft = { sessionId: string; text: string; context: LocalReviewLocation; pageTitle: string; scenarioName: string | null; requestId?: string };
 export function captureReviewDraft(session: LocalReviewSession, project: Project, context: LocalReviewLocation, text = ''): ReviewDraft {
   return { sessionId: session.id, text, context, pageTitle: project.scenes[context.sceneId]?.name ?? context.sceneId,
     scenarioName: context.scenarioId ? project.scenarios[context.scenarioId]?.name ?? context.scenarioId : null };
+}
+/** Keep continuous review unblocked across hot reloads: empty drafts track the live page, and non-empty drafts auto-rebind when their page/step still exists. */
+export function reconcileReviewDraft(draft: ReviewDraft | null, session: LocalReviewSession, project: Project, currentContext: LocalReviewLocation | null): ReviewDraft | null {
+  if (!draft || !draft.text.trim()) {
+    return currentContext ? captureReviewDraft(session, project, currentContext) : null;
+  }
+  if (draft.sessionId === session.id) return draft;
+  if (isReviewLocationValid(project, session.workId, draft.context)) {
+    return captureReviewDraft(session, project, draft.context, draft.text);
+  }
+  return draft;
 }
 export function reviewDraftKey(projectId: string, workId: string): string { return `joplo.review.draft:${projectId}:${workId}`; }
 export function readReviewDraft(key: string): ReviewDraft | null {

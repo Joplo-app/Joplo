@@ -4,7 +4,13 @@ import packageInfo from './version.json' with { type: 'json' };
 export type MusicOptions = { fadeMs?: number; startDelayMs?: number; duck?: boolean; maxRetiring?: number; loop?: boolean; volume?: number; from?: string };
 /** Scores and marker names stay on the author machine. Only rendered audio and numeric offsets ship. */
 export function alda(scores: Record<string, string>) {
-  return definePlugin({ packageName: '@joplo-app/plugin-alda', id: 'alda', title: 'Alda background music', version: packageInfo.version, components: {}, skill,
+  return definePlugin({ packageName: '@joplo-app/plugin-alda', id: 'alda', title: 'Alda background music', version: packageInfo.version,
+    bestFor: 'Offline procedural background music from Alda scores with marker seeking, smooth crossfades, and automatic narration ducking',
+    pairsWith: [
+      { with: 'content', packageName: '@joplo-app/plugin-content', how: 'Cue music.play/stop with fadeMs J-cuts across content chapter() camera moves.' },
+      { with: 'media', packageName: '@joplo-app/plugin-av', how: 'Layer media one-shot sfx.play() accents over alda background music.' },
+    ],
+    components: {}, skill,
     runtime: new URL(new URL(import.meta.url).pathname.endsWith('.ts') ? './runtime.ts' : './runtime.js', import.meta.url),
     local: new URL(new URL(import.meta.url).pathname.endsWith('.ts') ? './local.ts' : './local.js', import.meta.url),
     compile: { effect(e, ctx) {

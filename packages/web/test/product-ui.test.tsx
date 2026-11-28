@@ -16,7 +16,7 @@ import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, isNodeVisible, replay, stateAt, validate, type AuthoringProject, type Project } from '@joplo-app/core';
 import { I18nProvider } from '../src/i18n/context';
 import { Stage } from '../src/renderer/Stage';
-import { chartModel, diffTone, menuPlacement, notificationPlacement, selectedIds } from '../../../plugins/ui/src/runtime.tsx';
+import { diffTone, menuPlacement, notificationPlacement, selectedIds } from '../../../plugins/ui/src/runtime.tsx';
 import { CaseNav } from '../src/board/CaseNav';
 import { caseBrief, gapsOf, rolesOfFeature } from '../src/board/nav-model';
 import { SiteApp, SiteHome } from '../src/site/SiteApp';
@@ -34,8 +34,6 @@ function build(): { dev: Project; publish: Project } {
     h(ui.Indicator, { id: 'bell', label: $.ui.unread, disabled: $.ui.read }, h(ui.Text, null, 'Inbox')),
     h(ui.Stat, { id: 'kpi', label: 'Signups', value: $.data.signups, diff: '+12%' }),
     h(ui.KeyValue, { id: 'kv', total: true, items: [{ label: 'Seats', value: '5' }, { label: 'Total', value: $.data.total }] }),
-    h(ui.BarChart, { id: 'chart', dataKey: 'week', data: $.data.weeks, series: [{ name: 'signups', label: 'Signups' }] }),
-    h(ui.LineChart, { id: 'line', dataKey: 'week', data: $.data.weeks, series: [{ name: 'signups' }] }),
     h(ui.Avatar.Group, { id: 'avatars' }, h(ui.Avatar, { name: 'Ana Lee' }), h(ui.Avatar, { name: 'Bo Chen' })),
     h(ui.EmptyState, { id: 'empty', when: $.ui.empty, icon: '✉', title: 'No members yet', description: 'Invite teammates' }, h(ui.Button, { id: 'invite_first' }, 'Invite')),
     h(ui.ListRow, { id: 'row_bo', avatar: 'Bo Chen', title: 'Bo Chen', description: $.ui.boStatus, active: $.ui.boNew }, h(ui.Badge, null, 'Member')),
@@ -145,16 +143,6 @@ describe('新组件：编译、回放与按步骤渲染', () => {
 });
 
 describe('新组件的纯函数', () => {
-  it('chartModel：系列取数字（其余当 0），刻度是好看的整数步长，空数据不崩', () => {
-    const m = chartModel([{ w: 'a', x: 3 }, { w: 'b', x: 'bad' }, { w: 'c', x: 17 }], 'w', [{ name: 'x', label: 'X' }, { nope: 1 }]);
-    expect(m.labels).toEqual(['a', 'b', 'c']);
-    expect(m.series).toHaveLength(1);
-    expect(m.series[0]).toMatchObject({ name: 'x', label: 'X', values: [3, 0, 17] });
-    expect(m.max).toBeGreaterThanOrEqual(17);
-    expect(m.ticks[0]).toBe(0);
-    expect(m.ticks.at(-1)).toBe(m.max);
-    expect(chartModel(undefined, undefined, null)).toMatchObject({ labels: [], series: [], max: 1 });
-  });
   it('selectedIds / diffTone / menuPlacement / notificationPlacement', () => {
     expect([...selectedIds(['u1', { id: 'u2' }, null, ''], 'id')]).toEqual(['u1', 'u2']);
     expect([...selectedIds(undefined, 'id')]).toEqual([]);

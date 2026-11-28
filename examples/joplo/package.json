@@ -7,6 +7,7 @@
     "@joplo-app/plugin-ui": "workspace:*",
     "@joplo-app/plugin-diagram": "workspace:*",
     "@joplo-app/plugin-content": "workspace:*",
-    "@joplo-app/plugin-av": "workspace:*"
+    "@joplo-app/plugin-av": "workspace:*",
+    "@joplo-app/plugin-viz": "workspace:*"
   }
 }

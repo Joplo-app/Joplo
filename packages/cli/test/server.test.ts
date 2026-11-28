@@ -51,6 +51,7 @@ test('render --film / --video：参数、摘要与互斥（D92）', async () => 
   expect(r.stdout).toContain('chapter → f.a.t at 9.00s: max adjacent diff 3.0%');
   expect(r.stdout).toContain('CUT 4.00s f.a.s step 3');
   expect(r.stdout).toContain('STILL 6.00s–8.00s (2.00s)');
+  expect(r.stdout).toContain('add progressive stage content');
   const renderVideo = vi.fn(async () => ({ path: resolve('v.webm'), durationMs: 1, size: { width: 1280, height: 800 }, srt: null, voice: { mode: 'real' as const, missing: [] } }));
   expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--video', '--chain', '--out', 'v.webm'], { renderVideo })).stdout).toBe(`${resolve('v.webm')}\n1280×800 · voice real\n`);
   // 发布用的视频（#55 #56 #59）：分辨率、旁白、干净画面与字幕文件都传给 renderVideo；没有音频的旁白列出来

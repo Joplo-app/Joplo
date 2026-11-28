@@ -89,3 +89,22 @@ test('config.plugins entry that is an uncalled factory names the index and sugge
  expect(err.message).toContain('plugins: [alda(…)]');
  expect(err.message).not.toContain('Install this project');
 });
+
+test('joplo-plugins/SKILL.md synthesizes role palette, active cross-plugin combos and optional companions',async()=>{
+ const root=await temp();
+ const alpha={...base,id:'alpha',title:'Alpha visuals',bestFor:'Spatial stages and metrics',pairsWith:[{with:'beta',packageName:'joplo-plugin-beta',how:'Place beta topologies inside alpha stages.'},{with:'gamma',packageName:'joplo-plugin-gamma',how:'Pair alpha stages with gamma charts.'}],components:{World:{role:'stage',doc:'spatial canvas'},Kpi:{role:'metric',doc:'kpi card'},div:{role:'layout',intrinsic:'div',doc:'html div'}}};
+ const beta={...base,id:'beta',title:'Beta graphs',bestFor:'Architecture boards',pairsWith:[{with:'alpha',packageName:'joplo-plugin-alpha',how:'Host beta zones inside alpha.'}],components:{Node:{role:'topology',doc:'service node'}}};
+ await config(root,[alpha,beta]);
+ expect((await installSkill(root,'1.0')).code).toBe(0);
+ const index=await readFile(file(root,'joplo-plugins/SKILL.md'),'utf8');
+ expect(index).toContain('## Visual palette by expression intent (enabled plugins)');
+ expect(index).toContain('- **stage**');
+ expect(index).toContain('`alpha:World`');
+ expect(index).toContain('`beta:Node`');
+ expect(index).toContain('- **html fallbacks**: `alpha:div`');
+ expect(index).toContain('## How your enabled plugins compose');
+ expect(index).toContain('- **alpha + beta**: Place beta topologies inside alpha stages.');
+ expect(index).toContain('## Optional companion plugins (not enabled yet)');
+ expect(index).toContain('- **gamma** (`joplo-plugin-gamma`): Pair alpha stages with gamma charts.');
+ expect(index).toContain('Spatial stages and metrics');
+});

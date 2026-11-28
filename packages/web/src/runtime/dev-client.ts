@@ -13,7 +13,7 @@ import type { SelectionInput, SelectionWriteResult } from './demo';
 import { loadPluginRuntimes } from '../renderer/plugins';
 
 /** plugins（D86）：插件 id → 运行时地址（源码 Vite /@fs/… 或预构建看板的打包模块端点）；收到即载入（renderer/plugins.ts）。 */
-export type DevPayload = { projectId?: string; version: number; ok: boolean; project: Project | null; diagnostics: Diagnostic[]; home: string | null; plugins?: Record<string, string> };
+export type DevPayload = { projectId?: string; instanceId?: string; version: number; ok: boolean; project: Project | null; diagnostics: Diagnostic[]; home: string | null; plugins?: Record<string, string> };
 
 export type ProjectSummary = {
   id: string;
@@ -43,12 +43,41 @@ export function localToken(): string | null {
   return v && v !== '__JOPLO_TOKEN__' ? v : null;
 }
 
+let tokenRefresh: Promise<string | null> | null = null;
+/** Same-origin token refresh when joplo dev restarts on the same port, avoiding manual page reload. */
+export async function refreshLocalToken(): Promise<string | null> {
+  if (typeof document === 'undefined' || typeof fetch === 'undefined') return null;
+  if (tokenRefresh) return tokenRefresh;
+  tokenRefresh = (async () => {
+    try {
+      const res = await fetch('/', { cache: 'no-store' });
+      if (!res.ok) return null;
+      const html = await res.text();
+      const match = /<meta\b[^>]*\bname=["']joplo-token["'][^>]*\bcontent=["']([^"']+)["']/i.exec(html)
+        ?? /<meta\b[^>]*\bcontent=["']([^"']+)["'][^>]*\bname=["']joplo-token["']/i.exec(html);
+      const next = match?.[1]?.trim() ?? '';
+      if (!next || next === '__JOPLO_TOKEN__') return null;
+      const meta = document.querySelector<HTMLMetaElement>('meta[name="joplo-token"]');
+      if (meta) meta.content = next;
+      return next;
+    } catch {
+      return null;
+    } finally {
+      tokenRefresh = null;
+    }
+  })();
+  return tokenRefresh;
+}
+
 const enc = encodeURIComponent;
 const errMsg = (e: unknown): Text => e instanceof MessageError ? e.text : e instanceof Error ? e.message : String(e);
 
+async function readErrorBody(res: Response): Promise<{ message: string; code?: string }> {
+  const body = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
+  return { message: body?.error?.message ?? `HTTP ${res.status}`, ...(typeof body?.error?.code === 'string' ? { code: body.error.code } : {}) };
+}
 async function readError(res: Response): Promise<string> {
-  const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-  return body?.error?.message ?? `HTTP ${res.status}`;
+  return (await readErrorBody(res)).message;
 }
 
 function writeHeaders(json = true): Record<string, string> | null {
@@ -83,17 +112,26 @@ type Hot = { on(ev: string, cb: (d: any) => void): void; off(ev: string, cb: (d:
 const hot = (): Hot | null => (import.meta.hot as unknown as Hot | undefined) ?? null;
 
 /** 订阅某个项目的 IR 推送。返回取消函数。 */
-export function subscribeIR(projectId: string, cb: (p: DevPayload) => void, onConnection?: (connected: boolean) => void): () => void {
+export function subscribeIR(projectId: string, cb: (p: DevPayload) => void, onConnection?: (connected: boolean) => void, onReconnect?: () => void): () => void {
   const h = hot();
   if (!h) return () => undefined;
-  let revision=0,closed=false;
+  let revision=0,closed=false,disconnected=false;
   const handler = (p: DevPayload) => {
     if (p.projectId !== projectId) return;
     const current=++revision;
     void loadPluginRuntimes(p.plugins).then(()=>{if(!closed&&current===revision)cb(p);});
   };
-  const up = () => onConnection?.(true);
-  const down = () => onConnection?.(false);
+  const up = () => {
+    onConnection?.(true);
+    if (disconnected) {
+      disconnected = false;
+      onReconnect?.();
+    }
+  };
+  const down = () => {
+    disconnected = true;
+    onConnection?.(false);
+  };
   h.on('joplo:ir', handler);
   h.on('vite:ws:connect', up);
   h.on('vite:ws:disconnect', down);
@@ -101,6 +139,35 @@ export function subscribeIR(projectId: string, cb: (p: DevPayload) => void, onCo
   return () => {
     closed=true;
     h.off('joplo:ir', handler);
+    h.off('vite:ws:connect', up);
+    h.off('vite:ws:disconnect', down);
+  };
+}
+
+/** Subscribe to real-time local review updates (new rounds after hot reload and agent receipts). */
+export function subscribeReview(
+  projectId: string,
+  cb: (update: { projectId: string; workId?: string; version?: number; reconnected?: boolean }) => void,
+  onConnection?: (connected: boolean) => void,
+): () => void {
+  const h = hot();
+  if (!h) return () => undefined;
+  let disconnected = false;
+  const handler = (d: { projectId?: string; workId?: string; version?: number }) => {
+    if (d?.projectId === projectId) cb({ projectId, ...(d.workId ? { workId: d.workId } : {}), ...(d.version !== undefined ? { version: d.version } : {}) });
+  };
+  const up = () => {
+    onConnection?.(true);
+    if (!disconnected) return;
+    disconnected = false;
+    cb({ projectId, reconnected: true });
+  };
+  const down = () => { disconnected = true; onConnection?.(false); };
+  h.on('joplo:review', handler);
+  h.on('vite:ws:connect', up);
+  h.on('vite:ws:disconnect', down);
+  return () => {
+    h.off('joplo:review', handler);
     h.off('vite:ws:connect', up);
     h.off('vite:ws:disconnect', down);
   };
@@ -118,13 +185,39 @@ export function subscribeDiagnostics(projectId: string, cb: (update: Diagnostics
   return () => h.off('joplo:diagnostics', handler);
 }
 
-/** 订阅项目列表变化（再次 joplo dev 注册、编译状态变化、移除）。 */
-export function subscribeProjects(cb: (list: ProjectSummary[]) => void): () => void {
+/** Subscribe to live plugin runtime swaps (e.g. plugin edits in source mode) without full-page reload. */
+export function subscribePlugins(projectId: string, cb?: (plugins: Record<string, string>) => void): () => void {
   const h = hot();
   if (!h) return () => undefined;
+  const handler = (d: { projectId?: string; plugins?: Record<string, string> }) => {
+    if (d?.projectId && d.projectId !== projectId) return;
+    if (!d?.plugins || !Object.keys(d.plugins).length) return;
+    void loadPluginRuntimes(d.plugins).then(() => cb?.(d.plugins!));
+  };
+  h.on('joplo:plugins', handler);
+  return () => h.off('joplo:plugins', handler);
+}
+
+/** 订阅项目列表变化（再次 joplo dev 注册、编译状态变化、移除）。 */
+export function subscribeProjects(cb: (list: ProjectSummary[]) => void, onReconnect?: () => void): () => void {
+  const h = hot();
+  if (!h) return () => undefined;
+  let disconnected = false;
   const handler = (d: { projects: ProjectSummary[] }) => cb(d.projects);
+  const up = () => {
+    if (!disconnected) return;
+    disconnected = false;
+    onReconnect?.();
+  };
+  const down = () => { disconnected = true; };
   h.on('joplo:projects', handler);
-  return () => h.off('joplo:projects', handler);
+  h.on('vite:ws:connect', up);
+  h.on('vite:ws:disconnect', down);
+  return () => {
+    h.off('joplo:projects', handler);
+    h.off('vite:ws:connect', up);
+    h.off('vite:ws:disconnect', down);
+  };
 }
 
 export async function fetchSelection(projectId: string): Promise<Selection | null> {
@@ -160,18 +253,36 @@ async function post(url: string, body: unknown, method = 'POST'): Promise<Respon
 }
 
 /** 仅本地看板可用；读写都带本机令牌，发布站不导入这个客户端。 */
-export async function fetchLocalReview(projectId: string, workId: string): Promise<{ ok: true; state: LocalReviewState } | { ok: false; message: Text }> {
+export type LocalReviewResult = { ok: true; state: LocalReviewState } | { ok: false; message: Text; status?: number; code?: string };
+export async function fetchLocalReview(projectId: string, workId: string): Promise<LocalReviewResult> {
   try {
-    const headers = writeHeaders(false);
-    if (!headers) throw new MessageError(m.board.thisPageHasNoLocalToken);
-    const res = await fetch(`/__joplo/p/${enc(projectId)}/review?workId=${enc(workId)}`, { headers, cache: 'no-store' });
-    return res.ok ? { ok: true, state: await res.json() as LocalReviewState } : { ok: false, message: await readError(res) };
+    const run = async () => {
+      const headers = writeHeaders(false);
+      if (!headers) throw new MessageError(m.board.thisPageHasNoLocalToken);
+      return fetch(`/__joplo/p/${enc(projectId)}/review?workId=${enc(workId)}`, { headers, cache: 'no-store' });
+    };
+    const before = localToken();
+    let res = await run();
+    if (res.status === 403) {
+      const next = await refreshLocalToken();
+      if (next && next !== before) res = await run();
+    }
+    if (res.ok) return { ok: true, state: await res.json() as LocalReviewState };
+    const err = await readErrorBody(res);
+    return { ok: false, message: err.message, status: res.status, ...(err.code ? { code: err.code } : {}) };
   } catch (e) { return { ok: false, message: errMsg(e) }; }
 }
-export async function writeLocalReviewEvent(projectId: string, input: LocalReviewWrite): Promise<{ ok: true; state: LocalReviewState } | { ok: false; message: Text }> {
+export async function writeLocalReviewEvent(projectId: string, input: LocalReviewWrite): Promise<LocalReviewResult> {
   try {
-    const res = await post(`/__joplo/p/${enc(projectId)}/review`, input);
-    return res.ok ? { ok: true, state: await res.json() as LocalReviewState } : { ok: false, message: await readError(res) };
+    const before = localToken();
+    let res = await post(`/__joplo/p/${enc(projectId)}/review`, input);
+    if (res.status === 403) {
+      const next = await refreshLocalToken();
+      if (next && next !== before) res = await post(`/__joplo/p/${enc(projectId)}/review`, input);
+    }
+    if (res.ok) return { ok: true, state: await res.json() as LocalReviewState };
+    const err = await readErrorBody(res);
+    return { ok: false, message: err.message, status: res.status, ...(err.code ? { code: err.code } : {}) };
   } catch (e) { return { ok: false, message: errMsg(e) }; }
 }
 

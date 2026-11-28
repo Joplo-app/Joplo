@@ -128,12 +128,26 @@ describe('DemoController.autoNext：自动播放时接着播下一个场景', ()
     await sleep(80);
     expect(c.getSnapshot().scenarioId).toBe('f.a.two');
   });
-  it('手动一步步走到结尾：不自动跳', async () => {
+  it('手动一步步走到结尾：先停在结尾不自动跳，再按一次 next 直接切到下一个场景', async () => {
     const c = setup();
     await c.next();
     await until(() => c.getSnapshot().state?.position === 1);
     await sleep(80);
     expect(c.getSnapshot().scenarioId).toBe('f.a.one');
+    // 已在结尾时再次按 → / next：切入下一个场景
+    await c.next();
+    expect(c.getSnapshot().scenarioId).toBe('f.a.two');
+    expect(c.getSnapshot().state?.position).toBe(0);
+  });
+  it('播放中在最后一步停留时按 next：直接切入下一个场景并继续播放', async () => {
+    const c = setup();
+    c.autoNextDelay = 0;
+    void c.play();
+    await until(() => c.getSnapshot().scenarioId === 'f.a.one' && c.getSnapshot().state?.position === 1 && c.getSnapshot().playing);
+    await c.next();
+    await until(() => c.getSnapshot().scenarioId === 'f.a.two');
+    expect(c.getSnapshot().scenarioId).toBe('f.a.two');
+    c.stop();
   });
   it('等待跳转时暂停 / 停止：不再跳', async () => {
     const c = setup();

@@ -1,17 +1,15 @@
-import { isBind } from '@joplo-app/kit/node';
 import { compileCompare } from './compare-options.ts';
 import { isRegionRect } from './image-geometry.ts';
-import { ratioError } from './ratio.ts';
 import labels from './labels.json' with { type: 'json' };
 import type { PluginText } from '@joplo-app/kit/plugin';
 import packageInfo from './version.json' with { type: 'json' };
 import { skill, patterns, componentGuide } from './guide.ts';
-import { definePlugin, type ElementTraits, type PluginComponentSpec, type PluginIRNode } from '@joplo-app/kit/plugin';
+import { definePlugin, type ComponentRole, type ElementTraits, type PluginComponentSpec, type PluginIRNode } from '@joplo-app/kit/plugin';
 import { COMPONENT_TYPES, COMPONENT_DOCS, COMPONENT_EXAMPLES, INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS, HTML_TAGS } from './catalog.ts';
 
 // The UI family owns its vocabulary and display semantics, including HTML fallbacks.
 const display: Record<string,string[]> = {
-  Divider:['label'], Blockquote:['cite'], Avatar:['name'], Image:['alt'], 'Image.Region':['label'], 'Compare.Side':['label'], RatioBar:['labels','remainderLabel','thresholdLabel','unit'], Indicator:['label'],
+  Divider:['label'], Blockquote:['cite'], Avatar:['name'], Image:['alt'], 'Image.Region':['label'], 'Compare.Side':['label'], Indicator:['label'],
   'Timeline.Item':['title'], Table:['data'], DataTable:['records','noRecordsText'],
   Radio:['label'], 'Radio.Card':['label','description','leftSection'], 'Radio.Group':['label','description','value','error'],
   'Stepper.Step':['label','description'], Alert:['title'], Notification:['title'], Modal:['title'], Drawer:['title'],
@@ -19,12 +17,12 @@ const display: Record<string,string[]> = {
   Artifact:['title'], 'Artifact.Ref':['title'], Email:['from','to','subject','time'], DataCard:['title','value'], StateFlow:['labels'],
   Terminal:['title'], 'Terminal.Input':['prompt','placeholder','value'], Placeholder:['label'],
   EmptyState:['title','description'], ListRow:['title','description','avatar'], Stat:['label','value','diff','description'],
-  KeyValue:['items'], BarChart:['data','unit'], LineChart:['data','unit'],
+  KeyValue:['items'],
   NavLink:['label','description','leftSection','rightSection'], Button:['leftSection','rightSection'],
   'Menu.Item':['leftSection','rightSection'], 'Tabs.Tab':['leftSection','rightSection'],
   BrowserWindow:['label','url'], Arrow:['label'],
 };
-const textPaths: Record<string,string[][]> = {Compare:[['compareOptions','*','label']],DataTable:[['columns','*','title']],DataCard:[['fields','*','label']],BarChart:[['series','*','label']],LineChart:[['series','*','label']]};
+const textPaths: Record<string,string[][]> = {Compare:[['compareOptions','*','label']],DataTable:[['columns','*','title']],DataCard:[['fields','*','label']]};
 const fieldText = ['label','description','placeholder','error','value'];
 const traits = (name: string): ElementTraits => ({
   ...(INTERACTIVE_TYPES.has(name) ? {hover:true} : {}),
@@ -52,9 +50,27 @@ const traits = (name: string): ElementTraits => ({
   ...(name === 'AppShell.Aside' ? {region:'aside'} : {}),
   ...(name === 'Phone' ? {childWidth:{value:390,when:{prop:'landscape',value:true,width:772}}} : {}),
 });
+const ROLE_GROUPS: readonly (readonly [ComponentRole, readonly string[]])[] = [
+  ['stage', ['Board', 'BrowserWindow', 'Phone', 'AppShell', 'AppShell.Header', 'AppShell.Navbar', 'AppShell.Main', 'AppShell.Aside', 'AppShell.Footer']],
+  ['metric', ['Stat', 'RingProgress', 'Progress', 'KeyValue', 'DataCard', 'DataTable', 'Table', 'Table.Thead', 'Table.Tbody', 'Table.Tr', 'Table.Th', 'Table.Td']],
+  ['comparison', ['Compare', 'Compare.Side']],
+  ['state', ['StateFlow', 'Timeline', 'Timeline.Item', 'Stepper', 'Stepper.Step']],
+  ['code', ['Code', 'Terminal', 'Terminal.Command', 'Terminal.Output', 'Terminal.Input', 'Kbd']],
+  ['conversation', ['ChatMessage', 'ToolCall', 'Thinking', 'Artifact', 'Artifact.Ref', 'Email', 'PromptInput']],
+  ['annotation', ['Note', 'Arrow', 'Alert', 'Notification', 'Blockquote', 'EmptyState', 'Badge', 'Indicator', 'ThemeIcon', 'Loader', 'Skeleton', 'Placeholder']],
+  ['media', ['Image', 'Image.Region', 'Avatar', 'Avatar.Group']],
+  ['control', ['Radio', 'Radio.Card', 'Menu', 'Menu.Target', 'Menu.Dropdown', 'Menu.Label', 'Menu.Divider', 'Tabs.List', 'Tabs.Panel', 'Accordion', 'Accordion.Item', 'Accordion.Panel', 'Breadcrumbs', 'Modal', 'Drawer']],
+];
+const COMPONENT_ROLE: Record<string, ComponentRole> = Object.fromEntries(ROLE_GROUPS.flatMap(([role, names]) => names.map((name) => [name, role])));
+const roleOf = (name: string): ComponentRole => {
+  if (HTML_TAGS.includes(name)) return 'layout';
+  if (COMPONENT_ROLE[name]) return COMPONENT_ROLE[name]!;
+  return INTERACTIVE_TYPES.has(name) ? 'control' : 'layout';
+};
 export const components: Record<string, PluginComponentSpec> = Object.fromEntries(COMPONENT_TYPES.map(name=>[name,{
   // 看板检查抽屉里给人看的组件名（各语言），只进 dev IR
   ...((labels as Record<string, PluginText>)[name] ? {label:(labels as Record<string, PluginText>)[name]} : {}),
+  role: roleOf(name),
   doc: COMPONENT_DOCS[name],
   ...(COMPONENT_EXAMPLES[name] ? {example:COMPONENT_EXAMPLES[name]} : {}),
   ...(HTML_TAGS.includes(name) ? {intrinsic:name} : {}),
@@ -66,7 +82,18 @@ export const components: Record<string, PluginComponentSpec> = Object.fromEntrie
   ...(name==='Arrow' ? {parent:'Board'} : {}),
 }]));
 export default definePlugin({ packageName: '@joplo-app/plugin-ui',
-  id:'ui', title:'Standard UI', version:packageInfo.version, runtime:new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js',import.meta.url), skill, skillTopics: { components: { description: 'Component props and author examples', body: componentGuide(COMPONENT_DOCS, COMPONENT_EXAMPLES) }, patterns: { description: 'UI recipes and individual pitfalls', body: patterns } }, components,
+  id:'ui', title:'Standard UI', version:packageInfo.version,
+  bestFor: 'Product UI screens, interactive controls, KPI stats/gauges, side-by-side comparisons, terminals, and AI chat/agent panels',
+  pairsWith: [
+    { with: 'content', packageName: '@joplo-app/plugin-content', how: 'Place ui screens, BrowserWindow, Stat, Compare, or Terminal panels inside content:Canvas camera islands so the camera travels across states instead of cutting between static cards.' },
+    { with: 'diagram', packageName: '@joplo-app/plugin-diagram', how: 'Nest ui Stat, Badge, Code, Terminal, or ChatMessage inside diagram BoardZone/ClusterBox/ArchNode/DeviceFrame, or show a live architecture/sequence layer beside the product UI.' },
+    { with: 'viz', packageName: '@joplo-app/plugin-viz', how: 'Pair ui KPI Stat/RingProgress/Compare widgets with viz data visualizations in the same dashboard or Canvas island.' },
+    { with: 'code', packageName: '@joplo-app/plugin-code', how: 'Mount code:Editor beside ui Terminal, BrowserWindow, or DataCard so animated code edits visibly drive output.' },
+    { with: 'media', packageName: '@joplo-app/plugin-av', how: 'Embed engine-clock Video or Lottie clips inside ui frames, or add crisp one-shot WAV sound effects with sfx.play().' },
+    { with: 'alda', packageName: '@joplo-app/plugin-alda', how: 'Underscore chapter transitions and walkthroughs with restrained procedural background music that auto-ducks under narration.' },
+    { with: 'scene3d', packageName: '@joplo-app/plugin-3d', how: 'Embed interactive three.js 3D scenes driven by ui controls or chapter state for spatial and hardware demos.' },
+  ],
+  runtime:new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js',import.meta.url), skill, skillTopics: { components: { description: 'Component props and author examples', body: componentGuide(COMPONENT_DOCS, COMPONENT_EXAMPLES) }, patterns: { description: 'UI recipes and individual pitfalls', body: patterns } }, components,
   compile:{
   // derive 对每个节点各调一次、只给它自己的子树；箭头都在 Board 里，所以从 Board 统一校验 from / to。
   derive(root,{report}){
@@ -84,10 +111,6 @@ export default definePlugin({ packageName: '@joplo-app/plugin-ui',
   },
   node(n,{report}){
     if (n.type === 'ui:Compare') return compileCompare(n, report);
-    if (n.type === 'ui:RatioBar') {
-      const error = ratioError(n.props, isBind);
-      if (error) report('RATIO_BAR_INVALID', '<RatioBar> ' + error, n.source);
-    }
     if (n.type === 'ui:Image.Region' && !isRegionRect(n.props.rect)) {
       report('IMAGE_REGION_RECT', '<Image.Region> rect must be [x, y, width, height] inside the original image (0..1), with positive width and height', n.source);
     }

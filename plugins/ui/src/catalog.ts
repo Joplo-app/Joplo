@@ -26,13 +26,13 @@ const STRUCTURE = [
   // 导航
   'Tabs.List', 'Tabs.Panel', 'Compare.Side', 'Breadcrumbs', 'Stepper', 'Stepper.Step',
   // 反馈与浮层
-  'Alert', 'Loader', 'Progress', 'RatioBar', 'RingProgress', 'Skeleton', 'Notification', 'Modal', 'Drawer',
+  'Alert', 'Loader', 'Progress', 'RingProgress', 'Skeleton', 'Notification', 'Modal', 'Drawer',
   // AI 交互（Joplo 自有）
   'ChatMessage', 'ToolCall', 'Thinking', 'Artifact', 'Email', 'DataCard', 'StateFlow',
   // 设备外框（Joplo 自有）：终端与手机
   'Terminal', 'Terminal.Command', 'Terminal.Output', 'Phone',
-  // 产品界面（D68）：官网示例里反复手拼的常见界面，名字能对齐 Mantine 的就对齐（Menu、Avatar.Group、Radio.Card、BarChart、LineChart）
-  'Avatar.Group', 'Radio.Card', 'EmptyState', 'ListRow', 'Stat', 'KeyValue', 'BarChart', 'LineChart',
+  // 产品界面（D68）：官网示例里反复手拼的常见界面，名字能对齐 Mantine 的就对齐（Menu、Avatar.Group、Radio.Card）
+  'Avatar.Group', 'Radio.Card', 'EmptyState', 'ListRow', 'Stat', 'KeyValue',
   'Menu', 'Menu.Target', 'Menu.Dropdown', 'Menu.Label', 'Menu.Divider',
   // HTML 兜底
   ...HTML,
@@ -109,7 +109,6 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   'Image.Region': 'Direct child of Image. Give the anchor an id and rect={[x, y, width, height]} in original-image fractions. Optional label names the region for focus cues.',
   Compare: 'id, value or defaultValue, mode="auto" | "side-by-side" | "toggle". Compare two direct Compare.Side children. Auto uses side-by-side at the stage sm breakpoint. select(id, value) or the segmented buttons switch the active side.',
   'Compare.Side': 'value (unique string), label, children. Both sides occupy the same grid cell in toggle mode so switching preserves height.',
-  RatioBar: 'total, left, optional right and threshold in the same units. labels={[leftLabel, rightLabel]}, remainderLabel, thresholdLabel, colors={[leftColor, rightColor, remainderColor]}, unit, height (track thickness). Numeric props accept state bindings.',
   ThemeIcon: 'color, variant, size, radius; one character as child',
   Indicator: 'label, color, disabled (hides the badge; can be a condition), processing; wraps one element with a corner badge',
   Timeline: 'active (completed item index), bulletSize; Timeline.Item children',
@@ -175,8 +174,6 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   ListRow: 'avatar (name) or icon (character), title, description, active, withBorder, color; list row with right-side content (Badge, Button, Text) in children; not clickable itself: use NavLink for a tappable row',
   Stat: 'label, value, diff (e.g. "+12%", red when it starts with -), description, icon, color, progress (0-100); KPI card',
   KeyValue: 'items: [{ label, value }] (values can bind $.data.x), total (bold last row), withDivider; order summary / details list',
-  BarChart: 'data: [{ month: "Jan", signups: 40 }] (can bind $.data.x), dataKey (x axis), series: [{ name, label?, color? }], h (default 220), unit, withLegend; low-fi bars, values animate when data changes',
-  LineChart: 'same props as BarChart; low-fi lines with points',
   Menu: 'opened (usually opened={$.ui.menu}; dropdown shows only when true), position: bottom-start|bottom-end|top-start|top-end; Menu.Target + Menu.Dropdown children',
   'Menu.Target': 'Wraps the trigger (ActionIcon or Button with its own id)',
   'Menu.Dropdown': 'Menu items; visible only while the Menu is opened; floats above tables and cards',
@@ -260,7 +257,6 @@ export const COMPONENT_EXAMPLES: Partial<Record<ComponentType, string>> = {
   KeyValue: `<KeyValue withDivider total items={[{ label: 'Seats', value: '5 × $9' }, { label: 'Tax', value: '$4.50' }, { label: 'Total', value: $.data.total }]} />`,
   Arrow: `<Board><Box id="job" pos="absolute" left={160} top={120} w={120} h={64}>Job</Box>
   <Arrow from="job" to="job" label="Retry on timeout" /></Board>`,
-  RatioBar: `<RatioBar total={100} left={$.data.used} right={25} labels={['Used', 'Reserved']} remainderLabel="Available" threshold={80} unit="%" height={20} />`,
   Compare: `<Compare id="policy" value={$.ui.pick} defaultValue="a">
   <Compare.Side value="a" label="Keep draft"><Text>Draft preserved</Text></Compare.Side>
   <Compare.Side value="b" label="Clear draft"><Text>Draft cleared</Text></Compare.Side>
@@ -272,9 +268,6 @@ export const COMPONENT_EXAMPLES: Partial<Record<ComponentType, string>> = {
   Image: `<Image src={asset('../../assets/capitol.jpg')} alt="U.S. Capitol" h={240} fit="cover" position="center 40%" radius="md" />
 // import { asset } from '@joplo-app/kit'; the path is relative to this file. jpg/png/gif/webp/avif/svg, up to 2 MB each; compress first.
 // The image is embedded, so the board, build and share show it offline. For a tinted or full-bleed background, use style={{ backgroundImage: \`url(\${asset('./bg.jpg')})\` }}.`,
-  BarChart: `<BarChart h={220} dataKey="week" unit="" data={$.data.weeks} series={[{ name: 'signups', label: 'Signups' }, { name: 'churn', label: 'Churn', color: 'red' }]} />
-// state: data: { weeks: [{ week: 'W1', signups: 40, churn: 4 }, { week: 'W2', signups: 52, churn: 6 }] }; set() a new array to animate`,
-  LineChart: `<LineChart h={200} dataKey="day" data={[{ day: 'Mon', p95: 320 }, { day: 'Tue', p95: 280 }]} series={[{ name: 'p95', label: 'p95 latency' }]} unit="ms" />`,
   DataTable: `<DataTable idAccessor="id" records={$.data.members} selectedRecords={$.ui.selected} fetching={$.ui.loading}
   sortStatus={{ columnAccessor: 'joined', direction: 'desc' }}
   columns={[{ accessor: 'name', title: 'Name', avatar: true }, { accessor: 'status', title: 'Status', badge: { Active: 'green', Pending: 'yellow', Expired: 'gray' } }, { accessor: 'joined', title: 'Joined', sortable: true }]} />`,

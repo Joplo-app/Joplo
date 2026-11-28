@@ -46,6 +46,32 @@ describe('cue-math', () => {
     expect(p.from.x).toBe(p.box.x);
     expect(p.to.x).toBe(180);
   });
+  it('气泡避障：自动选边避开相邻卡片与同卡旁侧文本，优先落到无遮挡空位', () => {
+    const size = { w: 240, h: 46 };
+    const opts = { gap: 16, margin: 8 };
+    // 场景 1：双列卡片右侧元素（右出界、左侧有兄弟卡片 code_py、上方有内容、下方留白）→ 自动选 bottom
+    const codePy = { x: 40, y: 340, w: 440, h: 110 };
+    const codeRs = { x: 500, y: 340, w: 460, h: 110 };
+    const upperRow = { x: 40, y: 140, w: 920, h: 180 };
+    const placedRs = placeCallout(codeRs, size, region, { ...opts, obstacles: [codePy, upperRow] });
+    expect(placedRs.side).toBe('bottom');
+    // 场景 2：卡片左侧环形图（右侧紧贴说明文字、左侧紧贴兄弟卡片、上方有标题、下方留白）→ 自动选 bottom
+    const leftCard = { x: 40, y: 180, w: 300, h: 180 };
+    const ring = { x: 370, y: 200, w: 128, h: 128 };
+    const siblingText = { x: 514, y: 205, w: 160, h: 110 };
+    const header = { x: 40, y: 80, w: 900, h: 80 };
+    const placedRing = placeCallout(ring, size, region, { ...opts, obstacles: [leftCard, siblingText, header] });
+    expect(placedRing.side).toBe('bottom');
+    // 显式指定 side 时仍尊重作者选择
+    const explicit = placeCallout(codeRs, size, region, { ...opts, side: 'left', obstacles: [codePy, upperRow] });
+    expect(explicit.side).toBe('left');
+    // 四侧均有障碍时，选遮挡面积最小的一侧
+    const smallObs = { x: 640, y: 470, w: 40, h: 20 };
+    const bigLeft = { x: 40, y: 340, w: 440, h: 110 };
+    const bigTop = { x: 480, y: 240, w: 480, h: 90 };
+    const minOverlap = placeCallout(codeRs, size, region, { ...opts, obstacles: [bigLeft, bigTop, smallObs] });
+    expect(minOverlap.side).toBe('bottom');
+  });
   it('编号角标：放在目标左上角，夹进可见范围', () => {
     expect(badgeCenter({ x: 100, y: 100, w: 50, h: 50 }, 24, region)).toEqual({ x: 100, y: 100 });
     expect(badgeCenter({ x: 0, y: 0, w: 50, h: 50 }, 24, region)).toEqual({ x: 14, y: 14 });

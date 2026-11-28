@@ -255,8 +255,12 @@ export const numbered = (...targets: string[]): EffectDef => ({ kind: 'effect', 
  * 标注气泡：指向元素的一句话（便签式说明），建议和字幕一样不超过 24 个字。字幕讲“发生了什么”，气泡讲“为什么在这里”。
  *   .system('行程单完成', '行程单生成完毕', callout('share', '生成完才能分享'))
  *   callout('btn_pay', '按比例只收 18 天', { side: 'left' })
+ *   callout('btn_pay', '按比例只收 18 天', 'left')
  */
-export const callout = (target: string, text: string, opts: { side?: CalloutSide } = {}): EffectDef => ({ kind: 'effect', type: 'callout', target, text, ...(opts.side ? { side: opts.side } : {}) });
+export const callout = (target: string, text: string, opts: CalloutSide | { side?: CalloutSide } = {}): EffectDef => {
+  const side = typeof opts === 'string' ? opts : opts.side;
+  return { kind: 'effect', type: 'callout', target, text, ...(side ? { side } : {}) };
+};
 /**
  * 停留：自动播放时这一步至少停 seconds 秒（0.5–30，按播放速度缩放），给观众时间看画面（图表、对比、一大段结果）。
  * hold('voice', { pad: 0.4 }) / hold('audio', audio, { pad: 0 }) 按实测音频加余量；缺实测时明确估算。

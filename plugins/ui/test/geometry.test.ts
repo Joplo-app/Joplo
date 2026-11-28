@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { boardArrow } from '../src/board-arrow.ts';
 import { axisOffset, fittedSize, regionBox, type ImageFit } from '../src/image-geometry.ts';
-import { ratioParts } from '../src/ratio.ts';
 
 describe('board arrows', () => {
   const box = { x: 100, y: 50, w: 100, h: 60 };
@@ -47,15 +46,5 @@ describe('image-space projections', () => {
   });
   it('omits a completely cropped region', () => {
     expect(regionBox({ width: 400, height: 200, viewportWidth: 200, viewportHeight: 200, x: -200, y: 0 }, [0, 0, 0.1, 1])).toBeNull();
-  });
-});
-
-describe('ratio arithmetic', () => {
-  it.each([0, 100])('preserves threshold at %i', threshold => {
-    expect(ratioParts({ total: 100, left: 0, threshold })).toMatchObject({ percentages: [0, 0, 100], threshold });
-  });
-  it('keeps the denominator and accepts decimal counts that fill the bar', () => {
-    expect(ratioParts({ total: 200, left: 35, right: 25 })).toMatchObject({ percentages: [17.5, 12.5, 70] });
-    expect(ratioParts({ total: 0.3, left: 0.1, right: 0.2 })?.counts[2]).toBe(0);
   });
 });

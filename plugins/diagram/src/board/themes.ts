@@ -31,7 +31,7 @@ const SHARED_RULES = `
   background: var(--bd-slab);
   color: var(--bd-on);
   border: var(--bd-slab-border, none);
-  box-shadow: var(--bd-slab-ring, 0 0 0 1px var(--bd-edge)), var(--bd-slab-shadow, 0 12px 28px -10px rgba(15, 23, 42, 0.09));
+  box-shadow: var(--bd-status-ring, 0 0 0 0 transparent), var(--bd-slab-ring, 0 0 0 1px var(--bd-edge)), var(--bd-slab-shadow, 0 12px 28px -10px rgba(15, 23, 42, 0.09));
   position: relative;
   isolation: isolate;
 }
@@ -90,8 +90,8 @@ export const juiceLightTheme = `/* diagram:juice — Warm Tactile Ceramic Studio
   --bd-r-outer: 18px;
   --bd-r-inner: 13px;
   --bd-r-row: 10px;
-  --bd-slab-border: none;
-  --bd-slab-ring: 0 0 0 1px var(--bd-edge);
+  --bd-slab-border: 1px solid color-mix(in srgb, var(--bd-on) 15%, transparent);
+  --bd-slab-ring: 0 0 0 0 transparent;
   --bd-slab-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.09), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
 
   --bd-signal: #2231dd;

@@ -35,7 +35,7 @@ export const MENTAL_MODEL = [
 export const START_ORDER = [
   'Choose the starting template: compare feature options with npx joplo init <dir> (or --template starter); make one show people can play, pause and try with npx joplo init <dir> --template work. Bare names select built-ins, never a same-named local directory; use --template ./work for a local folder. Names matching [a-z0-9][a-z0-9-]* select directories in the template repository default branch, without version tags. Init installs engine skills and AGENTS.md, preserving any bundled plugin guides; after installing dependencies run skill install.',
   'Read npx joplo skill authoring and choose the capabilities; for feature review read cases before asking the user about edge cases; demo and installed plugin skills as needed.',
-  'Plan before coding (npx joplo skill story): audience, one to three points, one line per scenario (Given → When → Then, how it opens and ends; a case\'s expected is its Then); show the plan to the user. A demo is a story, not a feature tour.',
+  'Plan before coding (npx joplo skill story): audience, one to three points, one line per scenario (Given → When → Then, how it opens and ends; a case\'s expected is its Then), AND map each beat to concrete visual roles from .claude/skills/joplo-plugins/SKILL.md and npx joplo components (combining enabled plugins — or adding companion plugins when a beat needs spatial camera travel, topology, charts, code, or sound — instead of hand-writing raw HTML boxes or plain text panels); show the plan to the user. A demo is a story, not a feature tour.',
   'With minimal code, start with the Minimal Decision Recipe: for feature review build one happy path and one error-and-recovery scenario plus one contested boundary (add option B only when a real trade-off is open; defer extra pages, voice, and polish until after the first board check); for a standalone work start with one short chapter.',
   'Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.',
   'Extend to every option and every case agreed with the user for feature review, or to the agreed chapters for a standalone work; run check until 0 errors.',
@@ -45,6 +45,8 @@ export const START_ORDER = [
 /** 最常见的坑：一句话 + 详细主题。 */
 export const PITFALLS = [
   ["Finishing development is not the end: always start npx joplo feedback watch [dir] --local --follow --json (add --once if you will end your response) before you give the user the board URL, and keep receiving their feedback", "review"],
+  ["Do not hand-roll raw HTML boxes or repeated text panels when enabled plugins already provide specialized primitives: read .claude/skills/joplo-plugins/SKILL.md and npx joplo components first, combine multiple plugins across beats (and add missing companion plugins when needed), and fix STAGE_RAW_HTML_HEAVY / WORK_TEXT_ONLY_STAGE hints", "story"],
+  ["Components outside the enabled set may exist as companion plugins: check .claude/skills/joplo-plugins/SKILL.md, install the npm package at the matching version, add it to config({ plugins }), rerun npx joplo skill install, and read npx joplo skill <plugin id>", "plugins"],
   ["when takes a condition, not a boolean: when={eq($.ui.mode, 'code')}, never when={mode === 'code'}; for values known while writing use {flag && <X/>}", "authoring"],
   ["Every interactive element needs a flow step, disabled={true} with disabledReason, or unmodeled; otherwise check warns UNBOUND_INTERACTIVE", "check"],
   ["No onClick or other function props: behavior lives in flow steps (.click/.type/.select) and effects (set, push, go, done)", "authoring"],
@@ -64,13 +66,12 @@ export const PITFALLS = [
   ["Playing a demo never generates Joplo Cloud narration (it would spend characters): steps without audio use the browser voice until the user clicks Generate missing audio or you run npx joplo voice with their go-ahead", "publish"],
   ["Re-sharing with the default voice keeps valid local clips plus reusable published clips, even when their voices differ (automatic captions must still match current text in the clip language; stale audio is excluded); an old custom provider named cloud stays unsupported until the user explicitly chooses official Joplo Cloud (use voice.profile: 'Joplo Cloud' when config owns the selection)", "publish"],
   ["HAPPY_PATH_ONLY applies only to feature review: for a standalone explainer use work() + chapter(), with no cases or uses(); do not invent failure scenarios", "check"],
-  ["Required for short films and explainers: static storyboards cannot show hard cuts or frozen pictures. Run npx joplo render <dir> --scenario-id <first chapter> --film --chain, fix every CUT and STILL it reports, and watch --video once before handing over (render supports --viewport/--no-frame, --crop and public --frames-out/--timeline; --video takes --width/--height, --voice, --clean and --srt for publishing; see joplo skill demo)", "demo"],
+  ["Required for short films and explainers: static storyboards cannot show hard cuts or frozen pictures. Run npx joplo render <dir> --scenario-id <first chapter> --film --chain, fix unintended CUTs, and for long STILL runs while narration keeps speaking add progressive stage content (reveal a detail, highlight/callout, or split into visual sub-beats) instead of adding subtle camera drift/nudges just to dodge STILL; watch --video once before handing over (render supports --viewport/--no-frame, --crop and public --frames-out/--timeline; --video takes --width/--height, --voice, --clean and --srt for publishing; see joplo skill demo)", "demo"],
   ["For multimodal stories, list assets and licenses first, prove one real asset in a playable chapter, then extend the batch within the agreed spending limit. Keep source claims separate from interpretations", "story"],
   ["For generated binary assets, first look for CC0/public-domain material; use an enabled generation plugin for gaps. Run resources --dry-run before spending; check/build/render never generate paid artifacts. Commit outputs and metadata, keep keys local", "plugins"],
   ["For background audio use a media plugin: enable it explicitly, read its skill, place play/stop in steps, and verify sound after a viewer gesture; local resource failures are warnings", "plugins"],
   ["Collect reusable assets before drawing complex visuals; keep source URLs, authors, licenses and changes in assets/SOURCES.md, and verify bundled fonts and samples separately", "story"],
   ["For audience exploration, use native UI controls or work.free; keep deterministic results in flow steps. Read demo before using drag, hover, scroll or plugin actions", "demo"],
-  ["Components outside the catalog may exist as plugins: install the npm package, add it to config({ plugins }), then read npx joplo skill <plugin id> before writing its components", "plugins"],
 ] as const satisfies readonly (readonly [string, string])[];
 
 /** 中文触发词：技能 description 里的匹配文本，不是 CLI 界面文案（english-output 测试的白名单）。 */
@@ -120,6 +121,7 @@ function joploBody(): string {
     '',
     '## Show the product, not slides',
     'Every step is an action on the product and a visible change it causes. If a step could be a bullet on a slide, rebuild it as interface, state, or a trace.',
+    '- Compose across plugins by intent: read .claude/skills/joplo-plugins/SKILL.md (synthesized for this project) and npx joplo components before writing TSX. Combine specialized primitives across beats (spatial camera worlds, system topologies, request sequences, lifecycles, data charts, metrics, side-by-side comparisons, live source/terminals, interactive controls, and sound) — and install companion plugins listed there when a visual form is missing — instead of hand-writing raw HTML boxes or repeating identical text panels.',
     '- Feature: not a card listing "enter email / teammate gets a link / joins today"; instead Ana types the email, clicks Send, the row appears as Pending, then Leo\'s layer opens the mail and lands in the space.',
     '- Backend or architecture: not a card "App → API → Queue → Worker"; instead an installed plugin view where each request hop and failure changes on screen, beside the UI whose status changes with it.',
     '- Comparison: not a pros-and-cons table; instead options A and B each playing the same scenario, compared in the board.',
@@ -145,7 +147,14 @@ function joploBody(): string {
     '- Comparing versions or a PR: read npx joplo skill diff. Preserve stable .key() identities, treat repeated candidates as uncertain, and build two real publish versions. If an embedded player changes scenario independently, use Realign and wait for both target positions before resuming. Use prepare → uncredentialed build → trusted publish only within the user\'s authorized scope.',
     '',
     '## Common pitfalls',
-    ...PITFALLS.map(([text, topic]) => `- ${text}. See npx joplo skill ${topic}.`),
+    '### Authoring, visual craft & plugins',
+    ...PITFALLS.filter(([, t]) => ['story', 'authoring', 'plugins', 'check', 'cases'].includes(t)).map(([text, topic]) => `- ${text}. See npx joplo skill ${topic}.`),
+    '',
+    '### Playback, assets & media',
+    ...PITFALLS.filter(([, t]) => t === 'demo').map(([text, topic]) => `- ${text}. See npx joplo skill ${topic}.`),
+    '',
+    '### Review, voice & publishing',
+    ...PITFALLS.filter(([, t]) => ['review', 'publish'].includes(t)).map(([text, topic]) => `- ${text}. See npx joplo skill ${topic}.`),
     '',
     '## Reference',
     'npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists engine and enabled plugin topics. Installed engine references are linked below; plugin guides are indexed in ../joplo-plugins/SKILL.md.',

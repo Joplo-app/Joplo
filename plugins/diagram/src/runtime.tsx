@@ -11,9 +11,10 @@ import { rectOf } from '@joplo-app/kit/renderer';
 import { DESC_FONT, EDGE_FONT, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, edgeEmphasized, effectiveState, edgePath, graphView, sequenceView, startEdgeId, type GraphLayout, type SequenceLayout } from './render-layout.ts';
 import type { GraphStructure, SequenceStructure } from './model.ts';
 import type { DiagramStates } from './state.ts';
-import { TimeLanesView } from './time-lanes-view.tsx';
 import { IconGrid, TechIcon } from './board/icons.tsx';
+import { ensureBoardBaseCss } from './board/base-css.ts';
 import { ArchNode, BoardZone, CacheNode, ClusterBox, Database, FlowEdge, QueuePipe } from './board/arch.tsx';
+ensureBoardBaseCss();
 import { Callout, SpeechBubble, StickFigure, StickyNote } from './board/whiteboard.tsx';
 import { DeviceFrame } from './board/devices.tsx';
 import { ArrayCell, ArrayStrip, HashTable, LinkedList, ListNode, MatrixGrid, StackQueue } from './board/dsa.tsx';
@@ -754,7 +755,6 @@ const IMPL: Record<string, (props: NodeProps) => any> = {
   'diagram:StateMachine.Group': DiagramGroup,
   'diagram:StateMachine.State': DiagramNode,
   'diagram:StateMachine.Transition': DiagramEdge,
-  'diagram:TimeLanes': TimeLanesView,
   'diagram:Sequence': SequenceDiagram,
   'diagram:Sequence.Group': SequenceFrame,
   'diagram:Sequence.Block': SequenceFrame,

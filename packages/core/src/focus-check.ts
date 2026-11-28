@@ -8,11 +8,14 @@
  */
 import { CAPTION_MAX, DIRECTOR_LAYER, PAGE_LAYER, captionLength } from './catalog.ts';
 import { focusTimeline, inShotFrame } from './focus.ts';
+import { voiceMs } from './pace.ts';
 import { cameraAt, findNode, layersOf } from './player.ts';
 import type { Diagnostic } from './result.ts';
 import type { Project, Scenario, Scene } from './schema.ts';
 
 export const FOCUS_IDLE_RUN = 3;
+/** Long spoken narration on an unchanging stage: nudge authors to add visual beats instead of cosmetic camera drift. */
+export const NARRATION_STATIC_MS = 4_500;
 
 type Emit = (severity: Diagnostic['severity'], code: string, message: string, at: string | undefined, ref?: Diagnostic['ref']) => void;
 
@@ -65,14 +68,27 @@ export function focusReplayDiagnostics(p: Project, sc: Scenario, emit: Emit): vo
   const flush = () => {
     if (run.length >= FOCUS_IDLE_RUN) {
       const first = sc.steps[run[0]!]!;
-      emit('info', 'FOCUS_IDLE', `${run.length} system steps in a row (${run.map((i) => i + 1).join(', ')}) change nothing on stage, so viewers only read captions. Merge them into one step, or show what happens: shot / highlight / callout the element, or set() state that the stage displays`, first.source ?? sc.source, { kind: 'step', id: first.id, workId: sc.workId, stepId: first.id });
+      emit('info', 'FOCUS_IDLE', `${run.length} system steps in a row (${run.map((i) => i + 1).join(', ')}) change nothing on stage, so viewers only read captions. Merge them into one step, or enrich the stage with real visual progression (reveal a detail, highlight/callout an element, or set() visible state) — do not add subtle camera drift to mask an idle stage`, first.source ?? sc.source, { kind: 'step', id: first.id, workId: sc.workId, stepId: first.id });
     }
     run = [];
   };
   sc.steps.forEach((st, i) => {
     const f = tl[i + 1];
-    if (st.kind === 'system' && f && f.subject === 'caption') run.push(i);
-    else flush();
+    if (st.kind === 'system' && f && f.subject === 'caption') {
+      run.push(i);
+      if (p.mode === 'dev' && !st.effects.some((e) => e.type === 'stream' || e.type === 'complete') && !(st.effectHold && st.effectHold > 0)) {
+        const prevExt = i === 0 ? sc.ext : sc.steps[i - 1]!.ext;
+        const extChanged = st.ext !== undefined && JSON.stringify(st.ext) !== JSON.stringify(prevExt);
+        const spoken = extChanged || st.mute ? undefined : (st.narrate?.trim() || st.say?.trim());
+        if (spoken) {
+          const measured = st.holdFor && (st.holdFor.kind === 'voice' || st.holdFor.audio === st.audio) ? st.holdFor.durationMs : undefined;
+          const speechMs = measured ?? voiceMs(spoken);
+          if (speechMs >= NARRATION_STATIC_MS) {
+            emit('info', 'NARRATION_STATIC_BEAT', `Step ${i + 1} narrates for ~${(speechMs / 1000).toFixed(1)} s while nothing changes on stage. Enrich the stage with progressive content (reveal a detail, highlight or call out an element, update visible state, or split into visual sub-beats) instead of leaving it static or adding subtle camera drift`, st.source ?? sc.source, { kind: 'step', id: st.id, workId: sc.workId, stepId: st.id });
+          }
+        }
+      }
+    } else flush();
   });
   flush();
 }

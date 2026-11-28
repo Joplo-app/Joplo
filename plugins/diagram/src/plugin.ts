@@ -1,7 +1,7 @@
 import packageInfo from './version.json' with { type: 'json' };
 import { dataSpec } from './data-spec.ts';
 import { definePlugin, type PluginCompileHooks, type PluginIRNode } from '@joplo-app/kit/plugin';
-import { isBind, isNode, type JNode, type JChild } from '@joplo-app/kit/node';
+import { isNode, type JNode, type JChild } from '@joplo-app/kit/node';
 import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
 import { docs, examples } from './catalog.ts';
 import { skill, patterns, boardSkillTopics } from './guide.ts';
@@ -11,7 +11,6 @@ import { NodeData, FrameData, type NodeStatus, type PulseSnapshot, type Trace } 
 import { advanceStates } from './state.ts';
 import { machineStates } from './machine.ts';
 import { componentLabels, inspectFields } from './inspect.ts';
-import { readTimeLanes } from './time-lanes.ts';
 import { NODE_STATUSES, TONES, pulseDurationMs, type Tone } from './board/tokens.ts';
 import { blueprintTheme, juiceDarkTheme, juiceLightTheme, risoTheme, sketchTheme } from './board/themes.ts';
 
@@ -49,7 +48,7 @@ function dotLapMs(roots: readonly PluginIRNode[], edgeIds: string[]): number {
 const isBoardTone = (v: unknown): v is Tone => typeof v === 'string' && (TONES as readonly string[]).includes(v);
 const isBoardStatus = (v: unknown): v is NodeStatus => typeof v === 'string' && (NODE_STATUSES as readonly string[]).includes(v);
 type BoardStepOp =
-  | { kind: 'pulse'; edge: string; label?: string; reverse?: boolean; tone?: Tone; durationMs: number }
+  | { kind: 'pulse'; edge: string; label?: string; reverse?: boolean; tone?: Tone; durationMs: number; explicitDuration?: boolean }
   | { kind: 'setStatus'; target: string; status: NodeStatus };
 
 const hooks: PluginCompileHooks = {
@@ -60,15 +59,6 @@ const hooks: PluginCompileHooks = {
         report('DIAGRAM_EDGE_INVALID', '<FlowEdge> requires nonempty string "from" and "to" target ids', n.source);
       }
       return n;
-    }
-    if (n.type === 'diagram:TimeLanes') {
-      const { domain, spans, spanIds } = n.props;
-      if (spanIds !== undefined && !(Array.isArray(spanIds) && spanIds.every(id => typeof id === 'string' && id.trim()) && new Set(spanIds).size === spanIds.length)) {
-        report('TIME_LANES_INVALID', '<TimeLanes spanIds> expects unique, nonempty target ids.', n.source);
-      }
-      const result = readTimeLanes({ ...n.props, domain: isBind(domain) ? [-Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER] : domain, spans: isBind(spans) ? [] : spans });
-      if (result.error) report('TIME_LANES_INVALID', `<TimeLanes> ${result.error}`, n.source);
-      return;
     }
     if (isDiagramRoot(n.type)) {
       checkDiagramRoot(n, report);
@@ -84,9 +74,6 @@ const hooks: PluginCompileHooks = {
     return n;
   },
   derive(node, { viewport, options, report }) {
-    if (node.type === 'diagram:TimeLanes') {
-      return { framing: Object.fromEntries(all(node).map(n => [n.id, { kind: n === node ? 'root' : 'content' }])) };
-    }
     if (!isDiagramRoot(node.type)) return;
     const n = node as SceneNode;
     const layout = layoutFor(n, (Object.hasOwn(options, 'layout') ? options.layout : defaultGraphLayout) as GraphLayoutEngine | undefined, message => report('DIAGRAM_LAYOUT_FAILED', `<${n.type}> "${n.id}" could not be laid out (${message}); showing a simple grid instead. Check the edges and groups of this diagram`, n.source, 'warning'), viewport);
@@ -117,7 +104,8 @@ const hooks: PluginCompileHooks = {
           ctx.report('DIAGRAM_EDGE_UNKNOWN', `pulse("${edge}"): no <FlowEdge id="${edge}"> on this step`, ctx.source);
           return;
         }
-        const durationMs = pulseDurationMs(typeof p.durationMs === 'number' ? p.durationMs : undefined);
+        const hasExplicitDuration = typeof p.durationMs === 'number' && Number.isFinite(p.durationMs) && p.durationMs >= 150;
+        const durationMs = pulseDurationMs(hasExplicitDuration ? (p.durationMs as number) : undefined);
         boardOps.push({
           kind: 'pulse',
           edge,
@@ -125,6 +113,7 @@ const hooks: PluginCompileHooks = {
           ...(typeof p.reverse === 'boolean' ? { reverse: p.reverse } : {}),
           ...(isBoardTone(p.tone) ? { tone: p.tone } : {}),
           durationMs,
+          ...(hasExplicitDuration ? { explicitDuration: true } : {}),
         });
         return { data: { ...keepPrev, boardOps }, references: [edge], holdMs: durationMs + 150 };
       }
@@ -164,18 +153,6 @@ const hooks: PluginCompileHooks = {
     const scenes: Record<string, any> = {};
     for (const scene of ctx.scenes) {
       const nodes = all(scene.root);
-      const bound = nodes.filter(n => n.type === 'diagram:TimeLanes' && (typeof n.props?.spans === 'string' || typeof n.props?.domain === 'string'));
-      const used = bound.length ? new Set(nodes.map(n => n.id)) : new Set<string>();
-      for (const node of bound) {
-        const chart = readTimeLanes(ctx.resolveProps(node));
-        const at = `<TimeLanes id="${node.id}"> at position ${ctx.position}`;
-        if (!chart.data) { ctx.report('TIME_LANES_INVALID', `${at}: ${chart.error}`, node.source); continue; }
-        const declared = new Set(node.children?.map(child => child.id));
-        for (const { id } of chart.data.spans) {
-          if (!declared.has(id) && used.has(id)) ctx.report('TIME_LANES_INVALID', `${at}: span id "${id}" already belongs to another element on this stage.`, node.source);
-          used.add(id);
-        }
-      }
       const nodeIds = new Set(nodes.map(n => n.id));
       const sceneHasClassic = nodes.some(n => isDiagramRoot(n.type));
       const calls = traces.filter((_, i) => traceScenes[i] === scene.id);
@@ -205,6 +182,7 @@ const hooks: PluginCompileHooks = {
             ...(pulseOp.reverse !== undefined ? { reverse: pulseOp.reverse } : {}),
             ...(pulseOp.tone !== undefined ? { tone: pulseOp.tone } : {}),
             durationMs: pulseOp.durationMs,
+            ...(pulseOp.explicitDuration ? { explicitDuration: true } : {}),
           };
         }
       }
@@ -223,12 +201,28 @@ const hooks: PluginCompileHooks = {
     if (Object.keys(scenes).length) return { scenes };
   },
 };
+const DIAGRAM_ROLES: Record<string, import('@joplo-app/kit/plugin').ComponentRole> = {
+  BoardZone: 'stage', ClusterBox: 'stage', DeviceFrame: 'stage', SwimLane: 'stage',
+  ArchNode: 'topology', Database: 'topology', QueuePipe: 'topology', CacheNode: 'topology', FlowEdge: 'topology', TechIcon: 'topology', IconGrid: 'topology',
+  Diagram: 'topology', 'Diagram.Group': 'topology', 'Diagram.Node': 'topology', 'Diagram.Edge': 'topology',
+  Sequence: 'sequence', 'Sequence.Group': 'sequence', 'Sequence.Actor': 'sequence', 'Sequence.Message': 'sequence', 'Sequence.Block': 'sequence',
+  StateMachine: 'state', 'StateMachine.Group': 'state', 'StateMachine.State': 'state', 'StateMachine.Transition': 'state',
+  ArrayStrip: 'dsa', ArrayCell: 'dsa', LinkedList: 'dsa', ListNode: 'dsa', StackQueue: 'dsa', HashTable: 'dsa', MatrixGrid: 'dsa', FlowNode: 'dsa', ERTable: 'dsa', ERField: 'dsa',
+  StickFigure: 'annotation', StickyNote: 'annotation', SpeechBubble: 'annotation', Callout: 'annotation',
+};
 export default /* @__PURE__ */ definePlugin({
   skillTopics: { patterns: { description: 'Recipes and individual pitfalls', body: patterns }, ...boardSkillTopics },
   packageName: '@joplo-app/plugin-diagram',
   id: 'diagram',
   title: 'Diagrams',
   version: packageInfo.version,
+  bestFor: 'Manual system architecture whiteboards (ArchNode + FlowEdge + 86 tech logos), request sequences, state machines, data structures, ER schemas, and hand-drawn actors/notes',
+  pairsWith: [
+    { with: 'content', packageName: '@joplo-app/plugin-content', how: 'Space multiple BoardZone architecture islands on one content:Canvas world (300–500px apart) and steer camera() from overview to close-ups with pulse()/setStatus(); pass { focus: false } to trace() inside Canvas.' },
+    { with: 'ui', packageName: '@joplo-app/plugin-ui', how: 'Embed ui Code, Terminal, Stat, RingProgress, Compare, or ChatMessage directly inside BoardZone/ClusterBox/ArchNode/DeviceFrame children, or place a diagram layer beside product screens.' },
+    { with: 'viz', packageName: '@joplo-app/plugin-viz', how: 'Follow a diagram mechanism zone with a viz data chart zone on the same Canvas to prove system behavior with real measurements.' },
+    { with: 'code', packageName: '@joplo-app/plugin-code', how: 'Show code:Editor beside a FlowEdge architecture or Sequence so highlighted lines or diffs map directly to runtime hops.' },
+  ],
   runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
   themes: {
     juice: juiceLightTheme,
@@ -238,7 +232,7 @@ export default /* @__PURE__ */ definePlugin({
     blueprint: blueprintTheme,
   },
   skill,
-  components: Object.fromEntries(Object.entries(docs).map(([name, doc]) => [name, { ...(componentLabels[name] ? { label: componentLabels[name] } : {}), ...(inspectFields[name] ? { inspect: inspectFields[name] } : {}), doc, example: examples[name], catalogFamily: !name.includes('.'), traits: name === 'TimeLanes' ? { textPaths: [['spans', '*', 'label'], ['spans', '*', 'lane']] } : { text: ['label', 'description', 'name', 'value', 'title', 'sub', 'text', 'eyebrow', 'metric', 'detail', 'author', 'speaker', 'role', 'pointer', 'tag', 'badge', 'storage', 'ttl', 'lag'] }, selfEvident: true, ...(required.has(name) ? { needsId: true } : {}) }])),
+  components: Object.fromEntries(Object.entries(docs).map(([name, doc]) => [name, { ...(componentLabels[name] ? { label: componentLabels[name] } : {}), ...(inspectFields[name] ? { inspect: inspectFields[name] } : {}), ...(DIAGRAM_ROLES[name] ? { role: DIAGRAM_ROLES[name] } : {}), doc, example: examples[name], catalogFamily: !name.includes('.'), traits: { text: ['label', 'description', 'name', 'value', 'title', 'sub', 'text', 'eyebrow', 'metric', 'detail', 'author', 'speaker', 'role', 'pointer', 'tag', 'badge', 'storage', 'ttl', 'lag'] }, selfEvident: true, ...(required.has(name) ? { needsId: true } : {}) }])),
   data: dataSpec,
   compile: hooks,
   schemas: { node: NodeData, step: FrameData },

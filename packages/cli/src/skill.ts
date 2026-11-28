@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { access, mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { agentsBlock, agentSkills, JoploError, skillMarkdown, skillTopic, SKILL_TOPICS, pluginSkillTopic, type PluginSkillSource } from '@joplo-app/core';
+import { agentsBlock, agentSkills, JoploError, pluginCompositionGuide, skillMarkdown, skillTopic, SKILL_TOPICS, pluginSkillTopic, type PluginSkillSource } from '@joplo-app/core';
 
 import { projectPlugins } from './plugins.ts';
 
@@ -37,7 +37,7 @@ export const PLUGIN_SKILL_MANIFEST = '.joplo-plugins.json';
 export function pluginSkillFiles(version: string, plugins: readonly PluginSkillSource[]): SkillFile[] {
   if (!plugins.length) return [];
   const files: SkillFile[]=[];
-  const index=['---','name: joplo-plugins','description: Discover the plugins explicitly enabled in this Joplo project and read their installed versioned skills.','---','','# Enabled project plugins','','Source: config.plugins. Run joplo skill install after installing, adding or removing packages.'];
+  const index=['---','name: joplo-plugins','description: Discover the plugins explicitly enabled in this Joplo project, pick components by expression role, compose across plugins, and read installed versioned skills.','---','','# Enabled project plugins','','Source: config.plugins. Run joplo skill install after installing, adding or removing packages.',...pluginCompositionGuide(plugins),'','## Enabled plugin guides'];
   const seen=new Set<string>();
   for (const p of plugins) {
     if (!/^[a-z][a-z0-9-]{0,49}$/.test(p.id) || seen.has(p.id)) throw new JoploError('INVALID_SCHEMA',`Invalid or duplicate plugin skill id: ${p.id}`);
@@ -51,7 +51,7 @@ export function pluginSkillFiles(version: string, plugins: readonly PluginSkillS
     const description=`Use the ${p.title.replace(/\s+/g,' ')} plugin in Joplo; read its entry, component recipes and recovery rules for this project.`;
     const entry=['---',`name: ${name}`,`description: ${JSON.stringify(description)}`,'---','',pluginSkillTopic(p),'','## Installed references',...topicLinks,'','Engine contracts: [plugins](../joplo/topics/plugins.md).'].join('\n');
     files.push(managedSkillFile(name,`${name}/SKILL.md`,entry,version));
-    index.push('',`- [${p.id}](../${name}/SKILL.md): ${p.title}${p.version?` · ${p.version}`:''}${p.packageName?` · ${p.packageName}`:''}`,
+    index.push('',`- [${p.id}](../${name}/SKILL.md): ${p.title}${p.version?` · ${p.version}`:''}${p.packageName?` · ${p.packageName}`:''}${p.bestFor?` — ${p.bestFor}`:''}`,
       ...Object.entries(p.skillTopics??{}).map(([key,t])=>`  - [${p.id}/${key}](../${name}/topics/${key}.md): ${t.description}`));
   }
   files.push(managedSkillFile('joplo-plugins','joplo-plugins/SKILL.md',index.join('\n'),version));

@@ -1,0 +1,12 @@
+{
+  "DeltaBar": { "en": "Delta bar", "zh-CN": "前后变化对比条" },
+  "BarChart": { "en": "Bar chart", "zh-CN": "柱状图" },
+  "RatioBar": { "en": "Ratio bar", "zh-CN": "占比阈值条" },
+  "LineChart": { "en": "Line chart", "zh-CN": "趋势折线图" },
+  "TimeLanes": { "en": "Time lanes", "zh-CN": "时间泳道图" },
+  "ScatterPlot": { "en": "Scatter & Pareto plot", "zh-CN": "散点 / 帕累托图" },
+  "Heatmap": { "en": "Heatmap matrix", "zh-CN": "二维热力矩阵" },
+  "Sankey": { "en": "Sankey flow", "zh-CN": "桑基流向图" },
+  "Waterfall": { "en": "Waterfall attribution", "zh-CN": "瀑布归因图" },
+  "Radar": { "en": "Radar profile", "zh-CN": "多维雷达图" }
+}

@@ -402,3 +402,48 @@ test('invite and Joplo examples retain valid playback without chapter advice on 
     }
   }
 }, 60_000);
+
+test('STAGE_RAW_HTML_HEAVY flags static raw-div stages while sparing kinetic or expressive stages', () => {
+  const p = fixture();
+  const target = p.scenes[scene]!;
+  const rawChildren = Array.from({ length: 18 }, (_, i) => ({ id: `d_${i}`, type: 'ui:div', source: 'routes/members/page.tsx:10:5' }));
+  target.root = { id: 'root', type: 'ui:div', source: 'routes/members/page.tsx:5:3', children: rawChildren };
+  const ds = validate(p, { mode: 'structure', workId: a }).diagnostics.filter(d => d.code === 'STAGE_RAW_HTML_HEAVY');
+  expect(ds).toHaveLength(1);
+  expect(ds[0]).toMatchObject({ severity: 'info', at: 'routes/members/page.tsx:5:3' });
+  expect(ds[0]!.message).toContain('joplo-plugins/SKILL.md');
+
+  // Adding a kinetic plugin property (for example content motion) clears the raw-HTML hint
+  const animated = structuredClone(p);
+  animated.scenes[scene]!.root.children![0]!.props = { motion: 'tok_0' };
+  expect(validate(animated, { mode: 'structure', workId: a }).diagnostics.filter(d => d.code === 'STAGE_RAW_HTML_HEAVY')).toEqual([]);
+
+  // Adding an expressive plugin component also clears the raw-HTML hint
+  const rich = structuredClone(p);
+  rich.scenes[scene]!.root.children![0] = { id: 'metric_0', type: 'ui:Stat', source: 'routes/members/page.tsx:10:5' };
+  expect(validate(rich, { mode: 'structure', workId: a }).diagnostics.filter(d => d.code === 'STAGE_RAW_HTML_HEAVY')).toEqual([]);
+});
+
+test('WORK_TEXT_ONLY_STAGE flags multi-step layout-only card decks and ignores expressive or raw-HTML-flagged works', () => {
+  const p = fixture();
+  for (const s of Object.values(p.scenes).filter(sc => sc.workId === a)) {
+    s.root = {
+      id: 'stack', type: 'ui:Stack', source: 'features/invite/works/a-modal.tsx:8:5',
+      children: Array.from({ length: 14 }, (_, i) => ({ id: `c_${i}`, type: i % 2 ? 'ui:Text' : 'ui:Card', source: 'features/invite/works/a-modal.tsx:10:7' })),
+    };
+  }
+  for (const sc of Object.values(p.scenarios).filter(s => s.workId === a)) {
+    sc.ext = undefined;
+    sc.media = undefined;
+    for (const st of sc.steps) { st.ext = undefined; st.media = undefined; }
+  }
+  const ds = validate(p, { mode: 'structure', workId: a }).diagnostics.filter(d => d.code === 'WORK_TEXT_ONLY_STAGE');
+  expect(ds).toHaveLength(1);
+  expect(ds[0]).toMatchObject({ severity: 'info', ref: { kind: 'work', id: a, workId: a } });
+  expect(ds[0]!.message).toContain('npx joplo components');
+
+  // Adding one expressive component in any stage clears WORK_TEXT_ONLY_STAGE
+  const rich = structuredClone(p);
+  rich.scenes[scene]!.root.children![0] = { id: 'cmp', type: 'ui:Compare', source: 'features/invite/works/a-modal.tsx:10:7' };
+  expect(validate(rich, { mode: 'structure', workId: a }).diagnostics.filter(d => d.code === 'WORK_TEXT_ONLY_STAGE')).toEqual([]);
+});

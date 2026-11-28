@@ -2,6 +2,21 @@ export const skill = `# Standard UI: ui
 
 Use this plugin for application interfaces, forms, overlays, navigation, data displays, device frames and HTML fallback content. Install @joplo-app/plugin-ui, import ui from it and list ui in config.plugins. The engine enables nothing implicitly.
 
+## Pick by expression role (before reaching for raw divs or plain Cards)
+- **Metrics & structured data**: \`Stat\` (KPI + diff + progress), \`RingProgress\`, \`Progress\`, \`KeyValue\`, \`DataCard\` (auto highlights changed fields old → new), \`DataTable\`, \`Table\`. For quantitative charts, ratios, and before/after comparisons (\`DeltaBar\`, \`BarChart\`, \`RatioBar\`, \`LineChart\`, \`TimeLanes\`, \`ScatterPlot\`, \`Heatmap\`, \`Sankey\`, \`Waterfall\`, \`Radar\`), use \`@joplo-app/plugin-viz\`.
+- **Before / after & A/B**: \`Compare\` + \`Compare.Side\` (responsive side-by-side or toggle comparison that preserves height).
+- **Code & CLI**: \`Terminal\` (\`Terminal.Command\`, \`Terminal.Output\`, \`Terminal.Input\`), \`Code\` (with \`block\` / \`redact\`), \`Kbd\`.
+- **AI, agents & messaging**: \`ChatMessage\`, \`ToolCall\` (\`running|done|error\`), \`Thinking\`, \`Artifact\` + \`Artifact.Ref\`, \`Email\`, \`PromptInput\`.
+- **Lifecycle & sequences**: \`StateFlow\` (auto highlights current & completed states), \`Timeline\`, \`Stepper\`.
+- **Product frames & whiteboards**: \`AppShell\`, \`BrowserWindow\`, \`Phone\`, \`Board\` + \`Note\` + \`Arrow\`.
+- **Interactive controls**: \`Button\`, \`ActionIcon\`, \`Menu\`, \`Tabs\`, \`SegmentedControl\`, \`Select\`, \`MultiSelect\`, \`Switch\`, \`Checkbox\`, \`Radio.Group\`, \`TextInput\`, \`Modal\`, \`Drawer\`, \`TabBar\`.
+- **HTML fallbacks (\`div\`, \`span\`, \`p\`, …)**: use only for lightweight layout wrappers or custom geometry, never to hand-roll cards, tables, gauges, or terminals that already exist above.
+
+## Combining ui with other plugins
+- **+ content (\`Canvas\` / \`camera\`)**: mount \`BrowserWindow\`, \`Stat\`, \`Compare\`, or \`Terminal\` clusters inside \`<Canvas>\` zones so the camera travels across product states instead of cutting between static slides.
+- **+ diagram**: embed \`Stat\`, \`Code\`, \`Terminal\`, \`Badge\`, or \`ChatMessage\` directly inside diagram \`BoardZone\`/\`ClusterBox\`/\`ArchNode\`/\`DeviceFrame\` children, or show a live architecture layer beside the UI.
+- **+ viz / code / av / alda**: pair UI KPI cards with data visualizations (\`@joplo-app/plugin-viz\`), live animated code diffs (\`@joplo-app/plugin-code\`), engine-clock \`Video\`/\`Lottie\`/\`sfx\` (\`@joplo-app/plugin-av\`), and ducked BGM (\`@joplo-app/plugin-alda\`).
+
 ## Start and verify
 - HTML fallback nodes forward scalar data-* and aria-* attributes, role and title to their DOM element. Reserve data-j* for Joplo; use your own prefix such as data-app-frame for export/test selectors. id remains a Joplo node identity exposed as data-jid, not a DOM id. Event handlers and arbitrary DOM properties are not forwarded.
 - Import author markers directly from @joplo-app/plugin-ui and write normal TSX. The compiler emits ui:Button and other namespaced types; write HTML tags directly, which compile to ui:div, ui:span, etc.
@@ -15,7 +30,7 @@ Use this plugin for application interfaces, forms, overlays, navigation, data di
 - AppShell regions and Phone child width use the same declared layout data as playback. A narrow screen can hide a target even when when is true; check the actual viewport before changing the step.
 - Image accepts embedded project assets via asset('./photo.jpg') and direct localResource(...) references from enabled image plugins. Pass the reference directly as src; do not interpolate it into a string. Check generation diagnostics separately: accepting a resource reference does not prove its artifact exists. URLs and ordinary paths intentionally draw a placeholder; fix IMAGE_PLACEHOLDER by embedding the file. fit accepts cover, contain or fill. Image.Region exposes a source-image rectangle to the standard focus effects.
 - Display properties are declared per component for translation. Identifiers, structural values and unrelated props are not automatically display text; for custom content, declare text or exact textPaths traits in its own plugin. For nested data, target titles/labels precisely; do not translate an entire configuration object containing colors or identifiers.
-- RatioBar compares counts against one explicit total. Compare places two outcomes in the same work. Read ui/patterns for switching, missing counts and image focus examples.
+- Compare places two qualitative outcomes in the same work. For quantitative before/after deltas, part-to-whole ratios, trends, and charts, enable \`@joplo-app/plugin-viz\` (\`npx joplo skill viz\`). Read ui/patterns for Compare switching and image focus examples.
 
 ## Migration and recovery
 - Plugin unavailable placeholders indicate a missing or mismatched runtime: reinstall matching package versions and rerun build. The ui catalog, runtime and author markers are checked together by the release smoke test. Runtime imports must be production dependencies or explicit shared host services: a working workspace or prebuilt web bundle does not prove the package runtime can load after a clean install.
@@ -24,13 +39,6 @@ Related topics: components, authoring, focus, check, plugins
 `;
 
 export const patterns = `# UI recipes and pitfalls
-
-## Keep the denominator visible
-\`\`\`tsx
-<RatioBar total={$.data.capacity} left={$.ui.used} right={25} labels={['Used', 'Reserved']} remainderLabel="Available" threshold={80} thresholdLabel="Limit" unit="%" height={20} />
-\`\`\`
-The bar draws the two counts and what remains on one zero-based scale. Each legend entry shows its count and denominator. Give threshold in the same units as total. With total={200}, threshold={80} lands at 40% of the width. The unit suffix formats the supplied counts. Omit right for a single-count comparison. Colors follow left, right, remainder order even when right is omitted.
-RATIO_BAR_INVALID names the offending count or sum. Initialize bound values before showing the chart. Missing or invalid live counts display the no-data message until the state contains a valid comparison.
 
 ## Compare two outcomes in place
 \`\`\`tsx
@@ -217,12 +225,6 @@ From check:
 
 From check:
 An element that looks usable (Button, TextInput, Select, NavLink, a, …; see components) has an id but no step in any scenario of this option. Viewers will try it; decide what happens:
-
-From focus:
-  Skipped on purpose: modals and drawers (their backdrop already says it), DataCard / StateFlow (they show their own change), more than 3 changes at once, a new page or layer, the same element changing again or another line appended to the same log, and any step where you wrote a focus yourself.
-
-From focus:
-- Secrets and private data: <Code redact>sk-live-…</Code>, or redact={not($.ui.revealed)} to unblur after a step. Blurred, layout unchanged, on every step.
 
 Common pitfall: Only catalog components and the listed HTML tags exist; <br/> is UNKNOWN_COMPONENT, so write 'Line 1\\nLine 2' inside <Text>
 

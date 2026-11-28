@@ -79,5 +79,21 @@ export const str = (v: unknown, fallback = ''): string => (typeof v === 'string'
 export const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 export const bool = (v: unknown, fallback = false): boolean => (typeof v === 'boolean' ? v : fallback);
 export const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
+export const PULSE_SPEED_PX_PER_SEC = 220;
+export const PULSE_MIN_MS = 900;
+export const PULSE_MAX_AUTO_MS = 6500;
+
 export const pulseDurationMs = (ms: number | undefined): number =>
-  typeof ms === 'number' && Number.isFinite(ms) && ms >= 150 ? Math.min(ms, 4000) : 760;
+  typeof ms === 'number' && Number.isFinite(ms) && ms >= 150 ? Math.min(ms, 12000) : PULSE_MIN_MS;
+
+/**
+ * Constant-velocity lap duration for FlowEdge pulse packets (~220 px/s),
+ * so long corridor wires travel at the same calm visual speed as short links.
+ */
+export const pulseLapDurationMs = (pathLengthPx: number, explicitDurationMs?: number): number => {
+  if (typeof explicitDurationMs === 'number' && Number.isFinite(explicitDurationMs) && explicitDurationMs >= 150) {
+    return Math.min(explicitDurationMs, 12000);
+  }
+  const len = Number.isFinite(pathLengthPx) && pathLengthPx > 0 ? pathLengthPx : 0;
+  return Math.min(PULSE_MAX_AUTO_MS, Math.max(PULSE_MIN_MS, Math.round((len / PULSE_SPEED_PX_PER_SEC) * 1000)));
+};

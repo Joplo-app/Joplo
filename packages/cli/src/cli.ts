@@ -690,6 +690,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         for (const b of film.boundaries.filter(b => b.chapter)) line(`chapter → ${b.scenarioId} at ${s(b.atMs)}: max adjacent diff ${(b.maxDiff * 100).toFixed(1)}%, changed ${(b.maxChanged * 100).toFixed(0)}%`);
         for (const c of film.cuts) line(`CUT ${s(c.atMs)} ${c.scenarioId} step ${c.position}: ${(c.changed * 100).toFixed(0)}% of pixels changed in one frame`);
         for (const x of film.stills) line(`STILL ${s(x.fromMs)}–${s(x.toMs)} (${s(x.toMs - x.fromMs)}) ${x.scenarioId} step ${x.position}`);
+        if (film.stills.length) line('Tip: For long STILL runs during narration, add progressive stage content (reveal a detail, highlight/callout, pulse an edge, or split into visual sub-beats) instead of adding subtle camera drift/nudges. Deliberate reading or observation holds may stay still.');
         return;
       }
       if (opts.sheet) {

@@ -17,6 +17,9 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 ## Optional 3D
 The starter does not include 3D or its large browser dependency. To add it: npm install @joplo-app/plugin-3d@0.8.2; default-import scene3d from that package in joplo.config.ts, add scene3d to config.plugins, then run npx joplo skill install. Read npx joplo skill scene3d, scene3d/models and scene3d/generation for rendering, existing assets and optional local generation. A key is unnecessary for existing assets; dry-run before approving any generation.
 
+## Optional Data Visualization
+For narrative quantitative charts, before/after comparisons, part-to-whole ratios, trends, multi-lane timelines, Pareto frontiers, heatmaps, Sankey flows, attribution waterfalls, and radar profiles: npm install @joplo-app/plugin-viz@0.8.2; default-import viz from that package in joplo.config.ts, add viz to config.plugins, then run npx joplo skill install. Read npx joplo skill viz, viz/components and viz/recipes before hand-rolling chart bars or abusing RatioBar for before/after deltas.
+
 ## Errors and trust
 - UNKNOWN_PLUGIN: the element's author package is not enabled. Use its package provenance in the diagnostic to install/import it and add it to config.plugins. UNKNOWN_COMPONENT: no enabled manifest declares that element or intrinsic tag; read the installed catalogs.
 - PLUGIN_DUPLICATE: remove a duplicate declaration. PLUGIN_RUNTIME_MISSING: reinstall the package and verify its runtime export. A plugin unavailable placeholder gives its actual loading/API error; do not edit generated IR to hide it.
@@ -71,4 +74,4 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.
 
 Related topics: authoring, demo, check, publish
-<!-- joplo-skill 0.8.2 sha256:c3f30708160b3849f877ac05bf2d5fc38f3eb53111c7525b075ed7b9686aef23 -->
+<!-- joplo-skill 0.8.2 sha256:9b499883e40f2419ab5560f409724e199462ebf04f263426d1cefd53100d04ad -->

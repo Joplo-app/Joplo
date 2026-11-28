@@ -605,8 +605,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
 
   // ---------- 8. 发布视图与评审版：去掉设计备注与源位置 ----------
   if (strip) {
-    // 组件的显示名与检查抽屉信息只给本地看板用
-    for (const info of Object.values(plugins)) for (const c of Object.values(info.components)) { delete c.label; delete c.inspect; }
+    // 组件的显示名、检查抽屉信息与创作角色元数据只给本地看板和 dev check 用
+    for (const info of Object.values(plugins)) for (const c of Object.values(info.components)) { delete c.label; delete c.inspect; delete c.role; delete c.intrinsic; }
     for (const s of Object.values(out.scenes) as Scene[]) stripNotes(s.root);
     stripSources(out);
   }

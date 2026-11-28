@@ -1,5 +1,4 @@
-import type { TimeSpan } from './time-lanes.ts';
-import { component, createNode, Custom, type Bind, type JNode } from '@joplo-app/kit/node';
+import { component, type Bind } from '@joplo-app/kit/node';
 import type { JoploProps } from '@joplo-app/kit/plugin';
 const c = (name: string) => component(name, '@joplo-app/plugin-diagram') as unknown as (props: JoploProps) => any;
 // ---------- 关系类图表（Joplo 自有，D41 / D69） ----------
@@ -75,23 +74,6 @@ export const Sequence = Object.assign(c('diagram:Sequence') as (p: SequenceProps
   Message: c('diagram:Sequence.Message') as (p: MessageProps) => any,
   Block: c('diagram:Sequence.Block') as (p: BlockProps) => any,
 });
-
-export type { TimeSpan } from './time-lanes.ts';
-export type TimeLanesProps = Common & {
-  domain: readonly [number, number] | Bind;
-  spans: readonly TimeSpan[] | Bind;
-  unit?: string;
-  /** Scripted focus targets when the whole span array comes from state. */
-  spanIds?: readonly string[];
-};
-const timeLanes = c('diagram:TimeLanes');
-
-/** Register span identities before the host indexes scenes and compiles focus effects. */
-export function TimeLanes({ spanIds, ...props }: TimeLanesProps): JNode {
-  const ids = Array.isArray(props.spans) ? props.spans.map(span => span?.id) : spanIds ?? [];
-  const anchors = Array.isArray(ids) ? [...new Set(ids)].filter((id): id is string => typeof id === 'string' && !!id.trim()) : [];
-  return createNode(timeLanes, { ...props, spanIds, children: anchors.map(id => createNode(Custom, { id })) });
-}
 
 // ---------- Manual Architecture, 86 Authentic Tech/Cloud Icons & Whiteboard Primitives ----------
 export const TechIcon = c('diagram:TechIcon');
