@@ -24,6 +24,7 @@ A successful initial compilation registers local review rounds before dev return
 - Source changes close the old round (closed, source_changed) and start a new one after compilation. The follower moves on by itself; an exact-session watch exits 1, never 0, and you list again to select the new session. A stopped process without an approval also fails.
 - Records live under the real project path in .joplo/reviews/ and remain local. Distinct instances and worktrees never share session identities. Local feedback is never uploaded automatically.
 - Scripted writes use the same running-board API and revision checks: npx joplo feedback submit [dir] --local --work <qualified-id> --scenario <id> --position <n> --body <text>, and npx joplo feedback approve [dir] --local [--session <id>]. Supply an explicit reviewed position; the CLI does not know or pretend to control the reviewer's browser. --scene is optional, --request-id <uuid> makes retries idempotent, and approval never edits pick or publishes.
+- Feedback receipts and jump-to-step re-review: after editing source for local feedback (which closes the old round with source_changed and opens a new round), record how each item was handled in the current open round: npx joplo feedback reply [dir] --local --event <rv_...:seq> --status <addressed|deferred|declined> [--scenario <id> --position <n>] [--note <text>] [--request-id <uuid>]. Omitting --work/--session infers the work from --event and targets its active round; --scenario and --position must be passed together when targeting a step. The board shows receipts (and unaddressed previous-round items) in the native review popover with a direct jump button to that step (pausing on arrival for quick verification). Receipts never wake --follow --once and never preserve approvals across source changes.
 - Manage the board without simulating playback: board projects/add/remove, board appearance [dir], and board open [dir] --at <file:line[:column]>. Remove deletes only the registry entry, never project files; non-interactive removal requires --yes. Fullscreen, playback, clicks and drags remain native browser interactions.
 
 ## Before a video-like piece goes to reviewers
@@ -75,4 +76,4 @@ Example, scoped to one known option:
 - Authentication failures (exit 3) need the correct owner login/API key; never silently switch accounts. Invalid responses, quota errors and missing shares are failures, not approval. If the project CLI lacks these commands, check its version before changing the environment.
 
 Related topics: selection, check, publish
-<!-- joplo-skill 0.8.1 sha256:4ff689f78a65c199cc0bcb2a3ba69d0ce0f33440351da87ea35a1efe82b10839 -->
+<!-- joplo-skill 0.8.1 sha256:87726985d365c2bbb018965a617411964ddc3bcfcc45e84e54bfc06a337cae98 -->

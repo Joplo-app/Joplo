@@ -9,12 +9,13 @@ Use this plugin for application interfaces, forms, overlays, navigation, data di
 - Give interactive elements stable ids. Describe their behavior with flow steps, disabled plus disabledReason, or unmodeled. Run check, then render the affected steps; passing schema validation alone does not prove the intended screen is visible.
 
 ## State and visibility
-- type / select / toggle steps write inputs[id]. Use value, checked or defaultValue for initial visuals. Paused audiences can type (including multiline PromptInput), change Switch/Checkbox/Radio/Select/SegmentedControl, switch Tabs and expand Accordion locally; value/checked bindings synchronize local views. Playing, jumping or Reset discards these edits. A matching next scripted action wins; an action in another reachable scenario asks to switch.
+- type / select / toggle steps write inputs[id]. Use value, checked or defaultValue for initial visuals. Paused audiences can type (including multiline PromptInput), change Switch/Checkbox/Radio/Select/SegmentedControl, switch Tabs or Compare and expand Accordion locally; value/checked bindings synchronize local views. Playing, jumping or Reset discards these edits. A matching next scripted action wins; an action in another reachable scenario asks to switch.
 - Select accepts the displayed label or stored value; MultiSelect toggles membership. For a bound option list, ensure the list exists before the select step.
 - Modal and Drawer use opened, only; the old open alias is not supported. Menu forwards opened to its own dropdown; an explicitly set child value wins, and a nested menu owns its own state.
 - AppShell regions and Phone child width use the same declared layout data as playback. A narrow screen can hide a target even when when is true; check the actual viewport before changing the step.
-- Image accepts embedded project assets via asset('./photo.jpg') and direct localResource(...) references from enabled image plugins. Pass the reference directly as src; do not interpolate it into a string. Check generation diagnostics separately: accepting a resource reference does not prove its artifact exists. URLs and ordinary paths intentionally draw a placeholder; fix IMAGE_PLACEHOLDER by embedding the file. fit accepts cover or contain.
+- Image accepts embedded project assets via asset('./photo.jpg') and direct localResource(...) references from enabled image plugins. Pass the reference directly as src; do not interpolate it into a string. Check generation diagnostics separately: accepting a resource reference does not prove its artifact exists. URLs and ordinary paths intentionally draw a placeholder; fix IMAGE_PLACEHOLDER by embedding the file. fit accepts cover, contain or fill. Image.Region exposes a source-image rectangle to the standard focus effects.
 - Display properties are declared per component for translation. Identifiers, structural values and unrelated props are not automatically display text; for custom content, declare text or exact textPaths traits in its own plugin. For nested data, target titles/labels precisely; do not translate an entire configuration object containing colors or identifiers.
+- RatioBar compares counts against one explicit total. Compare places two outcomes in the same work. Read ui/patterns for switching, missing counts and image focus examples.
 
 ## Migration and recovery
 - Plugin unavailable placeholders indicate a missing or mismatched runtime: reinstall matching package versions and rerun build. The ui catalog, runtime and author markers are checked together by the release smoke test. Runtime imports must be production dependencies or explicit shared host services: a working workspace or prebuilt web bundle does not prove the package runtime can load after a clean install.
@@ -23,6 +24,31 @@ Related topics: components, authoring, focus, check, plugins
 `;
 
 export const patterns = `# UI recipes and pitfalls
+
+## Keep the denominator visible
+\`\`\`tsx
+<RatioBar total={$.data.capacity} left={$.ui.used} right={25} labels={['Used', 'Reserved']} remainderLabel="Available" threshold={80} thresholdLabel="Limit" unit="%" height={20} />
+\`\`\`
+The bar draws the two counts and what remains on one zero-based scale. Each legend entry shows its count and denominator. Give threshold in the same units as total. With total={200}, threshold={80} lands at 40% of the width. The unit suffix formats the supplied counts. Omit right for a single-count comparison. Colors follow left, right, remainder order even when right is omitted.
+RATIO_BAR_INVALID names the offending count or sum. Initialize bound values before showing the chart. Missing or invalid live counts display the no-data message until the state contains a valid comparison.
+
+## Compare two outcomes in place
+\`\`\`tsx
+<Compare id="policy" defaultValue="a" value={$.ui.pick}>
+  <Compare.Side value="a" label="Keep draft"><Text>The draft stays available.</Text></Compare.Side>
+  <Compare.Side value="b" label="Clear draft"><Text>The editor is empty.</Text></Compare.Side>
+</Compare>
+\`\`\`
+Use .select('policy', 'b') to show the second outcome during a flow. Paused viewers can also select the labeled buttons. Replay and bindings use the stable value of each Side. COMPARE_DUPLICATE_VALUE identifies repeated keys. A nested Compare owns its own pair. Put layout wrappers inside each Side. Auto uses two columns at stage width 768 and above, and a shared panel below it. Force mode="toggle" to compare at the same location on every viewport, or mode="side-by-side" to keep both outcomes visible. Toggle mode reserves enough height for both sides and disables interaction with the hidden side. Select the side before targeting its controls in a flow.
+
+## Focus on a detail inside an image
+\`\`\`tsx
+<Image src={asset('./billing.png')} alt="Billing" h={320} fit="contain">
+  <Image.Region id="quota" rect={[0.60, 0.18, 0.22, 0.09]} label="Quota" />
+</Image>
+\`\`\`
+Give callout('quota', 'Available this month'), highlight('quota'), spotlight('quota') or shot('quota') the region id. Measure x and width against the original image width, y and height against its height. Start at the top left. For example, [600, 90, 220, 45] pixels on a 1000 × 500 screenshot gives the rect above. The anchor follows image loading, resizing, fit and object position. Cover clips the target along with the image. Use contain or adjust position if the crop removes the detail entirely. Fill stretches each axis independently. Placeholders have no image region to target.
+IMAGE_REGION_RECT means the rectangle needs four finite fractions, positive dimensions and bounds within the original.
 
 ## A prompt the audience can actually edit
 PromptInput renders a native textarea. Arbitrary text is disposable exploration and follows the same first-input pause, bound value synchronization and reset/resume rules as other text fields. Captures and disabled prompts remain read-only. Keep submission in a declared click/press step or free reaction; editing alone does not call a model or send anything. Test a non-script phrase with a real keyboard, because replayed .type() does not prove that audience input works.
@@ -48,6 +74,7 @@ These examples use this explicitly enabled plugin. Engine flow/state/review rule
 Use when reviewers should see the whole feature, not one screen at a time: several screens side by side, joined by arrows, with sticky notes for edge cases, and the camera walking from screen to screen.
 - One layer: <Canvas w h> (from @joplo-app/plugin-content, enable content too) containing one <Board>. Place each screen as <BrowserWindow id label url pos="absolute" top left w h> (or a Phone) and write its page inside with normal ui components; they stay clickable and typeable.
 - <Arrow from to label> joins two element ids on the same Board (a button to the next screen reads best). <Note pos="absolute" top left color> holds a comment that stays on the board; callout() is for a reason that belongs to one step only. Arrow must be a direct child of Board; ARROW_TARGET_UNKNOWN means no element on that Board has the id.
+- <Arrow from="job" to="job" label="Retry on timeout" /> draws a loop outside the right edge with its label beyond the curve. Leave space for the label on that side. Use a negative bend such as bend={-0.4} to put the loop and label on the left.
 - Reveal the next screen and its arrow in the same step with when; an arrow to a hidden element is not drawn. Arrows draw themselves in when they appear during playback.
 - Per step: camera('screenA', 'screenB') frames the pair being connected. End with a camera on every visible screen and note, not camera() of the whole world, which leaves empty paper when later screens are hidden.
 - Leave 160–280 px between screens for arrow labels; keep notes slightly rotated (default -2°) and screens straight. Text inside screens is read at the zoom of a two-screen shot: check it in a rendered storyboard.
@@ -186,7 +213,7 @@ From check:
 - IMAGE_PLACEHOLDER: <Image src> is a URL or plain path, which is never loaded. Put the file in the project and write src={asset('./photo.jpg')}, or pass a localResource(...) reference directly from an enabled image plugin. Resource generation failures have their own diagnostics; this warning does not determine whether generated bytes exist.
 
 From check:
-- INVALID_IMAGE_FIT: <Image fit> accepts cover or contain.
+- INVALID_IMAGE_FIT: <Image fit> accepts cover, contain or fill.
 
 From check:
 An element that looks usable (Button, TextInput, Select, NavLink, a, …; see components) has an id but no step in any scenario of this option. Viewers will try it; decide what happens:

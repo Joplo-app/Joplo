@@ -34,8 +34,8 @@ export default work({
 chapter() continues the previous chapter by declaration order; the first starts from the initial state. Only exceptions use from: null (restart) or from: 'sliceKey' (another predecessor). Do not mix flow() and chapter() in one work, write cases/uses() in standalone works, or number titles manually: the UI and outline number chapters automatically. Empty scenarios: {} is a valid local work in progress; it is skipped in publish/review, and explicit build --work selection fails until a slice is added.
 
 ### Migrating an existing piece
-- A compiler migration does not update code blocks or paths inside strings: search displayed file trees, terminal examples and source snippets too. Keep each example on the current work API, identify historical reconstructions explicitly, and update locale keys with changed source text. Compare check diagnostic counts before and after; a text-only update should not add missing/stale translations.
-- Before changing files, freeze the old dev IR. Compare every step, compiled plugin snapshot and every stateAt position with the migrated work. Renaming flow() to chapter() alone does not prove continuous state or audiovisual equivalence; review motion and sound as well.
+- A compiler migration does not update code blocks or paths inside strings: search displayed file trees, terminal examples and source snippets too. Keep each example on the current work API, identify historical reconstructions explicitly, and update locale keys with changed source text. Check diagnostic counts before and after; a text-only update should not add missing/stale translations.
+- Before changing files, freeze the old dev IR. Diff every step, compiled plugin snapshot and every stateAt position against the migrated work. Renaming flow() to chapter() alone does not prove continuous state or audiovisual equivalence; review motion and sound as well.
 - Preserve independent starts: if an old chapter began from the initial state, give the new chapter from: null. Otherwise chapter two onward inherits ui/data/inputs and music from its predecessor. Keep default continuation only where the story really continues.
 - Move feature.roles audience descriptions into work.audience; preserve actual role() speakers. Keep say() role keys and config.voice.roles aligned so dialogue still uses the intended voices.
 - Rename project helper functions already called chapter before importing the kit's chapter builder; a name collision is not a compiler-model problem.
@@ -186,4 +186,4 @@ For a long story use chapter() to inherit the previous ending by default; from i
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.8.1 sha256:c7ecc55e40ffeaf4db7d7c2e08f1ad3b69a1216560aa899ab8fbf1161da88deb -->
+<!-- joplo-skill 0.8.1 sha256:7c165bc4f0dc2ea1655ee9d5b6340074f7a15e7c7e973fad56b4110100b0faa5 -->

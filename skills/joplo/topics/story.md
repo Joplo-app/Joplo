@@ -7,7 +7,8 @@ It is not a feature tour. Plan it in a few lines before writing TSX, show the pl
 
 ## 1. Show the product working, not slides
 Joplo exists to demonstrate product behavior with visuals and motion. It is not a PPT tool: a demo made of text cards and bullet lists has failed, however good the text.
-- Every step = a cause the viewer sees (a click, typing, an incoming message, a system event) + a change it makes (a new row, a status, a toast, a trace, a layer switch).
+- Every step = Action (a click, typing, an incoming message, a system event) → Reaction (a new row, a status, a toast, a trace, an object moving) → Meaning (why this change matters to the user's goal or mental model). Skipping Meaning leaves viewers watching clicks without knowing what was proved.
+- Match the narrative spine to the job: product demos follow user state change (Context → Problem → target Outcome → Workflow → edge Behavior → open Decision); explainers build a mental model (shared premise AND → misconception or bottleneck BUT → mechanism & new trade-off THEREFORE, never a paper's Intro/Method/Results table of contents).
 - Show, do not tell: a claim like 'invites are fast' becomes the invite happening on screen; 'the queue absorbs spikes' becomes trace() through the queue while the UI stays responsive.
 - On-screen writing has a supporting role: captions narrate what is on screen, explain() says why it matters, cards only open, close, jump in time, or switch roles.
 - Pick the visual by what you prove: UI flow → the product screens; who calls whom → the diagram plugin; time order → sequence view; lifecycle → lifecycle view; two answers → options A/B on the same scenario.
@@ -35,6 +36,7 @@ Backend behind the same feature: put a diagram component in its own layer and .s
 - One to three points: what viewers must believe after watching. Each point becomes a scenario or an A/B comparison, never a single step.
 - Scenario list, one line per scenario: Given (who, where, starting state) → When (the user's actions) → Then (the visible result), plus how it opens and how it ends.
 - Length: a scenario is usually 5–12 steps, about 20–60 s at 1×. check flags one over 90 s; npx joplo outline prints every estimate. An estimate is the sum of each step's time plan: the action demonstration (cursor travel, press, typing or a 0.9 s system pause) plus the longer of its stay and its estimated narration, the same plan autoplay runs.
+- Minimal Decision Recipe (first reviewable draft in minutes): for a feature decision, do not build every screen, edge case, or voice track up front. Start with **1 thin happy path + 1 failure/recovery path + 1 contested boundary** on the smallest screen that proves the state change; add Option B only when a genuine trade-off needs comparing, and expand the remaining cases only after the reviewer checks the first round in the board.
 - Unsure how to frame it? Offer two or three one-line framings and let the user pick.
 - Recreating an existing video, GIF or screen recording: read it before planning. Extract frames into contact sheets (for example ffmpeg -i ref.gif -vf "fps=1,tile=3x3" sheet%02d.png, written outside the project) and list its chapters, the states each chapter passes through and every on-screen sentence; those become slices, steps and narration (shared cases only for feature review). Map the reference's own chrome to the player's instead of redrawing it: its chapter label → chapter title (case title in feature review) and the player's step title, its bottom progress → the player's chapter list, its key badge → the host key record after .press(), its spoken captions → narrate()/say(). Ask about anything the reference does not show (chapters cut off, unseen states) instead of inventing it; replace third-party logos with neutral shapes.
 
@@ -70,6 +72,11 @@ Joplo already has the parts of a user story; fill them in that spirit.
 - No filler ('Now let us…', 'a whole new experience'): every sentence does a job. Do not invent numbers or facts; record guesses as ai_assumption rules.
 - Cover text: flow('Slice title', { description }) is the cover sentence, 30 units at most (DESCRIPTION_TOO_LONG). The cover falls back to the feature goal.
 - Rhythm: every short step waits 3 s, so a run of trivial steps feels like a metronome. Merge trivial steps (type, then click) and give key results an explain.
+- Titles, chapters and pacing targets:
+  - Internal review work title: 10–18 CJK chars (25–45 Latin chars); put the subject and decision in the first 10–12 CJK chars. External title: 14–22 CJK (35–55 Latin); GitHub README badges truncate at 28 Unicode code points (first 27 + ellipsis), so never open with a series prefix.
+  - Linear chapters (2–5 min shows): split into 3–6 chapters of ~25–60 s each (for YouTube chapters keep ≥ 3 chapters and ≥ 10 s each). Name chapters in 4–10 CJK chars (max 14) or 2–5 English words (max 32 chars) with the distinguishing noun first: Action-Outcome ('Retry hits original order') for feature reviews, Question-Hook ('Paid, yet timed out?') for explainers, or Stage-Milestone ('Ledger dedup') for architecture walkthroughs — never generic sets like 'Intro / Principles / Summary'.
+  - Step caption vs narration: keep top-left step captions to 4–10 CJK chars (visible state), and spoken narrate() lines to 12–30 CJK chars / 6–18 English words (3–8 s; split above 10 s) explaining *why* without repeating the caption.
+  - Six-beat framing grammar (shared across reviews and explainers): Establish wide context → Push in when detail needs magnification → Action → Reaction → Meaning → Silent observation window (reusable helper: const observe = (s = 2.2) => [narrate(false), hold(s)]) → Controlled A/B on identical inputs → Pull back to land the decision or open question.
 
 ## 6. Narration: narrate() is a presenter talking, not the caption read aloud
 When the board or the published site reads a demo aloud, each step reads, in order of preference: narrate() in the narrator's voice; else say(), the character's own line in that role's voice; else the caption in the narrator's voice (cards read title and sub). Use narrate(false) on a deliberately silent step: it suppresses narration, say(), caption/card fallback and the spoken subtitle; the step title stays visible and voice-paced streams use their normal text speed. narrate('') remains an error, not a silence marker. Without narrate(false), the existing fallback is unchanged. A caption read aloud sounds like a screen reader, so give the steps that will be heard a narrate() line, written the way a person walks a colleague through a feature. It may later be recorded by a real voice, so write how people speak.
@@ -78,6 +85,7 @@ When the board or the published site reads a demo aloud, each step reads, in ord
 - Say what the caption cannot: the intent, the reason, the consequence. Never repeat the caption word for word; name an on-screen label only when the viewer must find it.
 - Spoken sentences: subject first, active voice, one idea each. Commas and periods are the breaths; no brackets, slashes, arrows, emoji, or markdown.
 - Write numbers, money, times, and versions the way they are said in the demo's language ('four hundred sixty' rather than '¥460'; 'version two' rather than 'v2').
+- Deliberate observation windows (know when to stop talking): when a step carries a complex visual transition — objects flying into new slots, a multi-hop trace, or coupled quantities shifting — point the viewer's eyes in the preceding beat, then run the visual step with narrate(false) and hold(1.8–3) so spoken words do not compete with visual working memory; resume narration on the next beat to land the takeaway.
 - Transitions carry the story: role switches, time jumps, and closing cards need a line that tells the viewer why we moved.
 - Plain and concrete, not flowery: no metaphors, slogans, or hype. Vivid means specific: real names, amounts, and times.
 - Not every step needs its own line: a trivial step can keep its short caption, and a character's say() can carry a moment ('Count me in!').
@@ -119,4 +127,4 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Tell the user which cases have no expected result yet and which options do not cover a high-priority case.
 
 Related topics: authoring, cases, demo, focus
-<!-- joplo-skill 0.8.1 sha256:0c1be53fd2a0ca7045be1b07d594efe6c6ee2b274813f302cfb1ecacf17f610f -->
+<!-- joplo-skill 0.8.1 sha256:b55c9fa5631518037d55fbe257de2fb55c0c386c863ed321b74c1d4ae196e323 -->

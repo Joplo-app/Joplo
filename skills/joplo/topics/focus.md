@@ -30,6 +30,12 @@ Cues do not zoom. If a cue's target is outside the current shot, the camera firs
 In diagrams the frame always keeps the target's group (title at least) and a message's two participants: a cue on them stays in the shot; spotlight keeps the group title lit. Plugin components can declare that they show their own changes (fade-in, traces), so the reveal pulse skips them.
 With layers, a cue switches the director to its target's layer when the step has no shot.
 
+## Four-level attention ladder (escalate only as needed)
+1. **Motion vs stillness**: when only one object changes and viewers already see it, add no cue at all.
+2. **Default reveal pulse**: when an action on one side updates a small badge elsewhere, let autoFocus reveal pulse handle it.
+3. **Local pointer**: when viewers need to know *which* field, *what order*, or *why*, pick one primary pointer — highlight(), callout(), mark(), or numbered().
+4. **Isolation or zoom**: use spotlight() only when surrounding chrome competes visually, and shot() only when the target is too small to read. Keep one frame across consecutive steps on the same subject.
+
 ## Pacing rules
 1. One subject per step. If the caption needs "and", split the step.
 2. Context first: when a new screen appears, show the whole of it (or number its parts) before zooming into a corner.
@@ -62,4 +68,4 @@ flow('Plan a weekend trip', { start: '/' })
 Full example: examples/camping.
 
 Related topics: demo, plugins, check
-<!-- joplo-skill 0.8.1 sha256:9b9b123412c3f20bf66053967eec67b5dd717237280077e017f1d7f944c13428 -->
+<!-- joplo-skill 0.8.1 sha256:7b3c26e04d8a08c7835dddacf2b70d4cd02b66aaf9b2fc085394cc8cc73e5028 -->

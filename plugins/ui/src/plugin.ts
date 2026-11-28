@@ -1,3 +1,7 @@
+import { isBind } from '@joplo-app/kit/node';
+import { compileCompare } from './compare-options.ts';
+import { isRegionRect } from './image-geometry.ts';
+import { ratioError } from './ratio.ts';
 import labels from './labels.json' with { type: 'json' };
 import type { PluginText } from '@joplo-app/kit/plugin';
 import packageInfo from './version.json' with { type: 'json' };
@@ -7,7 +11,7 @@ import { COMPONENT_TYPES, COMPONENT_DOCS, COMPONENT_EXAMPLES, INTERACTIVE_TYPES,
 
 // The UI family owns its vocabulary and display semantics, including HTML fallbacks.
 const display: Record<string,string[]> = {
-  Divider:['label'], Blockquote:['cite'], Avatar:['name'], Image:['alt'], Indicator:['label'],
+  Divider:['label'], Blockquote:['cite'], Avatar:['name'], Image:['alt'], 'Image.Region':['label'], 'Compare.Side':['label'], RatioBar:['labels','remainderLabel','thresholdLabel','unit'], Indicator:['label'],
   'Timeline.Item':['title'], Table:['data'], DataTable:['records','noRecordsText'],
   Radio:['label'], 'Radio.Card':['label','description','leftSection'], 'Radio.Group':['label','description','value','error'],
   'Stepper.Step':['label','description'], Alert:['title'], Notification:['title'], Modal:['title'], Drawer:['title'],
@@ -20,7 +24,7 @@ const display: Record<string,string[]> = {
   'Menu.Item':['leftSection','rightSection'], 'Tabs.Tab':['leftSection','rightSection'],
   BrowserWindow:['label','url'], Arrow:['label'],
 };
-const textPaths: Record<string,string[][]> = {DataTable:[['columns','*','title']],DataCard:[['fields','*','label']],BarChart:[['series','*','label']],LineChart:[['series','*','label']]};
+const textPaths: Record<string,string[][]> = {Compare:[['compareOptions','*','label']],DataTable:[['columns','*','title']],DataCard:[['fields','*','label']],BarChart:[['series','*','label']],LineChart:[['series','*','label']]};
 const fieldText = ['label','description','placeholder','error','value'];
 const traits = (name: string): ElementTraits => ({
   ...(INTERACTIVE_TYPES.has(name) ? {hover:true} : {}),
@@ -28,9 +32,9 @@ const traits = (name: string): ElementTraits => ({
   ...(name === 'Accordion.Panel' ? {selectionGate:{owner:'ui:Accordion',item:'ui:Accordion.Item',value:'value'}} : {}),
   ...(['TextInput', 'Textarea', 'PasswordInput', 'NumberInput', 'Autocomplete', 'PromptInput'].includes(name) ? {native:{action:'type',prop:'value'}} as const : {}),
   ...(['Switch', 'Checkbox', 'Radio'].includes(name) ? {native:{action:'toggle',prop:'checked'}} as const : {}),
-  ...(['Tabs', 'Accordion', 'Radio.Group', 'Select', 'MultiSelect', 'SegmentedControl'].includes(name) ? {native:{action:'select',prop:'value',...(name === 'Accordion' ? {deselect:true} : {})}} as const : {}),
+  ...(['Compare', 'Tabs', 'Accordion', 'Radio.Group', 'Select', 'MultiSelect', 'SegmentedControl'].includes(name) ? {native:{action:'select',prop:'value',...(name === 'Accordion' ? {deselect:true} : {})}} as const : {}),
   ...(textPaths[name] ? {textPaths:textPaths[name]} : {}),
-  text: ['aria-label', ...(display[name] ?? []), ...(VALUE_TYPES.has(name) ? fieldText : []), ...(['Select','MultiSelect','SegmentedControl','TabBar'].includes(name) ? ['data'] : [])],
+  text: ['aria-label', ...(display[name] ?? []), ...(VALUE_TYPES.has(name) && name !== 'Compare' ? fieldText : []), ...(['Select','MultiSelect','SegmentedControl','TabBar'].includes(name) ? ['data'] : [])],
   ...(name === 'Indicator' ? {disabledPresentation:true} : {}),
   ...(['Card','Paper','Modal','Drawer','Alert','Notification','Email','DataCard','StateFlow','Artifact','Terminal','ChatMessage','Table','DataTable','Accordion.Item','Tabs.Panel','AppShell.Navbar','AppShell.Aside','AppShell.Header','AppShell.Footer','BrowserWindow'].includes(name) ? {frame:true} : {}),
   ...(VALUE_TYPES.has(name) ? { input: name === 'MultiSelect' ? 'multiple' : 'single' } as const : {}),
@@ -39,6 +43,7 @@ const traits = (name: string): ElementTraits => ({
   ...(name === 'Checkbox' ? {toggleCaption:'check'} as const : {}),
   ...(['Select','MultiSelect','SegmentedControl','TabBar'].includes(name) ? {choices:{prop:'data'}} : {}),
   ...(name === 'Radio.Group' ? {choices:{descendants:['ui:Radio','ui:Radio.Card']}} : {}),
+  ...(name === 'Compare' ? {choices:{prop:'compareOptions'}} : {}),
   ...(name === 'Tabs' ? {choices:{descendants:['ui:Tabs.Tab']}} : {}),
   ...(name === 'Accordion' ? {choices:{descendants:['ui:Accordion.Item'],labelChild:'ui:Accordion.Control'}} : {}),
   ...(name === 'Pagination' ? {choices:{range:'total'}} : {}),
@@ -56,6 +61,8 @@ export const components: Record<string, PluginComponentSpec> = Object.fromEntrie
   ...(INTERACTIVE_TYPES.has(name) ? {interactive:true} : {}),
   traits: traits(name),
   ...(name==='Menu' ? {inherit:[{target:'ui:Menu.Dropdown',props:['opened']}]} : {}),
+  ...(name==='Compare.Side' ? {parent:'Compare'} : {}),
+  ...(name==='Image.Region' ? {parent:'Image',needsId:true} : {}),
   ...(name==='Arrow' ? {parent:'Board'} : {}),
 }]));
 export default definePlugin({ packageName: '@joplo-app/plugin-ui',
@@ -76,10 +83,18 @@ export default definePlugin({ packageName: '@joplo-app/plugin-ui',
     }
   },
   node(n,{report}){
+    if (n.type === 'ui:Compare') return compileCompare(n, report);
+    if (n.type === 'ui:RatioBar') {
+      const error = ratioError(n.props, isBind);
+      if (error) report('RATIO_BAR_INVALID', '<RatioBar> ' + error, n.source);
+    }
+    if (n.type === 'ui:Image.Region' && !isRegionRect(n.props.rect)) {
+      report('IMAGE_REGION_RECT', '<Image.Region> rect must be [x, y, width, height] inside the original image (0..1), with positive width and height', n.source);
+    }
     if(n.type !== 'ui:Image') return;
     const {src,fit}=n.props;
     if(typeof src==='string'&&src&&!src.startsWith('data:image/') && !/^joplo-resource:resource-\d+$/.test(src)) report('IMAGE_PLACEHOLDER',`<ui:Image src="${src.length>60?`${src.slice(0,57)}...`:src}"> is drawn as a placeholder: only embedded images are shown. Put the file in the project and write src={asset('./photo.jpg')} (path relative to this file; import asset from @joplo-app/kit)`,n.source,'warning');
-    if(fit!==undefined&&!(typeof fit==='string'&&['cover','contain'].includes(fit))) report('INVALID_IMAGE_FIT',`<ui:Image> fit="${String(fit)}" is not supported (available: cover, contain)`,n.source);
+    if(fit!==undefined&&!(typeof fit==='string'&&['cover','contain','fill'].includes(fit))) report('INVALID_IMAGE_FIT',`<ui:Image> fit="${String(fit)}" is not supported (available: cover, contain, fill)`,n.source);
   }},
 });
 

@@ -1,0 +1,15 @@
+/* 纯黑深海留白舞台 + 引擎时钟采样的克制微脉冲（避免静止死帧且零装饰噪音）。 */
+@keyframes mla-pulse {
+  0%, 100% { opacity: 0.76; }
+  50% { opacity: 1; }
+}
+@keyframes mla-spin-soft {
+  0%, 100% { transform: scale(0.97); }
+  50% { transform: scale(1.03); }
+}
+.mla-live {
+  animation: mla-pulse 2.2s ease-in-out infinite;
+}
+.mla-gear {
+  animation: mla-spin-soft 1.8s ease-in-out infinite;
+}

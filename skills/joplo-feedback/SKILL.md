@@ -38,6 +38,7 @@ npx joplo feedback watch ./demo --local --session <id-from-list> [--after <last-
 - Use it to wait for one option version's approval (exit 0 only on approval, 1 if the round closes) or to resume a round from a cursor. Match projectDir, workId, instanceId and revision from list; if several match, choose explicitly instead of taking the newest.
 - Source edits close that round: list again and attach to the new one with its own cursor. Never reuse an old cursor on a new session or delete review records to reset a round.
 - For an explicitly requested scripted review action, feedback submit --local requires an exact work/scenario/position/body and feedback approve --local confirms that revision through the board API. The CLI does not pretend to know or control the reviewer's current browser position; approval never publishes.
+- After editing source to address local feedback (which opens a fresh review round), record a receipt with npx joplo feedback reply ./demo --local --event <rv_...:seq> --status <addressed|deferred|declined> [--scenario <id> --position <n>] [--note <text>]. The board shows each handled item alongside a direct jump button to that step so the reviewer can re-check changes in seconds without replaying the whole demo. Receipts do not end --follow --once or carry over old approvals.
 
 ## Share review: poll with a recoverable cursor
 ```sh
@@ -66,4 +67,4 @@ npx joplo feedback watch --share <share-id> --work <feature.option> --interval 1
 - AUTH_REQUIRED / AUTH_EXPIRED (exit 3): tell the user how to run npx joplo login; do not log in/out or switch accounts without their instruction. Permission, quota, and missing-share errors are not approvals.
 - If a command is unavailable, check the project's installed Joplo version and its skill output. Do not silently switch to another instance or use another project's credentials.
 - .joplo runtime state stays local, and local feedback is never uploaded just because a Share exists. Details: npx joplo skill review; source write-back and publishing: npx joplo skill publish.
-<!-- joplo-skill 0.8.1 sha256:87723bb405cbfda13d92eba1e4034232238371e10f9a70556a4c92477961cccd -->
+<!-- joplo-skill 0.8.1 sha256:17c4a021014fa47912026dd9ffe295faca4d638599bfe4081b2a13c8eaa54756 -->
