@@ -22,3 +22,19 @@ export const trace = Object.assign((...args: TraceArgs): PluginEffectDef => trac
   /** 这次没被调用：节点（以及它们之间的连线）标为 dim；不移动镜头。 */
   skip: (...ids: string[]): PluginEffectDef => pluginEffect('diagram', 'trace', { ids, mode: 'skip' }),
 });
+
+/** Send an animated packet pulse along a manual <FlowEdge id={edge}> during this step. */
+export function pulse(
+  edge: string,
+  options: { label?: string; reverse?: boolean; tone?: 'neutral' | 'accent' | 'info' | 'violet' | 'ok' | 'warn' | 'danger' | 'muted'; durationMs?: number } = {},
+): PluginEffectDef {
+  return pluginEffect('diagram', 'pulse', { edge, ...options });
+}
+
+/** Update the runtime health/highlight status of an <ArchNode>, <Database>, <CacheNode>, or <FlowNode>. */
+export function setStatus(
+  target: string,
+  status: 'idle' | 'healthy' | 'active' | 'hot' | 'degraded' | 'down' | 'cached',
+): PluginEffectDef {
+  return pluginEffect('diagram', 'setStatus', { target, status });
+}

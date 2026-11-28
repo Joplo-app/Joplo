@@ -240,7 +240,7 @@ test('本地 check/build/dev/skill 不发云端请求', async () => {
   await cli(['build', project]); await cli(['dev', project]); await cli(['skill', 'publish']); await cli(['check', project]); expect(calls).toEqual([]); expect(fetchSpy).not.toHaveBeenCalled();
 });
 test('真实 examples/invite 免费 share：预置共用运行时后成功，MIME 全部符合白名单', async () => {
-  limits.maxUploadBytes = 1_250_000; // Synthetic limit: inline plugin runtimes count as new HTML; shared assets still exceed the upload allowance.
+  limits.maxUploadBytes = 1_800_000; // Synthetic limit: inline plugin runtimes count as new HTML; shared assets still exceed the upload allowance.
   seedRuntime = true; await credentials(); await cp('examples/invite', project, { recursive: true, filter: s => !s.includes('node_modules') }); await symlink(resolve('node_modules'), join(root, 'node_modules')); await writeFile(join(root, 'package.json'), '{"type":"module"}');
   missingCount = 9999; const r = await cli(['share', '--private', '--no-review',  project, '--format=json'], { realBuild: true }); expect(r.code, r.stdout + r.stderr).toBe(0);
   const manifest = calls.find(c => c.path === '/api/v1/shares')!.body.files;

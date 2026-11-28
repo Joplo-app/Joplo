@@ -1,129 +1,130 @@
 import { DIAGRAM_GROUP_ICONS, DIAGRAM_NODE_KINDS, DIAGRAM_TONES, SEQUENCE_BLOCK_KINDS } from './model.ts';
+
 export const skill = `# Joplo diagrams: diagram
 
 Install @joplo-app/plugin-diagram at the same version as Joplo. Explicitly enable the manifest in config.plugins; no plugin is implicitly loaded.
 \`\`\`tsx
 import { config } from '@joplo-app/kit';
+import content from '@joplo-app/plugin-content';
 import diagram from '@joplo-app/plugin-diagram';
-export default config({ name: 'Architecture', plugins: [diagram] });
-// In author TSX: import { Diagram, Sequence, StateMachine, trace } from '@joplo-app/plugin-diagram';
+export default config({ name: 'Architecture', plugins: [content, diagram], theme: 'diagram:juice' });
 \`\`\`
-Three diagram components explain backend, architecture, and logic:
-- Diagram: what talks to what, grouped by business domain (gateway, runtime, storage…). Default for architecture.
-- Sequence: one request moving between services in time order. Use it to walk through a call chain.
-- StateMachine: states and transitions of one entity (order, task, run). Use it for lifecycles.
-Choose by the question: "what is where" → Diagram; "what happens in what order" → Sequence; "what states can it be in" → StateMachine.
 
-Import trace from @joplo-app/plugin-diagram. IR names are diagram:Diagram, diagram:StateMachine and diagram:Sequence; never hand-edit generated IR. UNKNOWN_PLUGIN means install this package and add diagram to config.plugins, then rerun check. Trace and state-machine transition states are compiled once per step, so seeking and offline playback read the same snapshot.
+## Default First Choice: Manual Rich Composition + FlowEdge (High Readability & Full Customization)
+For architecture explanations, system design walkthroughs, whiteboards, data structures, and ER diagrams (typically 3–14 nodes per frame), **prefer intentional manual layout with rich board primitives + \`<FlowEdge>\` over automatic graph layout**. Manual column/row placement with Flex/Grid gives far better reading flow, zero awkward whitespace, authentic official brand logos, custom inner widgets, and complete visual freedom.
 
-## Canvas framing and design size
-Inside a content Canvas, let camera() own framing and write trace('api', 'kernel', { focus: false }) (also supported by trace.fail). This updates the same node/edge snapshots and timing without suggesting a host shot, so screen overlays and the outer frame stay fixed. The default remains host-focused for existing works. Do not combine a Canvas camera with an accidental second host zoom.
+- **Architecture & Cloud**: \`<BoardZone>\`, \`<ClusterBox cloud="aws|gcp|cloudflare|kubernetes">\`, \`<ArchNode icon="cloudflare|go|rust|..." replicas metric status fill="solid">\`, 3D \`<Database engine="postgres|clickhouse|...">\`, \`<QueuePipe engine="kafka|rabbitmq|aws-sqs">\`, \`<CacheNode engine="redis" hitRate ttl>\`. Every container forwards \`children\` so you can nest custom content freely.
+- **Connectors & Kinetic Steps**: Connect ANY two \`id\`s (nodes, devices, stick figures, ER tables, or custom elements) with \`<FlowEdge id from to route="curve|straight|elbow|arc" fromSide toSide label protocol />\`. In steps, animate packets with \`pulse('edge_id', { label, tone })\` and highlight health/alerts with \`setStatus('node_id', 'hot' | 'down' | 'healthy')\`.
+- **86 Authentic Offline Tech/Cloud/K8s/DB/Framework Logos**: \`<TechIcon icon="postgres" variant="tile|badge|mark" />\` (auto-bound inside \`ArchNode\`, \`Database\`, \`QueuePipe\`, \`CacheNode\`, \`ClusterBox\`).
+- **Whiteboard Storytelling, Devices, DSA & ER**: \`<StickFigure pose="coding|thinking|team|...">\`, \`<StickyNote color="yellow|pink|mint|sky|lavender|peach">\`, \`<SpeechBubble>\`, \`<Callout>\`, \`<DeviceFrame kind="browser|terminal|phone|server">\`, \`<ArrayStrip>\`/\`<ArrayCell>\`, \`<LinkedList>\`, \`<StackQueue>\`, \`<HashTable>\`, \`<MatrixGrid>\`, \`<FlowNode shape="start|process|decision|io|end">\`, \`<ERTable>\`/\`<ERField>\`, \`<SwimLane>\`.
+- **5 Built-In Themes**: \`diagram:juice\` (tactile ceramic, default), \`diagram:sketch\` (Excalidraw hand-drawn whiteboard with Rough.js strokes), \`diagram:juice-dark\`, \`diagram:riso\`, \`diagram:blueprint\`.
 
-Diagram, StateMachine and Sequence accept scale={2} to request twice the native node, text and edge size in design pixels. The whole diagram still shrinks to fit its container; a larger scale needs enough width and height. At a 1920px Canvas design width, start with scale={2}, then inspect a real frame at the final camera zoom; a crowded graph may still need fewer nodes or a closer Canvas camera. Default scale is 1. Invalid/non-positive values report DIAGRAM_SCALE_INVALID; fix the value before publishing.
-
-## Diagram: group by business domain
 \`\`\`tsx
+import { ArchNode, BoardZone, CacheNode, ClusterBox, Database, FlowEdge, QueuePipe, StickFigure, pulse, setStatus } from '@joplo-app/plugin-diagram';
+
+<BoardZone id="arch" eyebrow="SYSTEM DESIGN" title="Checkout Pipeline">
+  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 72 }}>
+    <StickFigure id="user" pose="coding" label="User" />
+    <ClusterBox id="vpc" label="AWS · us-east-1" cloud="aws">
+      <ArchNode id="gw" label="API Gateway" icon="aws-apigw" metric="24k rps" fill="solid" />
+      <ArchNode id="svc" label="Order Service" icon="go" replicas={6} />
+      <Database id="pg" label="Orders Primary" engine="postgres" storage="2.4 TB" />
+    </ClusterBox>
+    <FlowEdge id="e1" from="user" to="gw" fromSide="right" toSide="left" label="HTTPS" />
+    <FlowEdge id="e2" from="gw" to="svc" fromSide="right" toSide="left" label="gRPC" />
+    <FlowEdge id="e3" from="svc" to="pg" fromSide="right" toSide="left" label="SQL" />
+  </div>
+</BoardZone>
+// Step: .system('Hot alert', setStatus('svc', 'hot'), pulse('e2', { label: 'POST /order' }))
+\`\`\`
+
+## Read Domain Topics On Demand
+- \`npx joplo skill diagram/icons\` — Full catalog of 86 built-in authentic tech/cloud/K8s/DB/language/framework/ops logos
+- \`npx joplo skill diagram/arch\` — Manual architecture nodes, 3D databases, queues, caches, cluster boxes, FlowEdge & pulse/setStatus
+- \`npx joplo skill diagram/whiteboard\` — 10-pose StickFigures, StickyNotes, SpeechBubbles, Callouts & DeviceFrames
+- \`npx joplo skill diagram/dsa-flow\` — ArrayStrip, LinkedList, StackQueue, HashTable, MatrixGrid, FlowNode, ERTable & SwimLane
+- \`npx joplo skill diagram/patterns\` — Recipes and diagnostic pitfalls
+
+---
+
+## Specialized & Optional Auto-Layout Diagrams (Opt-In)
+Use these specialized chart primitives when their specific structure fits better than manual layout:
+- **\`Sequence\`**: one request moving between services in strict time order (numbered rows, lifelines, \`alt/opt/loop/par\` blocks, \`trace()\`).
+- **\`StateMachine\`**: entity lifecycle bound to data (\`value={$.data.order.status}\`, initial dot, double-border final state, automatic transition highlight).
+- **\`TimeLanes\`**: multi-lane concurrent timeline / waterfall spans.
+- **\`Diagram\` (opt-in auto-layout, D2 TALA / ELK)**: use **only** when a dense 15+ node graph makes manual placement impractical or you specifically want cumulative \`trace()\` dimming across many crossings. Do not default to \`<Diagram>\` for small curated architecture boards where manual \`ArchNode\` + \`FlowEdge\` reads cleaner.
+
+### Diagram (Opt-In Auto-Layout) & trace()
+\`\`\`tsx
+import { Diagram, Sequence, StateMachine, TimeLanes, trace } from '@joplo-app/plugin-diagram';
 <Diagram id="arch" direction="right" h={520}>
   <Diagram.Group id="g_gw" label="Gateway" icon="gateway" tone="blue">
     <Diagram.Node id="api" label="API" kind="service" description="auth · rate limit" />
   </Diagram.Group>
-  <Diagram.Group id="g_run" label="Runtime" icon="service" tone="purple">
-    <Diagram.Node id="kernel" label="Kernel" description="model + tool loop" />
-    <Diagram.Node id="tools" label="Tools" kind="tool" />
-  </Diagram.Group>
   <Diagram.Group id="g_data" label="Storage" icon="database">
     <Diagram.Node id="pg" label="PostgreSQL" kind="database" />
   </Diagram.Group>
-  <Diagram.Edge from="api" to="kernel" label="run" />
-  <Diagram.Edge from="kernel" to="tools" label="call" />
-  <Diagram.Edge from="kernel" to="g_data" label="commit" async />
+  <Diagram.Edge from="api" to="pg" label="commit" async />
 </Diagram>
 \`\`\`
-- Every node belongs to a domain group; 2–6 groups, ~3–15 nodes per diagram. One group around everything says nothing (check reports DIAGRAM_UNGROUPED).
-- Group props: label, icon (${DIAGRAM_GROUP_ICONS.join(', ')}), tone (${DIAGRAM_TONES.join(', ')}), group (parent id). Groups nest.
-- Put a node in a group by nesting, or flat with group="g_run" (not both). Edges may connect to a group: to="g_data".
-- Node kind: ${DIAGRAM_NODE_KINDS.join(', ')}. description says the responsibility in a few words; edge label says what flows.
-- Bigger systems: split into layers (overview → one layer per domain) instead of one huge diagram.
+- Inside a content \`Canvas\`, let \`camera()\` own framing and write \`trace('api', 'pg', { focus: false })\`.
+- Group props: \`label\`, \`icon\` (${DIAGRAM_GROUP_ICONS.join(', ')}), \`tone\` (${DIAGRAM_TONES.join(', ')}). Node \`kind\`: ${DIAGRAM_NODE_KINDS.join(', ')}.
+- \`trace('a', 'b')\` lights \`a → b\` this step and keeps prior traced edges \`ok\`; \`trace.fail(...)\` marks error; \`trace.skip(...)\` dims unused paths.
 
-## Layout is automatic (compile time, D2 TALA default)
-- Joplo lays the diagram out when compiling using D2's open-source TALA engine (layout="tala" by default: 2D domain-cluster placement, balanced symmetry around hubs, and clean orthogonal edge routing; pass layout="elk" only when strict 1D Sugiyama layered ranks are wanted). Never write coordinates; browser and published sites read compiled coordinates with zero layout runtime.
-- Leave out direction: Joplo tries top → bottom and left → right and keeps the orientation that fills the stage with the largest text (domain groups arrange into balanced 2D neighborhoods around shared hubs instead of a tall single column). direction="right" / "down" pins the main entry axis; aspect={1.6} sets the wanted width / height; h="100%" fills a layer.
-- Write nodes, groups, and edges in reading order. Write the primary request edge before its callback / reply (api → kernel before kernel → api): the entry domain anchors upstream and bidirectional calls route on separate parallel lanes.
-- Mark asynchronous side-flows async (usage events, audit logs): they draw dashed and stay visually distinct from the synchronous call path.
-- When two chains feed one node (author → storage → player, and viewer → player), write the upstream chain's groups and edges first, in the direction data flows.
-- pin="start" / pin="end" constrains a node or group to the first / last rank of its container. The layout covers every element, including ones hidden with when: nodes never move between steps.
-- In each step only the traced call is bold, colored, with a moving dot and its label outlined; other edges turn thin and light. One call per step reads best.
+### Sequence & StateMachine
+- \`Sequence\`: \`<Sequence.Group>\`, \`<Sequence.Actor>\`, \`<Sequence.Message reply async>\`, \`<Sequence.Block kind="${SEQUENCE_BLOCK_KINDS.join('|')}">\`.
+- \`StateMachine\`: \`<StateMachine value={$.data.status}>\`, \`<StateMachine.State initial final>\`, \`<StateMachine.Transition>\`, \`<StateMachine.Group>\`.
+- Framing: \`shot('node_id')\` frames a node with its parent group title; \`shot()\` returns to the full layer.
 
-## Traces: light up a call
-- trace('api', 'kernel', 'pg') lights api → kernel → pg this step; earlier traces turn ok. trace.fail('kernel', 'pg') marks failure; trace.skip('tools') dims what was not called.
-- Ids are nodes, groups, or edge ids. Each segment needs an edge (either direction). For several edges between the same pair, trace the edge id.
-- Groups the call passes through are highlighted too, so viewers see which domains a request touches.
-- Do not write state props or set() to fake calls; trace does it.
+Diagnostics for diagrams are listed in check (\`DIAGRAM_EDGE_INVALID\`, \`DIAGRAM_EDGE_UNKNOWN\`, \`UNKNOWN_DIAGRAM_NODE\`, \`TRACE_UNKNOWN\`…).`;
 
-## Sequence: one call chain in time order
-\`\`\`tsx
-<Sequence id="login">
-  <Sequence.Group label="Client"><Sequence.Actor id="web" label="Web" kind="client" /></Sequence.Group>
-  <Sequence.Actor id="api" label="API" />
-  <Sequence.Actor id="db" label="DB" kind="database" />
-  <Sequence.Message id="m_req" from="web" to="api" label="POST /login" />
-  <Sequence.Message id="m_q" from="api" to="db" label="find user" />
-  <Sequence.Block kind="alt" label="wrong password">
-    <Sequence.Message id="m_401" from="api" to="web" label="401" reply />
-  </Sequence.Block>
-  <Sequence.Message id="m_ok" from="api" to="web" label="200 + session" reply />
-</Sequence>
-\`\`\`
-- Participants are columns in source order; messages are rows in source order, numbered (numbered={false} to hide numbers).
-- reply = dashed return; async = open arrow; from === to is a self call. Block kind: ${SEQUENCE_BLOCK_KINDS.join(', ')}.
-- Give messages ids and trace them per step: trace('m_req'), then trace('m_q'). Earlier rows turn ok; the camera frames the row with both participants.
-
-## StateMachine: a lifecycle
-\`\`\`tsx
-<StateMachine id="order_sm" value={$.data.order.status}>
-  <StateMachine.State id="created" label="Created" initial />
-  <StateMachine.State id="paid" label="Paid" />
-  <StateMachine.State id="closed" label="Closed" final />
-  <StateMachine.Transition from="created" to="paid" label="pay" />
-  <StateMachine.Transition from="created" to="closed" label="timeout 30 min" />
-</StateMachine>
-\`\`\`
-- value binds the current state (highlighted). When a step changes it (set($.data.order.status, 'paid')), the matching transition lights up by itself.
-- trace('created', 'paid') also works. initial adds a start dot; final draws a double border; StateMachine.Group boxes substates.
-
-## Frame with shot (what the camera keeps)
-- shot('kernel') frames the node with its parent group; when the whole group would make text too small, it keeps at least the group title. Viewers always see which domain they are in.
-- A trace with several nodes frames all of them and their group titles. shot('g_run') frames a whole domain; shot() returns to the whole layer.
-- UI cards and panels zoom at most 1.25× (more, up to 3×, only when their text would be under about 15px on screen, e.g. a phone layer) and keep their framed container (Card, Paper, Modal, Table, AppShell side…) in view, so neighbours stay visible.
-- Want more context? shot the container or group. Want the reader to compare two places? shot both ids in one step.
-- Do not use zoom to read tiny text: if a diagram needs heavy zoom, split it into layers.
-- Point at a part without zooming: spotlight / highlight / callout (see focus). A callout on the framed node's group or a message's participant stays in the shot.
-
-## Other diagram types
-- C4 context / container: use Diagram with kind="user" for people, Diagram.Group icon="box" for each system boundary, kind="external" for outside systems.
-- Data models: show records with DataCard and Table in their own layer (see demo); an ER diagram component is not available yet.
-
-Diagnostics for diagrams are listed in check (UNKNOWN_DIAGRAM_NODE, UNKNOWN_DIAGRAM_GROUP, TRACE_UNKNOWN…). See examples/agent-arch.`;
-
-export const diagnostics = `- Every node belongs to a domain group; 2–6 groups, ~3–15 nodes per diagram. One group around everything says nothing (check reports DIAGRAM_UNGROUPED).
-- Group props: label, icon (${DIAGRAM_GROUP_ICONS.join(', ')}), tone (${DIAGRAM_TONES.join(', ')}), group (parent id). Groups nest.
-- Node kind: ${DIAGRAM_NODE_KINDS.join(', ')}. description says the responsibility in a few words; edge label says what flows.
-- TRACE_UNKNOWN: Empty trace, unknown id, ids from different diagrams, or a disconnected path. Use connected ids in one Diagram / StateMachine / Sequence.
-- TRACE_AMBIGUOUS: Multiple candidate edges or messages between two nodes. Use the specific edge / message id in trace.
-- UNKNOWN_DIAGRAM_NODE: An edge, transition, or message endpoint is not a node / group / state / participant id in the same diagram. Correct the endpoint ids.
-- UNKNOWN_DIAGRAM_GROUP / DIAGRAM_GROUP_CONFLICT / DIAGRAM_GROUP_CYCLE: group="…" names a missing group, disagrees with the group the element is nested in, or makes groups contain each other. Use nesting or group=, not both. See diagram.
-- DIAGRAM_EDGE_INTO_OWN_GROUP: An edge connects an element to a group that contains it. Connect to an element inside, or to another group.
-- INVALID_DIAGRAM_PROP / INVALID_DIAGRAM_CHILD: layout, tone, pin, kind, or block kind is not a preset (layout accepts "tala" or "elk"), or a child is in the wrong container (messages in Sequence.Group, actors in Sequence.Block). See diagram.
-- DIAGRAM_UNGROUPED (info): Many nodes and no domain groups. Group them with <Diagram.Group label icon> so viewers see what belongs where.
-- DIAGRAM_LAYOUT_FAILED (warning): The automatic layout failed and the diagram shows a simple grid. Check its edges and groups; report it if they look right.`;
+export const diagnostics = `- Every node in auto-layout <Diagram> belongs to a domain group; 2–6 groups (check reports DIAGRAM_UNGROUPED).
+- DIAGRAM_EDGE_INVALID / DIAGRAM_EDGE_UNKNOWN: <FlowEdge> requires nonempty string from/to ids, and pulse(edgeId) must reference a <FlowEdge id={edgeId}> on the current step.
+- DIAGRAM_TARGET_UNKNOWN / DIAGRAM_STATUS_INVALID: setStatus(targetId, status) requires a valid node id and status (idle|healthy|active|hot|degraded|down|cached).
+- TRACE_UNKNOWN / TRACE_AMBIGUOUS: Empty trace, unknown id, disconnected path, or multiple candidate edges between the same pair.
+- UNKNOWN_DIAGRAM_NODE / UNKNOWN_DIAGRAM_GROUP / DIAGRAM_GROUP_CONFLICT / DIAGRAM_GROUP_CYCLE / DIAGRAM_EDGE_INTO_OWN_GROUP.
+- INVALID_DIAGRAM_PROP / INVALID_DIAGRAM_CHILD / DIAGRAM_LAYOUT_FAILED.`;
 
 export const patterns = `# diagram recipes and pitfalls
 
-From check:
-- TRACE_UNKNOWN: Empty trace, unknown id, ids from different diagrams, or a disconnected path. Use connected ids in one Diagram / StateMachine / Sequence.
+- **Manual vs Auto-Layout**: For curated 3–14 node system architectures, build with \`ArchNode\` + \`ClusterBox\` + \`Database\` + \`QueuePipe\` + \`FlowEdge\` + \`pulse()\`/\`setStatus()\`. Reserve auto-laid-out \`<Diagram>\` for dense 15+ node topologies or when cumulative \`trace()\` across many groups is needed.
+- **Avoid edge crossings manually**: Put \`<FlowEdge>\` inside the same positioned wrapper (\`position: 'relative'\`) as its endpoints, leave 64–84px gaps when an edge carries a pill label, and specify \`fromSide\`/\`toSide\` explicitly.
+- **From check**: \`DIAGRAM_EDGE_UNKNOWN\`, \`TRACE_UNKNOWN\`, \`INVALID_DIAGRAM_PROP\`, \`DIAGRAM_UNGROUPED\`.`;
 
-From check:
-- INVALID_DIAGRAM_PROP / INVALID_DIAGRAM_CHILD: layout, tone, pin, kind, or block kind is not a preset (layout accepts "tala" or "elk"), or a child is in the wrong container (messages in Sequence.Group, actors in Sequence.Block). See diagram.
-
-From check:
-- DIAGRAM_UNGROUPED (info): Many nodes and no domain groups. Group them with <Diagram.Group label icon> so viewers see what belongs where.`;
+export const boardSkillTopics: Record<string, { description: string; body: string }> = {
+  icons: {
+    description: '86 authentic offline tech, cloud, AWS, Kubernetes, database, language, framework, and observability SVG logos',
+    body: `# diagram/icons
+- \`<TechIcon icon="postgres" variant="tile|badge|mark" size label mono />\` and \`<IconGrid title cols>\`.
+- **Cloud & Edge (16)**: \`aws\`, \`aws-lambda\`, \`aws-s3\`, \`aws-ec2\`, \`aws-rds\`, \`aws-dynamodb\`, \`aws-sqs\`, \`aws-cloudfront\`, \`aws-apigw\`, \`gcp\`, \`azure\`, \`cloudflare\`, \`workers\`, \`vercel\`, \`supabase\`, \`firebase\`.
+- **Containers, K8s & DevOps (22)**: \`docker\`, \`kubernetes\`, \`k8s-pod\`, \`k8s-deploy\`, \`k8s-svc\`, \`k8s-ing\`, \`k8s-cm\`, \`k8s-pv\`, \`helm\`, \`terraform\`, \`nginx\`, \`envoy\`, \`linux\`, \`git\`, \`github\`, \`github-actions\`, \`gitlab\`, \`jenkins\`, \`ansible\`, \`consul\`, \`vault\`, \`argo\`.
+- **Databases & Data (15)**: \`postgres\`, \`mysql\`, \`sqlite\`, \`mongodb\`, \`redis\`, \`kafka\`, \`rabbitmq\`, \`elasticsearch\`, \`clickhouse\`, \`duckdb\`, \`snowflake\`, \`spark\`, \`airflow\`, \`prisma\`, \`graphql\`.
+- **Languages (12)**: \`typescript\`, \`javascript\`, \`python\`, \`go\`, \`rust\`, \`java\`, \`swift\`, \`cpp\`, \`nodejs\`, \`bun\`, \`deno\`, \`wasm\`.
+- **Frameworks (11)**: \`react\`, \`nextjs\`, \`vue\`, \`svelte\`, \`tailwind\`, \`vite\`, \`fastapi\`, \`pytorch\`, \`grpc\`, \`pnpm\`, \`figma\`.
+- **Observability & SaaS (10)**: \`prometheus\`, \`grafana\`, \`otel\`, \`datadog\`, \`sentry\`, \`stripe\`, \`slack\`, \`notion\`, \`linear\`, \`discord\`.`,
+  },
+  arch: {
+    description: 'Manual rich architecture nodes, 3D databases, queues, caches, cluster boxes, FlowEdge, and pulse/setStatus effects',
+    body: `# diagram/arch
+- **Default architecture mode**: compose \`<BoardZone>\`, \`<ClusterBox cloud="aws|gcp|cloudflare|kubernetes">\`, \`<ArchNode icon replicas metric status fill="solid">\`, \`<Database engine role storage>\`, \`<QueuePipe engine partitions lag messages>\`, and \`<CacheNode engine hitRate ttl>\` with Flex/Grid for crisp, intentional reading flow.
+- **Custom nesting**: \`ArchNode\`, \`ClusterBox\`, \`BoardZone\`, and \`DeviceFrame\` render arbitrary \`children\` so you can embed any widget, metric, or cross-plugin component inside a node.
+- **\`<FlowEdge id from to route="curve|straight|elbow|arc" fromSide toSide label protocol state dashed bidirectional />\`**: measures real \`data-jid\` coordinates inside its parent container; automatically renders hand-drawn Rough.js strokes in \`sketch\` / \`diagram:sketch\` themes.
+- **Step Effects**: \`pulse('edge_id', { label, tone, reverse, durationMs })\` sends an animated packet along a \`FlowEdge\`; \`setStatus('node_id', 'healthy|active|hot|degraded|down|cached')\` updates node health state across steps.`,
+  },
+  whiteboard: {
+    description: '10-pose hand-drawn StickFigures, tilted StickyNotes, SpeechBubbles, Callouts, and DeviceFrames',
+    body: `# diagram/whiteboard
+- \`<StickFigure pose="standing|coding|thinking|pointing|happy|confused|running|presenting|admin|team" label role tone size />\`.
+- \`<StickyNote title text author color="yellow|pink|mint|sky|lavender|peach" tilt pin w />\` (supports arbitrary children).
+- \`<SpeechBubble text speaker kind="speech|thought|shout" tail="left|right|bottom|top" tone />\`.
+- \`<Callout label detail kind="badge|stamp|warning|idea" tone />\`.
+- \`<DeviceFrame kind="browser|terminal|phone|tablet|laptop|server" title badge w>\` wraps any icons, nodes, or UI screens.`,
+  },
+  'dsa-flow': {
+    description: 'Data structures (ArrayStrip, LinkedList, StackQueue, HashTable, MatrixGrid), FlowNode diamonds, ERTable, and SwimLane',
+    body: `# diagram/dsa-flow
+- **Data Structures**: \`<ArrayStrip label meta>\` + \`<ArrayCell value index pointer state="idle|active|compare|swap|sorted|pivot" />\`, \`<LinkedList>\` + \`<ListNode value tag state />\`, \`<StackQueue kind="stack|queue" items />\`, \`<HashTable buckets />\`, \`<MatrixGrid rows highlight />\`.
+- **Flowcharts & Swimlanes**: \`<FlowNode shape="start|process|decision|io|end" label sub tone fill="solid" />\` (true SVG diamond & parallelogram) inside \`<SwimLane label tone>\`, connected by \`<FlowEdge />\`.
+- **ER Data Models**: \`<ERTable id name engine>\` + \`<ERField name type pk fk nullable />\` connected by \`<FlowEdge label="1 : N" />\`.`,
+  },
+};

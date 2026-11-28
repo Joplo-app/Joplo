@@ -1,4 +1,5 @@
-import { component, type Bind } from '@joplo-app/kit/node';
+import type { TimeSpan } from './time-lanes.ts';
+import { component, createNode, Custom, type Bind, type JNode } from '@joplo-app/kit/node';
 import type { JoploProps } from '@joplo-app/kit/plugin';
 const c = (name: string) => component(name, '@joplo-app/plugin-diagram') as unknown as (props: JoploProps) => any;
 // ---------- 关系类图表（Joplo 自有，D41 / D69） ----------
@@ -74,3 +75,47 @@ export const Sequence = Object.assign(c('diagram:Sequence') as (p: SequenceProps
   Message: c('diagram:Sequence.Message') as (p: MessageProps) => any,
   Block: c('diagram:Sequence.Block') as (p: BlockProps) => any,
 });
+
+export type { TimeSpan } from './time-lanes.ts';
+export type TimeLanesProps = Common & {
+  domain: readonly [number, number] | Bind;
+  spans: readonly TimeSpan[] | Bind;
+  unit?: string;
+  /** Scripted focus targets when the whole span array comes from state. */
+  spanIds?: readonly string[];
+};
+const timeLanes = c('diagram:TimeLanes');
+
+/** Register span identities before the host indexes scenes and compiles focus effects. */
+export function TimeLanes({ spanIds, ...props }: TimeLanesProps): JNode {
+  const ids = Array.isArray(props.spans) ? props.spans.map(span => span?.id) : spanIds ?? [];
+  const anchors = Array.isArray(ids) ? [...new Set(ids)].filter((id): id is string => typeof id === 'string' && !!id.trim()) : [];
+  return createNode(timeLanes, { ...props, spanIds, children: anchors.map(id => createNode(Custom, { id })) });
+}
+
+// ---------- Manual Architecture, 86 Authentic Tech/Cloud Icons & Whiteboard Primitives ----------
+export const TechIcon = c('diagram:TechIcon');
+export const IconGrid = c('diagram:IconGrid');
+export const BoardZone = c('diagram:BoardZone');
+export const ArchNode = c('diagram:ArchNode');
+export const Database = c('diagram:Database');
+export const QueuePipe = c('diagram:QueuePipe');
+export const CacheNode = c('diagram:CacheNode');
+export const ClusterBox = c('diagram:ClusterBox');
+export const FlowEdge = c('diagram:FlowEdge');
+export const StickFigure = c('diagram:StickFigure');
+export const StickyNote = c('diagram:StickyNote');
+export const SpeechBubble = c('diagram:SpeechBubble');
+export const Callout = c('diagram:Callout');
+export const DeviceFrame = c('diagram:DeviceFrame');
+export const ArrayStrip = c('diagram:ArrayStrip');
+export const ArrayCell = c('diagram:ArrayCell');
+export const LinkedList = c('diagram:LinkedList');
+export const ListNode = c('diagram:ListNode');
+export const StackQueue = c('diagram:StackQueue');
+export const HashTable = c('diagram:HashTable');
+export const MatrixGrid = c('diagram:MatrixGrid');
+export const FlowNode = c('diagram:FlowNode');
+export const ERTable = c('diagram:ERTable');
+export const ERField = c('diagram:ERField');
+export const SwimLane = c('diagram:SwimLane');

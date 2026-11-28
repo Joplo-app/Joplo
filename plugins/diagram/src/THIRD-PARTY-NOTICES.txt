@@ -15,3 +15,10 @@ elkjs 0.12.1 (Eclipse Layout Kernel JavaScript build), EPL-2.0
 Upstream repository: https://github.com/kieler/elkjs
 Upstream npm tarball: https://registry.npmjs.org/elkjs/-/elkjs-0.12.1.tgz
 Used when a diagram explicitly selects layout="elk".
+
+Offline Tech, Cloud, and Kubernetes Brand SVG Marks (src/board/svg-marks.tsx):
+- devicons/devicon (MIT License): https://github.com/devicons/devicon
+- gilbarbara/logos (CC0-1.0 / MIT): https://github.com/gilbarbara/logos
+- simple-icons (CC0-1.0 Public Domain): https://github.com/simple-icons/simple-icons
+- Kubernetes Resource Icons (Apache-2.0): https://github.com/kubernetes/community/tree/master/icons
+All trademarks belong to their respective owners.

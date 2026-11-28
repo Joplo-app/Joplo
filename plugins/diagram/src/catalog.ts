@@ -1,4 +1,5 @@
 export const docs: Record<string, string> = {
+  TimeLanes: 'domain=[start,end], spans=[{id,lane,start,end,label?,status?}], unit="ms". Interval lengths and offsets share a real time scale. Use spanIds to register focus targets when spans is a state binding.',
   Diagram: "h (height, default 420; h=\"100%\" fills a layer), layout: 'tala'|'elk' (default 'tala': D2 TALA 2D architecture layout and orthogonal routing), direction: 'right'|'down' (omit it: chosen to fit the stage), aspect (target width/height), scale (requested native diagram size, default 1, shrinks to fit); architecture / relationship diagram. Layout is computed at compile time, deterministic, and identical in every step: state, when and trace never move nodes. Group nodes by business domain with Diagram.Group. Details: npx joplo skill diagram",
   'Diagram.Group': "id (required when referenced), label, icon (preset: client|service|model|database|queue|storage|external|tool|user|cloud|gateway|lock|network|device|box|brain), tone: gray|blue|green|orange|red|purple|teal, group (parent group id, instead of nesting), pin: 'start'|'end'; nestable; edges may connect to a group; a trace through its nodes highlights it",
   'Diagram.Node': "id (required for edges and trace), label, description (small second line), kind: 'client'|'service'|'model'|'database'|'queue'|'storage'|'external'|'tool'|'user', group (group id, instead of nesting), pin: 'start'|'end' (first / last layer within its group); optional state: 'idle'|'active'|'ok'|'error'|'dim' (omit it: trace() derives state)",
@@ -12,8 +13,40 @@ export const docs: Record<string, string> = {
   'Sequence.Actor': "id (required), label, description, kind (same kinds as Diagram.Node); a participant column",
   'Sequence.Message': "id (recommended for trace), from, to (actor ids; from === to is a self call), label, reply (dashed return), async (open arrow); rows follow source order",
   'Sequence.Block': "label, kind: 'alt'|'opt'|'loop'|'par'|'break'|'critical' (default opt); fragment box around the messages inside it; nestable",
+
+  // ---- Manual Architecture, 86 Authentic Tech/Cloud Icons & Whiteboard Primitives ----
+  TechIcon: 'icon (86 built-in offline tech/cloud/aws/k8s/db/lang/framework/ops logos), variant?=tile|badge|mark, size?, label?, mono?; authentic vector brand logo',
+  IconGrid: 'title?, cols?=8; organized tray container for TechIcon tiles',
+  BoardZone: 'x?, y?, w?, h?, eyebrow?, title?; negative-space camera island anchor inside Canvas',
+  ArchNode: 'label, sub?, kind?=lb|gateway|cdn|firewall|service|worker|cron|cache|queue|pubsub|db|storage|search|dns|client|external, icon?, status?=healthy|active|hot|degraded|down|cached, replicas?, metric?, fill?=solid; rich manual architecture node',
+  Database: 'label, engine?=postgres|mysql|sqlite|mongodb|redis|clickhouse|duckdb|snowflake|aws-dynamodb|aws-rds, role?=primary|replica|sharded|analytics, storage?, fill?=solid; physical 3D cylinder database',
+  QueuePipe: 'label, engine?=kafka|rabbitmq|aws-sqs, partitions?, lag?, messages?; partitioned message queue conveyor',
+  CacheNode: 'label, engine?=redis, hitRate?, ttl?; in-memory cache node with hit-rate gauge',
+  ClusterBox: 'label, cloud?, badge?, tone?=info|accent|ok|warn|violet; dashed VPC/Region/K8s Namespace boundary container',
+  FlowEdge: 'from, to (data-jid ids), route?=curve|straight|elbow|arc, fromSide?, toSide?, bend?, dashed?, bidirectional?, protocol?, label?, state?=idle|active|blocked|cached|error, tone?; DOM-anchored vector connector (supports Rough.js in sketch mode and pulse() animation)',
+  StickFigure: 'pose?=standing|coding|thinking|pointing|happy|confused|running|presenting|admin|team, label?, role?, tone?, size?; Excalidraw-style hand-drawn stick figure actor',
+  StickyNote: 'title?, text?, author?, color?=yellow|pink|mint|sky|lavender|peach, tilt?, pin?, w?; tactile tilted Post-it sticky note',
+  SpeechBubble: 'text?, speaker?, kind?=speech|thought|shout, tail?=left|right|bottom|top, tone?; directional speech or thought bubble',
+  Callout: 'label, detail?, kind?=badge|stamp|warning|idea, tone?; whiteboard stamp, warning, or callout badge',
+  DeviceFrame: 'kind?=browser|terminal|phone|tablet|laptop|server, title?, badge?, w?; lightweight hardware or window container',
+  ArrayStrip: 'label?, meta?, fill?; contiguous indexed array container',
+  ArrayCell: 'value, index?, pointer?, state?=idle|active|compare|swap|sorted|pivot; indexed array cell with pointer badge',
+  LinkedList: 'label?; linked list container with NULL terminator',
+  ListNode: 'value, tag?, state?=idle|active; single linked-list node',
+  StackQueue: 'kind?=stack|queue, label?, items?; LIFO stack or FIFO queue container',
+  HashTable: 'label?, buckets: [{slot, entries}]; hash map with collision chain buckets',
+  MatrixGrid: 'label?, rows, highlight?, cellSize?; 2D grid / DP table',
+  FlowNode: 'shape?=start|process|decision|io|end, label, sub?, tone?, fill?; classic flowchart node (SVG diamond, IO parallelogram, pill)',
+  ERTable: 'name, engine?, fill?; entity-relationship database schema card',
+  ERField: 'name, type, pk?, fk?, nullable?; single database column field row',
+  SwimLane: 'label, tone?; actor or phase swimlane container',
 };
 export const examples: Record<string, string> = {
+  TimeLanes: `<TimeLanes id="waterfall" domain={[0, 300]} spans={[
+  { id: 'auth', lane: 'Gateway', start: 0, end: 40, label: 'Auth', status: 'ok' },
+  { id: 'fetch', lane: 'Storage', start: 20, end: 220, label: 'Read' },
+]} />
+// In a step: highlight('auth'), callout('auth', '40 ms'), or shot('auth')`,
   // 关系类图表（D69）：npx joplo components Diagram / Sequence / StateMachine 也给一个能直接用的例子；分组、布局、取景的细节在 npx joplo skill diagram
   Diagram: `<Diagram id="arch" direction="right" h={420}>
   <Diagram.Group id="g_gw" label="Gateway" icon="gateway" tone="blue">
