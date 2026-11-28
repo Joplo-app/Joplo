@@ -76,4 +76,4 @@ Example, scoped to one known option:
 - Authentication failures (exit 3) need the correct owner login/API key; never silently switch accounts. Invalid responses, quota errors and missing shares are failures, not approval. If the project CLI lacks these commands, check its version before changing the environment.
 
 Related topics: selection, check, publish
-<!-- joplo-skill 0.8.2 sha256:354a8cf3721e244570a786675cb343051f5de6b522a0f6045bb770cae13c1912 -->
+<!-- joplo-skill 0.9.0 sha256:354a8cf3721e244570a786675cb343051f5de6b522a0f6045bb770cae13c1912 -->

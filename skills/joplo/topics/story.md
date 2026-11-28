@@ -128,4 +128,4 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Tell the user which cases have no expected result yet and which options do not cover a high-priority case.
 
 Related topics: authoring, cases, demo, focus
-<!-- joplo-skill 0.8.2 sha256:0eae25ab9f162fa395c69f7cb11d7a2b884afb673020bbb5bfe06eabb0823169 -->
+<!-- joplo-skill 0.9.0 sha256:0eae25ab9f162fa395c69f7cb11d7a2b884afb673020bbb5bfe06eabb0823169 -->

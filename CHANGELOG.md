@@ -1,5 +1,13 @@
 # 更新日志
 
+## 0.9.0
+
+- **破坏性变更 & 新增叙事可视化插件（`@joplo-app/plugin-viz`）**：十三个包统一版本发行；新增第一方叙事数据可视化插件 `@joplo-app/plugin-viz`，统一提供 10 类图表组件（`DeltaBar`、`BarChart`、`RatioBar`、`LineChart`、`TimeLanes`、`ScatterPlot`、`Heatmap`、`Sankey`、`Waterfall`、`Radar`）与编译期确定性快照（`focusDatum` / `revealTo` / `setCursor` / `pinBaseline`）。原 `@joplo-app/plugin-ui` 的 `RatioBar` 与 `@joplo-app/plugin-diagram` 的 `TimeLanes` 统一迁入 `@joplo-app/plugin-viz`（PR #132）。
+- **多插件组合发现与创作引导**：`@joplo-app/kit` 扩展 `role` / `bestFor` / `pairsWith` 组件角色与配对元数据；`joplo skill install` 自动合成 `joplo-plugins/SKILL.md`（按表达意图分组的视觉调色盘、跨插件组合与伴生插件雷达），`joplo components` 按角色分组展示，并新增低噪声 `STAGE_RAW_HTML_HEAVY` / `WORK_TEXT_ONLY_STAGE` 开发提示（PR #132）。
+- **Diagram 白板自动布线、引擎 `callout()` 避障与快进切场**：`FlowEdge` 支持程序化避障路由与长标签自动拉长通道，`ArchNode` 增加柔和外框；引擎 `callout()` 自动避让画面障碍；播放器场景末步按 `→` 可直接切入下一场景（PR #132）。
+- **反微位移叙事校验**：新增 `CAMERA_DRIFT_ONLY` 与 `NARRATION_STATIC_BEAT` 诊断，并将 `film` 静止检测默认阈值调整为 `3000ms`，引导用渐进舞台内容代替微位移维持旁白节奏（PR #132）。
+- **无白屏热更新与连续本地评审**：本地审阅支持 `joplo:review` 实时推送与草稿无感重绑；`joplo dev` 将 Vite 断连改为同版本原位软重连，拦截项目/插件误发的 `full-reload`，修复项目新增 Tailwind 类名热更新，并在插件运行时热更新期间保留旧版画面实现零闪烁原子切换（PR #132）。
+
 ## 0.8.2
 
 - **本地评审闭环**：新增 `joplo feedback reply --local --event <session:seq> --status <addressed|deferred|declined> [--scenario <id> --position <n>] [--note <text>]`，看板评审浮层展示结构化回执并支持一键跳至复核场景与步骤（含 10 语种界面文案，PR #131）。

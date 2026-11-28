@@ -97,4 +97,4 @@ A project theme is themes/<name>.css selected by config({ theme: '<name>' }). De
 - Custom themes live in themes/<name>.css and define --jp-* tokens; do not change authored data to recolor a view. For component-specific layout, motion and visual variables, read its installed plugin skill.
 
 Related topics: authoring, plugins, focus, review, publish
-<!-- joplo-skill 0.8.2 sha256:b561b99c6218b8c7b6c63091853a633d4e8f059b51d482fdedc31d0e24d8db34 -->
+<!-- joplo-skill 0.9.0 sha256:b561b99c6218b8c7b6c63091853a633d4e8f059b51d482fdedc31d0e24d8db34 -->

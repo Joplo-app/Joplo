@@ -1161,10 +1161,10 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 6. joplo components inspects only the enabled manifests; a named query gives that component's declarations and example. For full recipes/behavior read its plugin skill.
 
 ## Optional 3D
-The starter does not include 3D or its large browser dependency. To add it: npm install @joplo-app/plugin-3d@0.8.2; default-import scene3d from that package in joplo.config.ts, add scene3d to config.plugins, then run npx joplo skill install. Read npx joplo skill scene3d, scene3d/models and scene3d/generation for rendering, existing assets and optional local generation. A key is unnecessary for existing assets; dry-run before approving any generation.
+The starter does not include 3D or its large browser dependency. To add it: npm install @joplo-app/plugin-3d@0.9.0; default-import scene3d from that package in joplo.config.ts, add scene3d to config.plugins, then run npx joplo skill install. Read npx joplo skill scene3d, scene3d/models and scene3d/generation for rendering, existing assets and optional local generation. A key is unnecessary for existing assets; dry-run before approving any generation.
 
 ## Optional Data Visualization
-For narrative quantitative charts, before/after comparisons, part-to-whole ratios, trends, multi-lane timelines, Pareto frontiers, heatmaps, Sankey flows, attribution waterfalls, and radar profiles: npm install @joplo-app/plugin-viz@0.8.2; default-import viz from that package in joplo.config.ts, add viz to config.plugins, then run npx joplo skill install. Read npx joplo skill viz, viz/components and viz/recipes before hand-rolling chart bars or abusing RatioBar for before/after deltas.
+For narrative quantitative charts, before/after comparisons, part-to-whole ratios, trends, multi-lane timelines, Pareto frontiers, heatmaps, Sankey flows, attribution waterfalls, and radar profiles: npm install @joplo-app/plugin-viz@0.9.0; default-import viz from that package in joplo.config.ts, add viz to config.plugins, then run npx joplo skill install. Read npx joplo skill viz, viz/components and viz/recipes before hand-rolling chart bars or abusing RatioBar for before/after deltas.
 
 ## Errors and trust
 - UNKNOWN_PLUGIN: the element's author package is not enabled. Use its package provenance in the diagnostic to install/import it and add it to config.plugins. UNKNOWN_COMPONENT: no enabled manifest declares that element or intrinsic tag; read the installed catalogs.
