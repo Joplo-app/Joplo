@@ -9,7 +9,7 @@ It is not a feature tour. Plan it in a few lines before writing TSX, show the pl
 Joplo exists to demonstrate product behavior with visuals and motion. It is not a PPT tool: a demo made of text cards and bullet lists has failed, however good the text.
 - Every step = Action (a click, typing, an incoming message, a system event) → Reaction (a new row, a status, a toast, a trace, an object moving) → Meaning (why this change matters to the user's goal or mental model). Skipping Meaning leaves viewers watching clicks without knowing what was proved.
 - Match the narrative spine to the job: product demos follow user state change (Context → Problem → target Outcome → Workflow → edge Behavior → open Decision); explainers build a mental model (shared premise AND → misconception or bottleneck BUT → mechanism & new trade-off THEREFORE, never a paper's Intro/Method/Results table of contents).
-- Show, do not tell: a claim like 'invites are fast' becomes the invite happening on screen; 'the queue absorbs spikes' becomes trace() through the queue while the UI stays responsive.
+- Show, do not tell: a claim like 'invites are fast' becomes the invite happening on screen; 'the queue absorbs spikes' becomes animated flow packets or a trace through the queue while the UI stays responsive.
 - On-screen writing has a supporting role: captions narrate what is on screen, explain() says why it matters, cards only open, close, jump in time, or switch roles.
 - Pick the visual by what you prove: UI flow → the product screens; who calls whom → the diagram plugin; time order → sequence view; lifecycle → lifecycle view; two answers → options A/B on the same scenario.
 Slide version (wrong): the same points as cards, nothing to operate, nothing changes.
@@ -29,7 +29,7 @@ flow('Invite a teammate', { start: '/members' })
   .card('Now Leo', { role: 'leo' })
   .click('mail_join', 'Leo opens the link and lands in the space', go('/space'), done('Leo joins the same day'))
 ```
-Backend behind the same feature: put a diagram component in its own layer and .system('Send mail', 'The mail job runs in the background', trace('api', 'queue', 'mailer'), shot('mailer')); a failure is trace.fail('queue', 'mailer') plus the error the user sees. Full examples: examples/invite, examples/agent-arch.
+Backend behind the same feature: put a diagram layer alongside the UI (prefer intentional manual composition with edge flow pulses and node status updates; use opt-in auto-layout trace() for dense graphs or sequences — see npx joplo skill diagram), then drive it in .system('Send mail', 'The mail job runs in the background', ...) and show the failure plus the error the user sees. Full examples: examples/invite, examples/agent-arch.
 
 ## 2. Plan the demo first (write it in your reply; ask only questions that change it, each with a default)
 - Audience: who watches (product review, design review, a customer, engineers) and what they must decide afterward.
@@ -127,4 +127,4 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Tell the user which cases have no expected result yet and which options do not cover a high-priority case.
 
 Related topics: authoring, cases, demo, focus
-<!-- joplo-skill 0.8.1 sha256:b55c9fa5631518037d55fbe257de2fb55c0c386c863ed321b74c1d4ae196e323 -->
+<!-- joplo-skill 0.8.1 sha256:247fe0ae66373e2cdb96feb258a477349b3d39e9da38c7bd1161f42b18c4ada5 -->

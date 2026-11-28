@@ -35,11 +35,11 @@
 - Show the naive mental model concretely on stage first (for example, a tentative box `"缓存整句回答？"`).
 - Trigger one concrete counter-case (a slightly different follow-up token or second run) that visibly breaks the naive model, cross it out or morph it away, and reveal the true mechanism in the same spatial slot.
 
-### E. Coupled UI Layer + TALA Architecture Layer
+### E. Coupled UI Layer + Intentional Architecture Layer
 *Best for: end-to-end product architecture walkthroughs where user experience and backend topology both matter.*
 - Layer 1 (`ui`): the real user-facing surface (`@joplo-app/plugin-ui`).
-- Layer 2 (`arch`): `<Diagram>` (using default `layout="tala"` 2D domain groups) or `<Sequence>`.
-- Switch layers only at causal boundaries: user acts on `ui` → switch to `arch` and `trace('gateway', 'worker', 'db')` (with a silent observation beat if the trace crosses multiple domains) → return to `ui` to land the user-visible consequence.
+- Layer 2 (`arch`): **Default** — manual architecture composition (`<BoardZone>`, `<ClusterBox>`, `<ArchNode>`, `<Database>`, `<QueuePipe>`, `<CacheNode>`, `<FlowEdge>`) animated with `pulse('edge_id')` and `setStatus('node_id', 'hot' | 'down' | 'healthy')`, or `<Sequence>` for strict time-ordered hops. Reserve opt-in auto-layout `<Diagram>` + `trace()` for dense 15+ node topologies where manual wiring is impractical.
+- Switch layers only at causal boundaries: user acts on `ui` → switch to `arch` and drive `pulse()` / `setStatus()` (or `trace()` on `<Sequence>` / opt-in `<Diagram>`, with a silent observation beat across multi-hop paths) → return to `ui` to land the user-visible consequence.
 
 ### F. Operator Fusion & Parallel Rail Decoupling
 *Best for: algebraic folding (matrix absorption, kernel fusion, constant folding), compiler passes, and decoupling a blocking constraint (such as splitting dynamic RoPE off a static content path).*

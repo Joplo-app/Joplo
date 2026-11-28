@@ -14,7 +14,7 @@ description: >-
 
 Turn abstract claims, formulas, rules, and system mechanics into **spatial structure + continuous object evolution** so a viewer understands causality by watching the stage, even with subtitles muted.
 
-This skill sits between narrative planning (`product-demo-director` or `explainer-director`) and Joplo TSX authoring (`joplo` + enabled plugin skills). Do not write `<Canvas>`, `<Diagram>`, `<Sequence>`, or `<StateMachine>` TSX for a complex piece until every beat has a concrete spatial-kinetic mapping under the five invariants below.
+This skill sits between narrative planning (`product-demo-director` or `explainer-director`) and Joplo TSX authoring (`joplo` + enabled plugin skills). Do not write `<Canvas>`, architecture board (`<ArchNode>`/`<FlowEdge>`), `<Diagram>`, `<Sequence>`, or `<StateMachine>` TSX for a complex piece until every beat has a concrete spatial-kinetic mapping under the five invariants below.
 
 ## 1. Pure-Geometry Void Stage — Never Build a "SaaS Dashboard" or Bento Slide
 
@@ -29,7 +29,7 @@ Instead, compose like a technical motion designer (pure dark or warm-paper void,
 |---|---|---|
 | **Network depth, queues, or pipelines** ("how a pass traverses stages or loops") | Stack of thin bars/slots + a single glowing specimen pill (`motion="probe"`) physically traveling through them and looping along an SVG arc | Four bordered dashboard cards saying "Input / Compute / Output" |
 | **Per-item compute budget or attention weight** ("easy vs hard tokens, resource allocation") | The actual words/items in a clean row with `1` vs `4` glowing dots (`•`) or proportional ticks directly underneath each item | Formulas or text badges (`"O(N) adaptive compute"`) |
-| **Domain boundaries & service calls** ("what talks to what") | `<Diagram>` (D2 TALA 2D domain clusters) + per-step `trace()` / `trace.fail()` | Bullet list of architecture layers |
+| **Domain boundaries & service calls** ("what talks to what") | **Default**: intentional manual architecture board (`<BoardZone>`/`<ClusterBox>`/`<ArchNode>`/`<Database>`/`<QueuePipe>` + `<FlowEdge>` + `pulse()` / `setStatus()` + authentic `<TechIcon>`s); opt-in auto-layout `<Diagram>` + `trace()` only for dense 15+ node graphs | Bullet list of architecture layers |
 | **Time-ordered request/reply** ("in what exact order hops occur") | `<Sequence>` with actors as columns and numbered messages traced row by row | Static prose paragraph describing step 1, step 2, step 3 |
 | **Entity lifecycle & guard conditions** | `<StateMachine>` bound to state + transition highlights | Status badge table with text descriptions |
 | **Trade-offs & scaling laws** ("weights stay flat while depth grows", "space vs time") | Side-by-side minimalist towers or coupled zero-anchored bars where one bar stays **locked** while the other grows | A two-column "Pros / Cons" card |
@@ -65,7 +65,7 @@ Follow strict visual restraint: every movement consumes the viewer's entire atte
 
 Continuous narration during complex visual transitions overloads phonological and visual working memory simultaneously.
 
-Insert an **observation window** whenever a beat contains multi-element FLIP flights, a multi-hop `trace()`, a state reversal, or a counter-intuitive proportional shift:
+Insert an **observation window** whenever a beat contains multi-element FLIP flights, multi-hop `pulse()` or `trace()` flows, a state reversal, or a counter-intuitive proportional shift:
 1. **Lead-in beat (orient & point)**: use a short spoken cue telling the viewer *where* to look and *what* to watch for (for example, `"注意看右侧显存槽：旧词元的 K 和 V 会发生什么。"`).
 2. **Silent observation beat (`narrate(false)` + `hold(1.8–3.0)`)**: trigger the visual transformation with **no spoken audio**, letting the viewer's eyes follow the flight, lock-in, and meter shift uninterrupted. Keep a concise step title (`≤ 16` CJK chars) for orientation.
 3. **Payoff beat (conclude)**: once the visual settles, resume narration to name the takeaway or introduce the next tension (`"旧的纹丝不动，只有新词元算了一次——这就是复用。但代价在下面……"`).

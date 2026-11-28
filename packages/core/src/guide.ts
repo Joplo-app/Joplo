@@ -249,7 +249,7 @@ It is not a feature tour. Plan it in a few lines before writing TSX, show the pl
 Joplo exists to demonstrate product behavior with visuals and motion. It is not a PPT tool: a demo made of text cards and bullet lists has failed, however good the text.
 - Every step = Action (a click, typing, an incoming message, a system event) → Reaction (a new row, a status, a toast, a trace, an object moving) → Meaning (why this change matters to the user's goal or mental model). Skipping Meaning leaves viewers watching clicks without knowing what was proved.
 - Match the narrative spine to the job: product demos follow user state change (Context → Problem → target Outcome → Workflow → edge Behavior → open Decision); explainers build a mental model (shared premise AND → misconception or bottleneck BUT → mechanism & new trade-off THEREFORE, never a paper's Intro/Method/Results table of contents).
-- Show, do not tell: a claim like 'invites are fast' becomes the invite happening on screen; 'the queue absorbs spikes' becomes trace() through the queue while the UI stays responsive.
+- Show, do not tell: a claim like 'invites are fast' becomes the invite happening on screen; 'the queue absorbs spikes' becomes animated flow packets or a trace through the queue while the UI stays responsive.
 - On-screen writing has a supporting role: captions narrate what is on screen, explain() says why it matters, cards only open, close, jump in time, or switch roles.
 - Pick the visual by what you prove: UI flow → the product screens; who calls whom → the diagram plugin; time order → sequence view; lifecycle → lifecycle view; two answers → options A/B on the same scenario.
 Slide version (wrong): the same points as cards, nothing to operate, nothing changes.
@@ -269,7 +269,7 @@ flow('Invite a teammate', { start: '/members' })
   .card('Now Leo', { role: 'leo' })
   .click('mail_join', 'Leo opens the link and lands in the space', go('/space'), done('Leo joins the same day'))
 \`\`\`
-Backend behind the same feature: put a diagram component in its own layer and .system('Send mail', 'The mail job runs in the background', trace('api', 'queue', 'mailer'), shot('mailer')); a failure is trace.fail('queue', 'mailer') plus the error the user sees. Full examples: examples/invite, examples/agent-arch.
+Backend behind the same feature: put a diagram layer alongside the UI (prefer intentional manual composition with edge flow pulses and node status updates; use opt-in auto-layout trace() for dense graphs or sequences — see npx joplo skill diagram), then drive it in .system('Send mail', 'The mail job runs in the background', ...) and show the failure plus the error the user sees. Full examples: examples/invite, examples/agent-arch.
 
 ## 2. Plan the demo first (write it in your reply; ask only questions that change it, each with a default)
 - Audience: who watches (product review, design review, a customer, engineers) and what they must decide afterward.
@@ -704,7 +704,7 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED: from must name another scenario key in the same work, the dependency must not loop, and the preceding scenario must replay successfully. Fix that scenario first.
 - FROM_WITH_START: from already determines the starting route; remove start or start a separate story.
 - LAYER_UNKNOWN: Invalid layer key, missing content, or flow('Slice title', { layer }) names no declared layer. Use letters/digits/underscores/hyphens, do not start with @, and provide nonempty JSX.
-- Every node belongs to a domain group; 2–6 groups, ~3–15 nodes per diagram. One group around everything says nothing (check reports PLUGIN_UNGROUPED).
+- In opt-in auto-layout diagrams, every node belongs to a domain group (2–6 groups; one group around everything reports PLUGIN_UNGROUPED). For curated 3–14 node architectures, prefer intentional manual composition and explicit connectors (see npx joplo skill diagram).
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
 - Node kind: client, service, model, database, queue, storage, external, tool, user. description says the responsibility in a few words; edge label says what flows.
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
@@ -714,7 +714,7 @@ Read the relevant installed plugin skill for the visual component, its props and
 - PLUGIN_EDGE_INTO_OWN_GROUP: An edge connects an element to a group that contains it. Connect to an element inside, or to another group.
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
-- PLUGIN_LAYOUT_FAILED (warning): The automatic layout failed and the diagram shows a simple grid. Check its edges and groups; report it if they look right.
+- PLUGIN_LAYOUT_FAILED (warning): An opt-in automatic layout failed and fell back to a simple grid. Check its edges and groups, or switch to intentional manual composition.
 - THEME_UNKNOWN: config({ theme }) names neither a built-in nor themes/<name>.css. Use a built-in or add that CSS file; see Write a theme in demo.
 - ELEMENT_PROP: A component prop contains JSX. Use strings for icons, such as leftSection="+", and children for content.
 - ASSUMPTION_CONFIRMED: Keep AI assumptions \`pending\`. After user confirmation, record the actual origin; do not change only status.

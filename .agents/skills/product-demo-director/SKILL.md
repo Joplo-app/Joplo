@@ -36,7 +36,7 @@ Anchor the narrative on the six-layer funnel (trim lower layers only when the ar
 2. **Problem (阻力)** — Where does the current workflow stall, fail, or waste attention?
 3. **Outcome (目标体验)** — What does the world look like once solved? Show or state the target end-state early (Working Backwards) so every subsequent UI element has a clear reason to exist.
 4. **Workflow (主流程)** — The thin, concrete end-to-end path from trigger to visible outcome.
-5. **Behavior (系统响应与边界)** — Async states, permissions, retries, timeouts, duplicates, and cross-system `trace()`s (`mock()` + `response()` written once and exercised across `flow({ api })` slices).
+5. **Behavior (系统响应与边界)** — Async states, permissions, retries, timeouts, duplicates, and cross-system architecture flows (`pulse()` / `setStatus()` on manual boards, or `trace()` on sequences / opt-in diagrams; `mock()` + `response()` written once and exercised across `flow({ api })` slices).
 6. **Decision (待拍板分歧)** — Explicit `question()` items or A/B trade-offs that require human sign-off.
 
 **Time budget rule**: Never spend equal seconds on every step. Skip or compress low-information mechanics (login, opening menus, boilerplate form fields); spend 60%+ of dwell time on contested business rules, high-risk state transitions, and recovery behavior.
@@ -46,10 +46,10 @@ Anchor the narrative on the six-layer funnel (trim lower layers only when the ar
 Every step or tight 2-step beat in a product demo must close all three links:
 
 - **Action**: What the user or external trigger concretely did (`.click`, `.type`, incoming webhook/timeout).
-- **Reaction**: How interface and system state visibly changed (`set`, `push`, `toast`, `trace`, status transition).
+- **Reaction**: How interface and system state visibly changed (`set`, `push`, `toast`, `pulse` / `setStatus` / `trace`, status transition).
 - **Meaning**: *Why this change matters to the user or business rule* — expressed concisely via `explain()`, `narrate()`, or an unmistakable on-screen consequence (for example, `"人工确认后任务从断点继续，无需重跑前四步"`), never parroting `"用户点击了批准按钮"`.
 
-When a system transition is visually rich (multi-service `trace()`, state-machine guard, or cross-role handoff), apply `visual-explanation`: cue where to look, hold a brief `narrate(false)` observation beat while the transition plays out, then state the meaning.
+When a system transition is visually rich (multi-service `pulse()` / `trace()`, state-machine guard, or cross-role handoff), apply `visual-explanation`: cue where to look, hold a brief `narrate(false)` observation beat while the transition plays out, then state the meaning.
 
 ## 4. Pre-Code Planning Contract (Lightweight Beat Brief)
 

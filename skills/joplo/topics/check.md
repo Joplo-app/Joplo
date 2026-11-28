@@ -94,7 +94,7 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED: from must name another scenario key in the same work, the dependency must not loop, and the preceding scenario must replay successfully. Fix that scenario first.
 - FROM_WITH_START: from already determines the starting route; remove start or start a separate story.
 - LAYER_UNKNOWN: Invalid layer key, missing content, or flow('Slice title', { layer }) names no declared layer. Use letters/digits/underscores/hyphens, do not start with @, and provide nonempty JSX.
-- Every node belongs to a domain group; 2–6 groups, ~3–15 nodes per diagram. One group around everything says nothing (check reports PLUGIN_UNGROUPED).
+- In opt-in auto-layout diagrams, every node belongs to a domain group (2–6 groups; one group around everything reports PLUGIN_UNGROUPED). For curated 3–14 node architectures, prefer intentional manual composition and explicit connectors (see npx joplo skill diagram).
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
 - Node kind: client, service, model, database, queue, storage, external, tool, user. description says the responsibility in a few words; edge label says what flows.
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
@@ -104,7 +104,7 @@ Read the relevant installed plugin skill for the visual component, its props and
 - PLUGIN_EDGE_INTO_OWN_GROUP: An edge connects an element to a group that contains it. Connect to an element inside, or to another group.
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
-- PLUGIN_LAYOUT_FAILED (warning): The automatic layout failed and the diagram shows a simple grid. Check its edges and groups; report it if they look right.
+- PLUGIN_LAYOUT_FAILED (warning): An opt-in automatic layout failed and fell back to a simple grid. Check its edges and groups, or switch to intentional manual composition.
 - THEME_UNKNOWN: config({ theme }) names neither a built-in nor themes/<name>.css. Use a built-in or add that CSS file; see Write a theme in demo.
 - ELEMENT_PROP: A component prop contains JSX. Use strings for icons, such as leftSection="+", and children for content.
 - ASSUMPTION_CONFIRMED: Keep AI assumptions `pending`. After user confirmation, record the actual origin; do not change only status.
@@ -136,4 +136,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.8.1 sha256:7a62e39e5db86abb25bb36b9b19e307e11840ebe99c6c266dff6f2609331dc5e -->
+<!-- joplo-skill 0.8.1 sha256:cd2da5d5bdf553ed47cb0929c548e2eca5b318011cfa342a8ee7ba0ae113e819 -->
